@@ -1,23 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Comentarios para YouTube">
 <defs>
 <linearGradient id="bg-youtube-comentarios" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#151129"/><stop offset="1" stop-color="#0b0918"/>
+<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
 </linearGradient>
-<radialGradient id="halo-youtube-comentarios" cx="0.78" cy="0.18" r="0.75">
-<stop offset="0" stop-color="#FF0000" stop-opacity="0.55"/>
+<radialGradient id="halo-youtube-comentarios" cx="0.5" cy="0.42" r="0.62">
+<stop offset="0" stop-color="#FF0000" stop-opacity="0.42"/>
 <stop offset="1" stop-color="#FF0000" stop-opacity="0"/>
 </radialGradient>
-<linearGradient id="ink-youtube-comentarios" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#FF0000"/><stop offset="1" stop-color="#ff2e93"/>
-</linearGradient>
 </defs>
 <rect width="600" height="400" fill="url(#bg-youtube-comentarios)"/>
 <rect width="600" height="400" fill="url(#halo-youtube-comentarios)"/>
-<circle cx="482" cy="86" r="118" fill="#FF0000" opacity="0.13"/>
-<circle cx="96" cy="332" r="92" fill="#ff2e93" opacity="0.09"/>
-<g transform="translate(56 128) scale(3.4)">
-<path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="url(#ink-youtube-comentarios)"/>
+<g transform="translate(300 200)">
+<circle r="96" fill="#FF0000" opacity="0.14"/>
+<circle r="96" fill="none" stroke="#FF0000" stroke-opacity="0.35" stroke-width="1.5"/>
+<g transform="translate(-52 -52) scale(4.33)">
+<path d="M4 4h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="#FF0000"/>
 </g>
-<text x="56" y="316" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="800" fill="#ffffff">Comentarios</text>
-<text x="56" y="352" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="22" font-weight="600" fill="#FF0000">para YouTube</text>
+</g>
 </svg>

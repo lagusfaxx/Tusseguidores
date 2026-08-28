@@ -73,11 +73,22 @@ export function getPricedTiers(product: ProductWithService): PricedTier[] {
   return getTiers(product.id).map((tier) => priceTier(tier, product, product.rate_usd_per_1000, ctx));
 }
 
-/** Precio "desde" que se muestra en las tarjetas del catálogo. */
+/** Pack más barato del producto. Se usa para el "desde $X" del sitio. */
 export function cheapestTier(product: ProductWithService): PricedTier | null {
   const tiers = getPricedTiers(product);
   if (!tiers.length) return null;
   return tiers.reduce((min, t) => (t.priceClp < min.priceClp ? t : min));
+}
+
+/**
+ * Pack que se muestra en la tarjeta del catálogo: el marcado como popular, que
+ * es el mismo que viene preseleccionado en la ficha. Mostrar siempre el más
+ * chico hacía que media portada repitiera el precio mínimo de la tienda.
+ */
+export function highlightTier(product: ProductWithService): PricedTier | null {
+  const tiers = getPricedTiers(product);
+  if (!tiers.length) return null;
+  return tiers.find((t) => t.popular) ?? tiers[0];
 }
 
 export type PlatformSummary = { platform: string; products: number };

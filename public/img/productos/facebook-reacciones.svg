@@ -1,23 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Reacciones para Facebook">
 <defs>
 <linearGradient id="bg-facebook-reacciones" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#151129"/><stop offset="1" stop-color="#0b0918"/>
+<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
 </linearGradient>
-<radialGradient id="halo-facebook-reacciones" cx="0.78" cy="0.18" r="0.75">
-<stop offset="0" stop-color="#1877F2" stop-opacity="0.55"/>
+<radialGradient id="halo-facebook-reacciones" cx="0.5" cy="0.42" r="0.62">
+<stop offset="0" stop-color="#1877F2" stop-opacity="0.42"/>
 <stop offset="1" stop-color="#1877F2" stop-opacity="0"/>
 </radialGradient>
-<linearGradient id="ink-facebook-reacciones" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#1877F2"/><stop offset="1" stop-color="#ff2e93"/>
-</linearGradient>
 </defs>
 <rect width="600" height="400" fill="url(#bg-facebook-reacciones)"/>
 <rect width="600" height="400" fill="url(#halo-facebook-reacciones)"/>
-<circle cx="482" cy="86" r="118" fill="#1877F2" opacity="0.13"/>
-<circle cx="96" cy="332" r="92" fill="#ff2e93" opacity="0.09"/>
-<g transform="translate(56 128) scale(3.4)">
-<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-3.5 7A1.5 1.5 0 1 1 7 10.5 1.5 1.5 0 0 1 8.5 9Zm7 0A1.5 1.5 0 1 1 14 10.5 1.5 1.5 0 0 1 15.5 9ZM12 18a5.5 5.5 0 0 1-5-3h10a5.5 5.5 0 0 1-5 3Z" fill="url(#ink-facebook-reacciones)"/>
+<g transform="translate(300 200)">
+<circle r="96" fill="#1877F2" opacity="0.14"/>
+<circle r="96" fill="none" stroke="#1877F2" stroke-opacity="0.35" stroke-width="1.5"/>
+<g transform="translate(-52 -52) scale(4.33)">
+<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-3.5 7A1.5 1.5 0 1 1 7 10.5 1.5 1.5 0 0 1 8.5 9Zm7 0A1.5 1.5 0 1 1 14 10.5 1.5 1.5 0 0 1 15.5 9ZM12 18a5.5 5.5 0 0 1-5-3h10a5.5 5.5 0 0 1-5 3Z" fill="#1877F2"/>
 </g>
-<text x="56" y="316" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="800" fill="#ffffff">Reacciones</text>
-<text x="56" y="352" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="22" font-weight="600" fill="#1877F2">para Facebook</text>
+</g>
 </svg>

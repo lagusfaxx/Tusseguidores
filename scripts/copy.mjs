@@ -206,6 +206,24 @@ const FAQ_COMMON = (p, t) => [
   },
 ];
 
+/** Frase de la tarjeta del catálogo: una por tipo, para que no se repitan. */
+const CARD_LINE = {
+  seguidores: () => `Suman a tu cuenta sin que des la clave.`,
+  suscriptores: (p) => `De a poco, para que ${p} no lo note raro.`,
+  miembros: () => `Para que quien llegue vea movimiento.`,
+  likes: () => `Llegan a los minutos y ayudan a que el post circule.`,
+  reacciones: () => `Se reparten en la publicación para que se vea activa.`,
+  vistas: () => `La métrica que más pesa para que el video siga saliendo.`,
+  reproducciones: () => `Escuchas repartidas en varios días.`,
+  comentarios: () => `Comentarios en español, escritos por personas.`,
+  compartidos: () => `Sacan tu contenido de tu círculo de siempre.`,
+  guardados: () => `De las señales que más valora el algoritmo.`,
+  historias: () => `Te suben en la barra de historias.`,
+  "en-vivo": () => `Espectadores durante todo el stream, no solo al principio.`,
+  votos: () => `Votos en la opción que elijas.`,
+  trafico: () => `Visitas reales, de distintos países y dispositivos.`,
+};
+
 export function buildCopy({ platform, type }) {
   const p = PLATFORM_LABEL[platform] ?? platform;
   const t = TYPE_LABEL[type] ?? type;
@@ -246,7 +264,7 @@ export function buildCopy({ platform, type }) {
   return {
     name,
     slug,
-    shortDescription: `${t} para ${p} con entrega automática, sin contraseña y con precios en pesos chilenos.`,
+    shortDescription: (CARD_LINE[type] ?? CARD_LINE.seguidores)(p),
     descriptionHtml,
     bullets,
     faq: FAQ_COMMON(p, t),

@@ -6,7 +6,7 @@ import { PlatformIcon } from "./icons";
 
 export function SiteHeader() {
   const settings = getSettings();
-  const platforms = sortPlatforms(getPlatformsWithProducts()).slice(0, 7);
+  const platforms = sortPlatforms(getPlatformsWithProducts()).slice(0, 5);
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/8 bg-ink-950/85 backdrop-blur-md">
@@ -25,7 +25,7 @@ export function SiteHeader() {
             <Link
               key={p.platform}
               href={`/${p.platform}`}
-              className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm text-ink-200 transition-colors hover:bg-white/6 hover:text-white"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-2 text-sm text-ink-200 transition-colors hover:bg-white/6 hover:text-white"
             >
               <PlatformIcon slug={p.platform} className="h-4 w-4" />
               {platformLabel(p.platform)}
@@ -34,11 +34,14 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          <Link href="/seguimiento" className="hidden rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white sm:block">
+          <Link
+            href="/seguimiento"
+            className="hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white sm:block"
+          >
             Mi pedido
           </Link>
-          <Link href="/#catalogo" className="btn btn-primary px-4 py-2 text-sm">
-            Comprar ahora
+          <Link href="/catalogo" className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm">
+            Ver precios
           </Link>
         </div>
       </div>

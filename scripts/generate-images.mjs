@@ -43,28 +43,27 @@ function cover({ platform, type }) {
   const glyph = GLYPH[type] ?? GLYPH.seguidores;
   const id = `${platform}-${type}`;
 
+  // Sin texto: la tarjeta ya muestra el nombre del producto justo debajo, y
+  // repetirlo sobre la imagen se ve a relleno.
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="${esc(subtitle)} para ${esc(title)}">
 <defs>
 <linearGradient id="bg-${id}" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#151129"/><stop offset="1" stop-color="#0b0918"/>
+<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
 </linearGradient>
-<radialGradient id="halo-${id}" cx="0.78" cy="0.18" r="0.75">
-<stop offset="0" stop-color="${color}" stop-opacity="0.55"/>
+<radialGradient id="halo-${id}" cx="0.5" cy="0.42" r="0.62">
+<stop offset="0" stop-color="${color}" stop-opacity="0.42"/>
 <stop offset="1" stop-color="${color}" stop-opacity="0"/>
 </radialGradient>
-<linearGradient id="ink-${id}" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="#ff2e93"/>
-</linearGradient>
 </defs>
 <rect width="600" height="400" fill="url(#bg-${id})"/>
 <rect width="600" height="400" fill="url(#halo-${id})"/>
-<circle cx="482" cy="86" r="118" fill="${color}" opacity="0.13"/>
-<circle cx="96" cy="332" r="92" fill="#ff2e93" opacity="0.09"/>
-<g transform="translate(56 128) scale(3.4)">
-<path d="${glyph}" fill="url(#ink-${id})"/>
+<g transform="translate(300 200)">
+<circle r="96" fill="${color}" opacity="0.14"/>
+<circle r="96" fill="none" stroke="${color}" stroke-opacity="0.35" stroke-width="1.5"/>
+<g transform="translate(-52 -52) scale(4.33)">
+<path d="${glyph}" fill="${color}"/>
 </g>
-<text x="56" y="316" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="800" fill="#ffffff">${esc(subtitle)}</text>
-<text x="56" y="352" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="22" font-weight="600" fill="${color}">para ${esc(title)}</text>
+</g>
 </svg>`;
 }
 

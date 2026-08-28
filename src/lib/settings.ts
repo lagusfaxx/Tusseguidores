@@ -7,7 +7,7 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   site_name: "TusSeguidores",
   site_domain: "tusseguidores.cl",
   site_url: "https://tusseguidores.cl",
-  site_tagline: "Seguidores, likes y visualizaciones reales para tus redes",
+  site_tagline: "Seguidores, likes y visualizaciones para tus redes, en pesos chilenos",
   site_description:
     "Compra seguidores, likes y visualizaciones para Instagram, TikTok, YouTube y más. Entrega automática en minutos, pago seguro con Webpay y soporte en Chile.",
   contact_email: "hola@tusseguidores.cl",

@@ -138,6 +138,17 @@ const LADDERS = {
   trafico: [1000, 5000, 10000, 25000],
 };
 
+/**
+ * Etiquetas de las tarjetas. Van solo en unos pocos productos: si todas dicen
+ * "más vendido" la etiqueta deja de significar nada.
+ */
+const BADGES = {
+  "instagram/seguidores": "Lo más pedido",
+  "tiktok/vistas": "Barato",
+  "youtube/suscriptores": "Entrega lenta y segura",
+  "instagram/likes": "Llega en minutos",
+};
+
 /** Qué publicamos de entrada. El resto queda importado y oculto. */
 const CURATED = [
   ["instagram", "seguidores", 1], ["instagram", "likes", 1], ["instagram", "vistas", 1],
@@ -282,7 +293,7 @@ const seedProducts = db.transaction(() => {
       seo_description: copy.seoDescription,
       seo_keywords: copy.seoKeywords,
       image_url: `/img/productos/${platform}-${type}.svg`,
-      badge: featured ? "Más vendido" : null,
+      badge: BADGES[`${platform}/${type}`] ?? null,
       min_qty: ladder[0],
       max_qty: service.max_qty,
       link_label: copy.link.label,

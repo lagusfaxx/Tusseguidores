@@ -9,7 +9,7 @@ export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-24 border-t border-white/8 bg-ink-900/60">
+    <footer className="border-t border-white/8 bg-ink-900/60">
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-extrabold">
@@ -18,9 +18,7 @@ export function SiteFooter() {
             </span>
             Tus<span className="-ml-2 text-brand-300">Seguidores</span>
           </div>
-          <p className="mt-4 text-sm leading-relaxed text-ink-400">
-            {s.site_tagline}. Precios en pesos chilenos, entrega automática y soporte por WhatsApp.
-          </p>
+          <p className="mt-4 text-sm leading-relaxed text-ink-400">{s.site_tagline}.</p>
         </div>
 
         <div>
