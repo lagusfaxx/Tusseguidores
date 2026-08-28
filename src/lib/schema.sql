@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS provider_services (
   refill               INTEGER NOT NULL DEFAULT 0,
   cancel               INTEGER NOT NULL DEFAULT 0,
   provider_description TEXT,
+  -- Puntajes de calidad (0-100) con los que la tienda elige a qué servicio
+  -- pedirle cada pedido. Se recalculan en cada importación.
+  refill_days          INTEGER NOT NULL DEFAULT 0,
+  drop_score           INTEGER NOT NULL DEFAULT 50,
+  speed_score          INTEGER NOT NULL DEFAULT 50,
+  -- Región a la que apunta el servicio y subtipo dentro de su categoría.
+  -- Se usan para no enrutar un producto a algo que no le corresponde.
+  geo                  TEXT    NOT NULL DEFAULT 'global',
+  variant              TEXT    NOT NULL DEFAULT '',
   provider_enabled     INTEGER NOT NULL DEFAULT 1,
   last_provider_update TEXT,
   synced_at            TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -29,6 +38,8 @@ CREATE TABLE IF NOT EXISTS provider_services (
 CREATE INDEX IF NOT EXISTS idx_ps_platform ON provider_services(platform, service_type);
 CREATE INDEX IF NOT EXISTS idx_ps_enabled  ON provider_services(provider_enabled);
 CREATE INDEX IF NOT EXISTS idx_ps_rate     ON provider_services(rate_usd_per_1000);
+-- Índice de la consulta que elige el mejor servicio para un producto.
+CREATE INDEX IF NOT EXISTS idx_ps_pick     ON provider_services(platform, service_type, variant, provider_enabled, drop_score, speed_score);
 
 -- Productos publicados en la tienda. Uno apunta a un servicio del proveedor.
 CREATE TABLE IF NOT EXISTS products (
@@ -56,6 +67,13 @@ CREATE TABLE IF NOT EXISTS products (
 
   price_mode          TEXT    NOT NULL DEFAULT 'auto',   -- auto | manual
   margin_override     REAL,                              -- % que reemplaza al margen global
+
+  -- Enrutado automático: el cliente elige el producto y la tienda decide a qué
+  -- servicio del proveedor pedírselo (el más rápido y con menos caída dentro
+  -- del presupuesto). provider_service_id queda como servicio de referencia:
+  -- fija el precio, los límites y lo que se muestra en la ficha.
+  auto_select         INTEGER NOT NULL DEFAULT 1,
+  max_cost_ratio      REAL    NOT NULL DEFAULT 1.35,
 
   min_qty             INTEGER NOT NULL DEFAULT 100,
   max_qty             INTEGER NOT NULL DEFAULT 10000,
@@ -97,7 +115,8 @@ CREATE TABLE IF NOT EXISTS orders (
   code                TEXT    NOT NULL UNIQUE,
   product_id          INTEGER REFERENCES products(id),
   product_name        TEXT    NOT NULL,
-  provider_service_id INTEGER NOT NULL,
+  provider_service_id INTEGER NOT NULL,   -- servicio al que se envió de verdad
+  reference_service_id INTEGER,            -- servicio con el que se calculó el precio
   quantity            INTEGER NOT NULL,
   link                TEXT    NOT NULL,
   email               TEXT    NOT NULL,

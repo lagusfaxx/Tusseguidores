@@ -12,6 +12,10 @@ import path from "node:path";
 import crypto from "node:crypto";
 import Database from "better-sqlite3";
 import { detectPlatform, detectServiceType, normalizeText } from "../src/lib/taxonomy.mjs";
+import {
+  dropScore, speedScore, overallScore, refillDaysFromName,
+  detectGeo, detectVariant, ROUTABLE_GEOS,
+} from "../src/lib/quality.mjs";
 import { buildCopy, POST_TYPES, PLATFORM_LABEL, TYPE_LABEL } from "./copy.mjs";
 
 const root = process.cwd();
@@ -39,9 +43,11 @@ const upsertService = db.prepare(`
   INSERT INTO provider_services
     (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
      min_qty, max_qty, avg_minutes, refill, cancel, provider_description,
+     refill_days, drop_score, speed_score, geo, variant,
      provider_enabled, last_provider_update, synced_at)
   VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
           @min_qty, @max_qty, @avg_minutes, @refill, @cancel, @provider_description,
+          @refill_days, @drop_score, @speed_score, @geo, @variant,
           @provider_enabled, @last_provider_update, datetime('now'))
   ON CONFLICT(service_id) DO UPDATE SET
     name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
@@ -50,6 +56,11 @@ const upsertService = db.prepare(`
     min_qty = excluded.min_qty, max_qty = excluded.max_qty,
     avg_minutes = excluded.avg_minutes,
     provider_description = excluded.provider_description,
+    refill_days = excluded.refill_days,
+    drop_score = excluded.drop_score,
+    speed_score = excluded.speed_score,
+    geo = excluded.geo,
+    variant = excluded.variant,
     provider_enabled = excluded.provider_enabled,
     last_provider_update = excluded.last_provider_update,
     synced_at = datetime('now')
@@ -61,6 +72,7 @@ const importAll = db.transaction((rows) => {
     const serviceType = detectServiceType(row.name, row.category);
     const clean = normalizeText(row.name);
     const refillMatch = /refill|guarantee|garant/i.test(clean) && !/no refill/i.test(clean);
+    const days = refillDaysFromName(clean);
     upsertService.run({
       service_id: row.serviceId,
       name: row.name,
@@ -75,6 +87,11 @@ const importAll = db.transaction((rows) => {
       refill: refillMatch ? 1 : 0,
       cancel: 0,
       provider_description: row.providerDescription,
+      refill_days: days,
+      drop_score: dropScore(clean, days),
+      speed_score: speedScore(clean, row.avgMinutes),
+      geo: detectGeo(clean),
+      variant: detectVariant(clean),
       provider_enabled: row.providerEnabled,
       last_provider_update: row.lastProviderUpdate,
     });
@@ -139,30 +156,39 @@ const CURATED = [
   ["linkedin", "seguidores", 0],
 ];
 
+const geoMarks = ROUTABLE_GEOS.map(() => "?").join(",");
 const candidates = db.prepare(`
   SELECT * FROM provider_services
    WHERE platform = ? AND service_type = ? AND provider_enabled = 1
+     AND variant = '' AND geo IN (${geoMarks})
      AND rate_usd_per_1000 > 0 AND min_qty <= ?
    ORDER BY rate_usd_per_1000 ASC
 `);
 
 /**
- * Del set de servicios equivalentes descartamos los más baratos (suelen ser
- * los de peor calidad) y nos quedamos con uno del primer tercio, prefiriendo
- * los que traen relleno/garantía.
+ * Servicio de referencia del producto: el que fija el precio de venta y los
+ * límites que se muestran en la ficha.
+ *
+ * Nos quedamos con el más barato dentro del tercio de mejor calidad. Así el
+ * precio queda competitivo y, al despachar, el enrutado automático todavía
+ * tiene presupuesto para subir a algo aún mejor si aparece.
  */
 function pickService(platform, type, ladder) {
   const minNeeded = Math.min(...ladder);
-  let rows = candidates.all(platform, type, minNeeded);
-  if (!rows.length) rows = candidates.all(platform, type, minNeeded * 10);
+  let rows = candidates.all(platform, type, ...ROUTABLE_GEOS, minNeeded);
+  if (!rows.length) rows = candidates.all(platform, type, ...ROUTABLE_GEOS, minNeeded * 10);
   if (!rows.length) return null;
 
   const usable = rows.filter((r) => r.max_qty >= Math.max(...ladder) / 2);
   const pool = usable.length ? usable : rows;
-  const withRefill = pool.filter((r) => r.refill === 1);
-  const finalPool = withRefill.length >= 3 ? withRefill : pool;
-  const index = Math.min(finalPool.length - 1, Math.floor(finalPool.length * 0.3));
-  return finalPool[index];
+
+  const scored = pool
+    .map((r) => ({ ...r, score: overallScore(r.drop_score, r.speed_score) }))
+    .sort((a, b) => b.score - a.score);
+
+  const topCount = Math.max(1, Math.ceil(scored.length / 3));
+  const top = scored.slice(0, topCount);
+  return top.reduce((cheapest, r) => (r.rate_usd_per_1000 < cheapest.rate_usd_per_1000 ? r : cheapest));
 }
 
 function ladderFor(type, service) {
@@ -263,7 +289,11 @@ const seedProducts = db.transaction(() => {
       link_placeholder: copy.link.placeholder,
       link_help: copy.link.help,
       delivery_label: deliveryLabel(service.avg_minutes),
-      quality_label: service.refill ? "Alta calidad · con reposición" : "Alta calidad",
+      quality_label: service.drop_score >= 80
+        ? "Alta calidad · sin caídas"
+        : service.refill
+          ? "Alta calidad · con reposición"
+          : "Alta calidad",
       refill_days: days,
       guarantee_text: days
         ? days >= 9999

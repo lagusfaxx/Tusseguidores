@@ -13,11 +13,26 @@ type ServiceInfo = {
   min_qty: number;
   max_qty: number;
   provider_enabled: number;
+  drop_score: number;
+  speed_score: number;
+};
+
+export type RoutingPreview = {
+  serviceId: number;
+  name: string;
+  rateUsd: number;
+  drop: number;
+  speed: number;
+  score: number;
+  rerouted: boolean;
+  reason: string;
 };
 
 type Props = {
   product: Product | null;
   service: ServiceInfo;
+  routing: RoutingPreview | null;
+  alternatives: RoutingPreview[];
   tiers: PricedTier[];
   bullets: string[];
   faq: FaqItem[];
@@ -96,7 +111,7 @@ function Check({ label, name, defaultChecked, hint }: { label: string; name: str
 }
 
 export function ProductForm(props: Props) {
-  const { product, service, autoRatePer1000 } = props;
+  const { product, service, autoRatePer1000, routing, alternatives } = props;
   const [state, formAction] = useActionState<ActionState, FormData>(saveProduct, {});
   const [rows, setRows] = useState(
     props.tiers.length
@@ -178,6 +193,10 @@ export function ProductForm(props: Props) {
                 <div className="flex justify-between"><dt>Costo por 1.000</dt><dd>US${service.rate_usd_per_1000}</dd></div>
                 <div className="flex justify-between"><dt>Rango del proveedor</dt><dd>{service.min_qty} – {service.max_qty}</dd></div>
                 <div className="flex justify-between">
+                  <dt>Retención / velocidad</dt>
+                  <dd>{service.drop_score} / {service.speed_score}</dd>
+                </div>
+                <div className="flex justify-between">
                   <dt>Estado</dt>
                   <dd className={service.provider_enabled ? "text-lime-400" : "text-red-300"}>
                     {service.provider_enabled ? "Activo" : "Dado de baja"}
@@ -194,6 +213,64 @@ export function ProductForm(props: Props) {
             <Field label="Días de reposición" name="refill_days" type="number" defaultValue={product?.refill_days ?? 0}
               hint="0 = sin reposición. 9999 = de por vida." />
             <Field label="Texto de garantía" name="guarantee_text" defaultValue={product?.guarantee_text} />
+          </Section>
+
+          <Section
+            title="Elección del servicio"
+            hint="El cliente elige el producto; la tienda decide a qué servicio del proveedor pedírselo."
+          >
+            <Check
+              label="Elegir automáticamente el mejor servicio"
+              name="auto_select"
+              defaultChecked={product ? product.auto_select === 1 : true}
+              hint="Al despachar se busca el servicio más rápido y con menos caída entre los equivalentes activos. Si lo desmarcas, siempre se usa el servicio de referencia."
+            />
+            <Field
+              label="Presupuesto máximo"
+              name="max_cost_ratio"
+              type="number"
+              defaultValue={product?.max_cost_ratio ?? 1.35}
+              hint="Cuánto puede costar el servicio elegido respecto del de referencia. 1.35 = hasta un 35% más caro; sube este número para priorizar la calidad sobre el margen."
+            />
+
+            {routing ? (
+              <div className="rounded-lg border border-white/10 bg-white/4 p-4 text-sm">
+                <p className="text-xs uppercase tracking-wider text-ink-400">
+                  Ahora mismo se enviaría a
+                </p>
+                <p className="mt-1.5 font-mono text-xs text-brand-300">#{routing.serviceId}</p>
+                <p className="mt-1 leading-relaxed">{routing.name}</p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <span className="rounded bg-white/6 px-2 py-1">Retención {routing.drop}/100</span>
+                  <span className="rounded bg-white/6 px-2 py-1">Velocidad {routing.speed}/100</span>
+                  <span className="rounded bg-white/6 px-2 py-1">US${routing.rateUsd}</span>
+                </div>
+                <p className="mt-2 text-xs text-ink-400">{routing.reason}</p>
+              </div>
+            ) : (
+              <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+                No hay ningún servicio activo capaz de atender este producto. Revisa las cantidades
+                o sincroniza el catálogo del proveedor.
+              </p>
+            )}
+
+            {alternatives.length ? (
+              <details className="text-sm">
+                <summary className="cursor-pointer text-ink-400 hover:text-white">
+                  Ver las {alternatives.length} alternativas consideradas
+                </summary>
+                <ul className="mt-2 space-y-1.5">
+                  {alternatives.map((option) => (
+                    <li key={option.serviceId} className="rounded border border-white/8 bg-white/3 px-2.5 py-2 text-xs">
+                      <span className="font-mono text-ink-400">#{option.serviceId}</span>{" "}
+                      <span className="text-brand-300">{option.score.toFixed(0)}</span>{" "}
+                      <span className="text-ink-400">US${option.rateUsd}</span>
+                      <div className="mt-0.5 truncate text-ink-200">{option.name}</div>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
           </Section>
 
           <Section title="Precios">

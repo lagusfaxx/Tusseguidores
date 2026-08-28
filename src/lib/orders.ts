@@ -5,6 +5,7 @@ import { pricingContext, priceCustomQuantity, costUsd } from "./pricing";
 import { provider, mapProviderStatus, ProviderError, providerConfigured } from "./provider";
 import { getBoolSetting } from "./settings";
 import { orderCode } from "./utils";
+import { pickService } from "./routing";
 import type { Order, OrderStatus } from "./types";
 
 export function logEvent(orderId: number, type: string, message: string) {
@@ -64,7 +65,6 @@ export type CreateOrderResult =
 export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const product = getProductById(input.productId);
   if (!product || product.published !== 1) return { ok: false, error: "El producto ya no está disponible." };
-  if (product.provider_enabled !== 1) return { ok: false, error: "Este servicio está temporalmente pausado." };
 
   const min = Math.max(product.min_qty, product.provider_min);
   const max = Math.min(product.max_qty, product.provider_max);
@@ -72,6 +72,23 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   if (!Number.isFinite(quantity) || quantity < min || quantity > max) {
     return { ok: false, error: `La cantidad debe estar entre ${min} y ${max}.` };
   }
+
+  // El servicio definitivo se elige al despachar, pero comprobamos ya que
+  // exista al menos uno capaz de atenderlo: así no cobramos algo que no
+  // podemos entregar.
+  const routed = pickService(
+    {
+      platform: product.platform,
+      serviceType: product.service_type,
+      quantity,
+      referenceServiceId: product.provider_service_id,
+      referenceRateUsd: product.rate_usd_per_1000,
+      maxCostRatio: product.max_cost_ratio,
+      variant: product.variant,
+    },
+    product.auto_select === 1,
+  );
+  if (!routed) return { ok: false, error: "Este servicio está temporalmente pausado. Inténtalo más tarde." };
 
   const ctx = pricingContext();
   // El precio se recalcula aquí en el servidor: nunca confiamos en el del formulario.
@@ -90,14 +107,15 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const code = uniqueCode();
   const info = run(
     `INSERT INTO orders
-       (code, product_id, product_name, provider_service_id, quantity, link, email, phone,
-        amount_clp, discount_clp, coupon_code, cost_usd, status, payment_status, ip)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
+       (code, product_id, product_name, provider_service_id, reference_service_id, quantity,
+        link, email, phone, amount_clp, discount_clp, coupon_code, cost_usd,
+        status, payment_status, ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
     [
-      code, product.id, product.name, product.provider_service_id, quantity,
-      input.link.trim(), input.email.trim().toLowerCase(), input.phone?.trim() || null,
+      code, product.id, product.name, routed.service.service_id, product.provider_service_id,
+      quantity, input.link.trim(), input.email.trim().toLowerCase(), input.phone?.trim() || null,
       amount, coupon?.discountClp ?? 0, coupon?.code ?? null,
-      costUsd(product.rate_usd_per_1000, quantity), input.ip ?? null,
+      costUsd(routed.service.rate_usd_per_1000, quantity), input.ip ?? null,
     ],
   );
 
@@ -141,6 +159,46 @@ export async function markPaid(orderId: number, paymentRef: string): Promise<voi
 
 export type SendResult = { ok: true; providerOrderId: number } | { ok: false; error: string };
 
+/**
+ * Decide a qué servicio del proveedor se le pide el pedido en el momento del
+ * despacho, y deja constancia si cambió respecto de lo elegido al comprar.
+ */
+function resolveDispatchService(order: Order): number {
+  const product = order.product_id ? getProductById(order.product_id) : undefined;
+  if (!product) return order.provider_service_id;
+
+  const routed = pickService(
+    {
+      platform: product.platform,
+      serviceType: product.service_type,
+      quantity: order.quantity,
+      referenceServiceId: order.reference_service_id ?? product.provider_service_id,
+      referenceRateUsd: product.rate_usd_per_1000,
+      maxCostRatio: product.max_cost_ratio,
+      variant: product.variant,
+    },
+    product.auto_select === 1,
+  );
+  if (!routed) return order.provider_service_id;
+
+  if (routed.service.service_id !== order.provider_service_id) {
+    run(
+      "UPDATE orders SET provider_service_id = ?, cost_usd = ?, updated_at = datetime('now') WHERE id = ?",
+      [
+        routed.service.service_id,
+        (routed.service.rate_usd_per_1000 / 1000) * order.quantity,
+        order.id,
+      ],
+    );
+    logEvent(
+      order.id,
+      "routing",
+      `Servicio reasignado al #${routed.service.service_id}. ${routed.reason}`,
+    );
+  }
+  return routed.service.service_id;
+}
+
 /** Envía el pedido al proveedor. Es seguro llamarlo dos veces. */
 export async function sendToProvider(orderId: number): Promise<SendResult> {
   const order = getOrderById(orderId);
@@ -154,9 +212,14 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
     return { ok: false, error: message };
   }
 
+  // Volvemos a elegir el servicio justo antes de enviarlo: entre que el cliente
+  // pagó y este momento el proveedor pudo haber desactivado uno o haber
+  // habilitado otro mejor.
+  const serviceId = resolveDispatchService(order);
+
   try {
     const response = await provider.addOrder({
-      service: order.provider_service_id,
+      service: serviceId,
       link: order.link,
       quantity: order.quantity,
     });
@@ -169,7 +232,7 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
         WHERE id = ?`,
       [providerOrderId, orderId],
     );
-    logEvent(orderId, "sent", `Enviado al proveedor (ID ${providerOrderId}).`);
+    logEvent(orderId, "sent", `Enviado al proveedor, servicio #${serviceId} (pedido ${providerOrderId}).`);
     return { ok: true, providerOrderId };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error desconocido del proveedor.";

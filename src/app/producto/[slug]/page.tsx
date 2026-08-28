@@ -13,6 +13,7 @@ import { platformLabel, serviceTypeLabel } from "@/lib/labels";
 import { formatClp, formatNumber, formatDuration, pricingContext } from "@/lib/pricing";
 import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { sanitizeHtml } from "@/lib/utils";
+import { routingForProduct } from "@/lib/routing";
 import type { FaqItem } from "@/lib/types";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -47,6 +48,20 @@ export default async function ProductPage({ params }: Params) {
   const minRate = ctx.minRates[product.service_type] ?? ctx.minRates.otros ?? 2900;
   const margin = product.margin_override ?? ctx.marginPercent;
   const ratePer1000Clp = Math.max(product.rate_usd_per_1000 * ctx.usdClp * (1 + margin / 100), minRate);
+
+  // El pedido se le pide al mejor servicio disponible en el momento de
+  // despacharlo, así que la entrega y la garantía que mostramos salen de ese
+  // servicio y no del de referencia: lo que promete la ficha es lo que llega.
+  const routed = routingForProduct(product, product.rate_usd_per_1000);
+  const deliveryLabel = routed
+    ? formatDuration(routed.service.avg_minutes) ?? product.delivery_label
+    : product.delivery_label;
+  const refillDays = routed ? Math.max(routed.service.refill_days, product.refill_days) : product.refill_days;
+  const guaranteeText = refillDays >= 9999
+    ? "Reposición de por vida si bajan"
+    : refillDays > 0
+      ? `Reposición gratis por ${refillDays} días`
+      : product.guarantee_text || "Reembolso si el pedido no se entrega";
 
   const minQty = Math.max(product.min_qty, product.provider_min);
   const maxQty = Math.min(product.max_qty, product.provider_max);
@@ -118,13 +133,9 @@ export default async function ProductPage({ params }: Params) {
 
               <dl className="mt-6 grid gap-3 sm:grid-cols-3">
                 {[
-                  { icon: BoltIcon, label: "Entrega", value: product.delivery_label },
+                  { icon: BoltIcon, label: "Entrega", value: deliveryLabel },
                   { icon: CheckIcon, label: "Calidad", value: product.quality_label },
-                  {
-                    icon: ShieldIcon,
-                    label: "Garantía",
-                    value: product.guarantee_text || "Reembolso si no se entrega",
-                  },
+                  { icon: ShieldIcon, label: "Garantía", value: guaranteeText },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="card p-4">
                     <dt className="flex items-center gap-1.5 text-xs text-ink-400">
@@ -174,9 +185,7 @@ export default async function ProductPage({ params }: Params) {
                             <td className="px-4 py-3 text-ink-400">
                               ${tier.unitClp.toLocaleString("es-CL", { maximumFractionDigits: 2 })}
                             </td>
-                            <td className="px-4 py-3 text-ink-400">
-                              {formatDuration(product.avg_minutes) ?? product.delivery_label}
-                            </td>
+                            <td className="px-4 py-3 text-ink-400">{deliveryLabel}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -213,8 +222,8 @@ export default async function ProductPage({ params }: Params) {
                 linkLabel={product.link_label}
                 linkPlaceholder={product.link_placeholder}
                 linkHelp={product.link_help}
-                deliveryLabel={product.delivery_label}
-                guaranteeText={product.guarantee_text}
+                deliveryLabel={deliveryLabel}
+                guaranteeText={guaranteeText}
                 ratePer1000Clp={ratePer1000Clp}
                 minPriceClp={ctx.minPriceClp}
                 rounding={ctx.rounding}

@@ -29,7 +29,37 @@ function open(): Database.Database {
     ? fs.readFileSync(schemaPath, "utf8")
     : fs.readFileSync(path.join(process.cwd(), "schema.sql"), "utf8");
   database.exec(schema);
+  migrate(database);
   return database;
+}
+
+/**
+ * schema.sql solo crea tablas que no existan, así que las columnas nuevas hay
+ * que agregarlas aparte para no perder la base de datos de un sitio ya en
+ * producción. ALTER TABLE ADD COLUMN en SQLite es instantáneo.
+ */
+function migrate(database: Database.Database) {
+  const columns = (table: string) =>
+    new Set(
+      (database.pragma(`table_info(${table})`) as { name: string }[]).map((row) => row.name),
+    );
+
+  const additions: [string, string, string][] = [
+    ["provider_services", "refill_days", "INTEGER NOT NULL DEFAULT 0"],
+    ["provider_services", "drop_score", "INTEGER NOT NULL DEFAULT 50"],
+    ["provider_services", "speed_score", "INTEGER NOT NULL DEFAULT 50"],
+    ["provider_services", "geo", "TEXT NOT NULL DEFAULT 'global'"],
+    ["provider_services", "variant", "TEXT NOT NULL DEFAULT ''"],
+    ["products", "auto_select", "INTEGER NOT NULL DEFAULT 1"],
+    ["products", "max_cost_ratio", "REAL NOT NULL DEFAULT 1.35"],
+    ["orders", "reference_service_id", "INTEGER"],
+  ];
+
+  for (const [table, column, definition] of additions) {
+    if (!columns(table).has(column)) {
+      database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }
 
 export const db: Database.Database = globalThis.__tsDb ?? open();

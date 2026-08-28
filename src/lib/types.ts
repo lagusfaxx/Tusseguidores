@@ -12,6 +12,11 @@ export type ProviderService = {
   refill: number;
   cancel: number;
   provider_description: string | null;
+  refill_days: number;
+  drop_score: number;
+  speed_score: number;
+  geo: string;
+  variant: string;
   provider_enabled: number;
   last_provider_update: string | null;
   synced_at: string;
@@ -37,6 +42,8 @@ export type Product = {
   badge: string | null;
   price_mode: "auto" | "manual";
   margin_override: number | null;
+  auto_select: number;
+  max_cost_ratio: number;
   min_qty: number;
   max_qty: number;
   link_label: string;
@@ -77,6 +84,7 @@ export type Order = {
   product_id: number | null;
   product_name: string;
   provider_service_id: number;
+  reference_service_id: number | null;
   quantity: number;
   link: string;
   email: string;

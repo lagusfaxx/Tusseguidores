@@ -9,6 +9,11 @@ export type ProductWithService = Product & {
   provider_enabled: number;
   avg_minutes: number | null;
   provider_name: string;
+  /** Subtipo y calidad del servicio de referencia. */
+  variant: string;
+  geo: string;
+  drop_score: number;
+  speed_score: number;
 };
 
 const PRODUCT_SELECT = `
@@ -18,7 +23,11 @@ const PRODUCT_SELECT = `
          s.max_qty        AS provider_max,
          s.provider_enabled,
          s.avg_minutes,
-         s.name           AS provider_name
+         s.name           AS provider_name,
+         s.variant,
+         s.geo,
+         s.drop_score,
+         s.speed_score
     FROM products p
     JOIN provider_services s ON s.service_id = p.provider_service_id
 `;

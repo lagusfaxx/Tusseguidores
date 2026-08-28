@@ -21,6 +21,14 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
     "SELECT clean_name, rate_usd_per_1000, provider_enabled FROM provider_services WHERE service_id = ?",
     [order.provider_service_id],
   );
+  // Si el enrutado automático cambió de servicio, mostramos ambos.
+  const reference =
+    order.reference_service_id && order.reference_service_id !== order.provider_service_id
+      ? get<{ clean_name: string }>(
+          "SELECT clean_name FROM provider_services WHERE service_id = ?",
+          [order.reference_service_id],
+        )
+      : null;
   const costClp = order.cost_usd * ctx.usdClp;
   const profit = order.amount_clp - costClp;
 
@@ -39,7 +47,17 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
             <h2 className="font-bold">{order.product_name}</h2>
             <dl className="mt-4 grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div><dt className="text-ink-400">Cantidad</dt><dd>{formatNumber(order.quantity)}</dd></div>
-              <div><dt className="text-ink-400">Servicio del proveedor</dt><dd>#{order.provider_service_id}</dd></div>
+              <div>
+                <dt className="text-ink-400">Servicio del proveedor</dt>
+                <dd>
+                  #{order.provider_service_id}
+                  {reference ? (
+                    <span className="ml-2 rounded bg-brand-500/20 px-1.5 py-0.5 text-[11px] text-brand-300">
+                      enrutado desde #{order.reference_service_id}
+                    </span>
+                  ) : null}
+                </dd>
+              </div>
               <div className="sm:col-span-2">
                 <dt className="text-ink-400">Destino</dt>
                 <dd className="break-all font-mono text-xs">

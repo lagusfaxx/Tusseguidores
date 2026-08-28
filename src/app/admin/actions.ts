@@ -3,10 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, hashPassword } from "@/lib/auth";
-import { db, get, run } from "@/lib/db";
+import { all, db, get, run } from "@/lib/db";
 import { setSettings, invalidateSettings } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
+import {
+  dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant,
+} from "@/lib/quality.mjs";
 import { sendToProvider, setStatus, syncOpenOrders, logEvent, markPaid } from "@/lib/orders";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import type { OrderStatus } from "@/lib/types";
@@ -141,6 +144,8 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
     margin_override: formData.get("margin_override")
       ? Number(formData.get("margin_override")) || null
       : null,
+    auto_select: formData.get("auto_select") ? 1 : 0,
+    max_cost_ratio: Math.min(5, Math.max(1, Number(formData.get("max_cost_ratio")) || 1.35)),
     min_qty: Math.max(service.min_qty, Number(formData.get("min_qty")) || service.min_qty),
     max_qty: Math.min(service.max_qty, Number(formData.get("max_qty")) || service.max_qty),
     link_label: String(formData.get("link_label") ?? "").trim() || "Enlace o usuario",
@@ -168,6 +173,7 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
            seo_title=@seo_title, seo_description=@seo_description, seo_keywords=@seo_keywords,
            og_image=@og_image, noindex=@noindex, image_url=@image_url, badge=@badge,
            price_mode=@price_mode, margin_override=@margin_override,
+           auto_select=@auto_select, max_cost_ratio=@max_cost_ratio,
            min_qty=@min_qty, max_qty=@max_qty,
            link_label=@link_label, link_placeholder=@link_placeholder, link_help=@link_help,
            delivery_label=@delivery_label, quality_label=@quality_label,
@@ -181,13 +187,15 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
         `INSERT INTO products
            (slug, name, platform, service_type, provider_service_id, short_description,
             description_html, bullets_json, faq_json, seo_title, seo_description, seo_keywords,
-            og_image, noindex, image_url, badge, price_mode, margin_override, min_qty, max_qty,
+            og_image, noindex, image_url, badge, price_mode, margin_override,
+            auto_select, max_cost_ratio, min_qty, max_qty,
             link_label, link_placeholder, link_help, delivery_label, quality_label,
             refill_days, guarantee_text, featured, published, sort_order)
          VALUES
            (@slug, @name, @platform, @service_type, @provider_service_id, @short_description,
             @description_html, @bullets_json, @faq_json, @seo_title, @seo_description, @seo_keywords,
-            @og_image, @noindex, @image_url, @badge, @price_mode, @margin_override, @min_qty, @max_qty,
+            @og_image, @noindex, @image_url, @badge, @price_mode, @margin_override,
+            @auto_select, @max_cost_ratio, @min_qty, @max_qty,
             @link_label, @link_placeholder, @link_help, @delivery_label, @quality_label,
             @refill_days, @guarantee_text, @featured, @published, @sort_order)`,
       ).run(values);
@@ -344,18 +352,30 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
   }
   if (!Array.isArray(rows)) return { error: "El proveedor devolvió una respuesta inesperada." };
 
+  // La API de servicios no devuelve el tiempo promedio, así que conservamos el
+  // que ya teníamos: es mejor señal de velocidad que el nombre del servicio.
+  const knownAvg = new Map(
+    all<{ service_id: number; avg_minutes: number | null }>(
+      "SELECT service_id, avg_minutes FROM provider_services WHERE avg_minutes IS NOT NULL",
+    ).map((row) => [row.service_id, row.avg_minutes]),
+  );
+
   const upsert = db.prepare(`
     INSERT INTO provider_services
       (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
-       min_qty, max_qty, refill, cancel, provider_enabled, synced_at)
+       min_qty, max_qty, refill, cancel, refill_days, drop_score, speed_score, geo, variant,
+       provider_enabled, synced_at)
     VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
-            @min_qty, @max_qty, @refill, @cancel, 1, datetime('now'))
+            @min_qty, @max_qty, @refill, @cancel, @refill_days, @drop_score, @speed_score,
+            @geo, @variant, 1, datetime('now'))
     ON CONFLICT(service_id) DO UPDATE SET
       name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
       platform = excluded.platform, service_type = excluded.service_type,
       rate_usd_per_1000 = excluded.rate_usd_per_1000,
       min_qty = excluded.min_qty, max_qty = excluded.max_qty,
       refill = excluded.refill, cancel = excluded.cancel,
+      refill_days = excluded.refill_days, drop_score = excluded.drop_score,
+      speed_score = excluded.speed_score, geo = excluded.geo, variant = excluded.variant,
       provider_enabled = 1, synced_at = datetime('now')
   `);
 
@@ -365,10 +385,12 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
       const serviceId = Number(row.service);
       if (!serviceId) continue;
       seen.push(serviceId);
+      const clean = normalizeText(row.name);
+      const days = refillDaysFromName(clean);
       upsert.run({
         service_id: serviceId,
         name: row.name,
-        clean_name: normalizeText(row.name),
+        clean_name: clean,
         category: normalizeText(row.category) || String(row.category ?? ""),
         platform: detectPlatform(row.name, row.category),
         service_type: detectServiceType(row.name, row.category),
@@ -377,6 +399,11 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
         max_qty: Number(row.max) || 1000,
         refill: row.refill ? 1 : 0,
         cancel: row.cancel ? 1 : 0,
+        refill_days: days,
+        drop_score: dropScore(clean, days || (row.refill ? 30 : 0)),
+        speed_score: speedScore(clean, knownAvg.get(serviceId) ?? null),
+        geo: detectGeo(clean),
+        variant: detectVariant(clean),
       });
     }
     // Lo que el proveedor ya no lista queda deshabilitado, no se borra: así los

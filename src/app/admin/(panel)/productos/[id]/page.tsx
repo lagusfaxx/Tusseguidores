@@ -6,6 +6,7 @@ import { getProductById, getPricedTiers, parseJson } from "@/lib/catalog";
 import { get } from "@/lib/db";
 import { PLATFORM_OPTIONS, SERVICE_TYPE_OPTIONS } from "@/lib/labels";
 import { pricingContext } from "@/lib/pricing";
+import { rankCandidates, routingForProduct } from "@/lib/routing";
 import type { FaqItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -25,10 +26,50 @@ export default async function EditProductPage({
   const service = get<{
     service_id: number; clean_name: string; rate_usd_per_1000: number;
     min_qty: number; max_qty: number; provider_enabled: number;
+    drop_score: number; speed_score: number;
   }>(
-    "SELECT service_id, clean_name, rate_usd_per_1000, min_qty, max_qty, provider_enabled FROM provider_services WHERE service_id = ?",
+    `SELECT service_id, clean_name, rate_usd_per_1000, min_qty, max_qty,
+            provider_enabled, drop_score, speed_score
+       FROM provider_services WHERE service_id = ?`,
     [product.provider_service_id],
   )!;
+
+  // Vista previa de a qué servicio se enviaría un pedido hecho ahora mismo.
+  const routed = routingForProduct(product, product.rate_usd_per_1000);
+  const routing = routed
+    ? {
+        serviceId: routed.service.service_id,
+        name: routed.service.clean_name,
+        rateUsd: routed.service.rate_usd_per_1000,
+        drop: routed.service.drop_score,
+        speed: routed.service.speed_score,
+        score: routed.score,
+        rerouted: routed.rerouted,
+        reason: routed.reason,
+      }
+    : null;
+
+  const alternatives = rankCandidates(
+    {
+      platform: product.platform,
+      serviceType: product.service_type,
+      quantity: Math.max(product.min_qty, product.provider_min),
+      referenceServiceId: product.provider_service_id,
+      referenceRateUsd: product.rate_usd_per_1000,
+      maxCostRatio: product.max_cost_ratio,
+      variant: product.variant,
+    },
+    6,
+  ).map((candidate) => ({
+    serviceId: candidate.service_id,
+    name: candidate.clean_name,
+    rateUsd: candidate.rate_usd_per_1000,
+    drop: candidate.drop_score,
+    speed: candidate.speed_score,
+    score: candidate.score,
+    rerouted: false,
+    reason: "",
+  }));
 
   const ctx = pricingContext();
   const margin = product.margin_override ?? ctx.marginPercent;
@@ -60,6 +101,8 @@ export default async function EditProductPage({
         <ProductForm
           product={product}
           service={service}
+          routing={routing}
+          alternatives={alternatives}
           tiers={getPricedTiers(product)}
           bullets={parseJson<string[]>(product.bullets_json, [])}
           faq={parseJson<FaqItem[]>(product.faq_json, [])}

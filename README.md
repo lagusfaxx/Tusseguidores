@@ -82,16 +82,52 @@ precio mínimo de la tienda.
 
 Cada producto puede además tener su propio margen o precios totalmente manuales.
 
+### Elección del servicio del proveedor
+
+El cliente elige **un producto** ("Seguidores para Instagram"), nunca un servicio
+del proveedor. La tienda decide sola a cuál de los servicios equivalentes se lo
+pide, y lo vuelve a decidir en el momento de despacharlo.
+
+Cada servicio importado se puntúa de 0 a 100 en dos ejes, leídos de su nombre,
+sus banderas de reposición y su tiempo promedio:
+
+- **Retención** (`drop_score`): Non Drop, Low Drop, High Drops, días de
+  reposición, "Real / HQ" frente a "Bot Users".
+- **Velocidad** (`speed_score`): tiempo promedio real y, si falta, lo que promete
+  el nombre (Instant, 0-1H Start, Superfast…).
+
+Al despachar se elige el de mayor `retención × 0,55 + velocidad × 0,45` entre los
+que:
+
+- están **activos** en el proveedor (los desactivados quedan fuera solos);
+- aceptan la cantidad pedida;
+- son del **mismo subtipo** (los likes de una publicación no se enrutan a likes
+  de transmisión en vivo);
+- apuntan a una **audiencia usable** (global, Latinoamérica u occidental: nada de
+  cuentas de India o Bangladesh para una tienda chilena);
+- no cuestan más que el servicio de referencia por el **presupuesto** del
+  producto (1,35× por defecto), para que el margen no se caiga.
+
+El `provider_service_id` del producto queda como **servicio de referencia**: fija
+el precio de venta y los límites. La ficha muestra la entrega y la garantía del
+servicio que realmente se va a usar, no las del de referencia.
+
+Todo esto se ve y se ajusta por producto en **Panel → Productos → Elección del
+servicio**, que muestra a qué servicio se enviaría un pedido hecho ahora mismo y
+las alternativas que se consideraron.
+
 ### Pedido, de principio a fin
 
 1. El cliente elige un pack (o una cantidad libre) y deja su enlace y correo.
-2. El servidor **recalcula el precio** — nunca confía en el del formulario — y
-   crea el pedido con un código tipo `TS-7K2F9Q`.
+2. El servidor **recalcula el precio** — nunca confía en el del formulario —,
+   elige el mejor servicio disponible y crea el pedido con un código tipo
+   `TS-7K2F9Q`.
 3. Se crea el pago en Flow y se redirige al cliente.
 4. Flow confirma por webhook en `/api/flow/confirmar`. El webhook vuelve a
    consultar el estado a Flow (no confía en el POST), valida el monto y es
    idempotente porque Flow reintenta.
-5. Con el pago confirmado el pedido se envía solo al proveedor.
+5. Con el pago confirmado se vuelve a elegir el mejor servicio (pudo cambiar
+   entre la compra y el pago) y el pedido se envía solo al proveedor.
 6. El cron consulta el avance y el cliente lo sigue en `/pedido/<código>`.
 
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
@@ -155,6 +191,8 @@ src/
     schema.sql                  esquema de la base de datos
     pricing.ts                  motor de precios
     provider.ts                 cliente de honestsmm
+    quality.mjs                 puntajes de retención, velocidad, región y subtipo
+    routing.ts                  elección del servicio al que se despacha
     flow.ts                     cliente de Flow
     orders.ts                   ciclo de vida de los pedidos
     taxonomy.mjs                clasificación de servicios

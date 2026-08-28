@@ -20,10 +20,27 @@ type Row = {
   min_qty: number;
   max_qty: number;
   refill: number;
+  drop_score: number;
+  speed_score: number;
+  geo: string;
+  variant: string;
   provider_enabled: number;
   synced_at: string;
   used: number;
 };
+
+/** Barra compacta 0-100 para leer los puntajes de un vistazo. */
+function ScoreBar({ value }: { value: number }) {
+  const tone = value >= 80 ? "bg-lime-400" : value >= 60 ? "bg-brand-400" : value >= 40 ? "bg-amber-400" : "bg-red-400";
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="h-1.5 w-10 overflow-hidden rounded-full bg-white/10">
+        <span className={`block h-full rounded-full ${tone}`} style={{ width: `${value}%` }} />
+      </span>
+      <span className="text-[11px] text-ink-400">{value}</span>
+    </span>
+  );
+}
 
 export default async function AdminCatalogPage({
   searchParams,
@@ -42,6 +59,7 @@ export default async function AdminCatalogPage({
   if (red) { where.push("s.platform = ?"); params.push(red); }
   if (tipo) { where.push("s.service_type = ?"); params.push(tipo); }
   if (estado === "baja") where.push("s.provider_enabled = 0");
+  else if (estado === "enrutables") where.push("s.provider_enabled = 1 AND s.variant = '' AND s.geo IN ('global','latam','western')");
   else if (estado !== "todos") where.push("s.provider_enabled = 1");
   const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
 
@@ -49,7 +67,8 @@ export default async function AdminCatalogPage({
   const rows = all<Row>(
     `SELECT s.*, (SELECT COUNT(*) FROM products p WHERE p.provider_service_id = s.service_id) AS used
        FROM provider_services s ${clause}
-      ORDER BY s.platform, s.service_type, s.rate_usd_per_1000
+      ORDER BY s.platform, s.service_type,
+               (s.drop_score * 0.55 + s.speed_score * 0.45) DESC, s.rate_usd_per_1000
       LIMIT ? OFFSET ?`,
     [...params, PAGE_SIZE, (page - 1) * PAGE_SIZE],
   );
@@ -95,6 +114,7 @@ export default async function AdminCatalogPage({
         </select>
         <select name="estado" defaultValue={estado ?? ""} className="field max-w-[150px]">
           <option value="">Activos</option>
+          <option value="enrutables">Solo enrutables</option>
           <option value="baja">Dados de baja</option>
           <option value="todos">Todos</option>
         </select>
@@ -106,6 +126,7 @@ export default async function AdminCatalogPage({
           <thead>
             <tr>
               <th>ID</th><th>Servicio</th><th>Red</th><th>Tipo</th>
+              <th>Retención</th><th>Velocidad</th>
               <th>Costo /1.000</th><th>Venta 1.000</th><th>Rango</th><th></th>
             </tr>
           </thead>
@@ -118,7 +139,17 @@ export default async function AdminCatalogPage({
                   <div className="truncate text-[11px] text-ink-400">{row.category}</div>
                 </td>
                 <td className="text-xs">{platformLabel(row.platform)}</td>
-                <td className="text-xs">{serviceTypeLabel(row.service_type)}</td>
+                <td className="text-xs">
+                  {serviceTypeLabel(row.service_type)}
+                  {row.variant ? (
+                    <span className="ml-1 rounded bg-white/8 px-1 py-0.5 text-[10px] text-ink-400">{row.variant}</span>
+                  ) : null}
+                  {row.geo !== "global" ? (
+                    <span className="ml-1 rounded bg-white/8 px-1 py-0.5 text-[10px] text-ink-400">{row.geo}</span>
+                  ) : null}
+                </td>
+                <td><ScoreBar value={row.drop_score} /></td>
+                <td><ScoreBar value={row.speed_score} /></td>
                 <td className="text-xs">US${row.rate_usd_per_1000}</td>
                 <td className="text-xs font-semibold text-brand-300">
                   {formatClp(autoPriceClp(row.rate_usd_per_1000, 1000, row.service_type, ctx))}
@@ -141,7 +172,7 @@ export default async function AdminCatalogPage({
               </tr>
             ))}
             {rows.length === 0 ? (
-              <tr><td colSpan={8} className="py-10 text-center text-ink-400">No hay servicios con ese filtro.</td></tr>
+              <tr><td colSpan={10} className="py-10 text-center text-ink-400">No hay servicios con ese filtro.</td></tr>
             ) : null}
           </tbody>
         </table>
