@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Votos para WhatsApp">
+<defs>
+<linearGradient id="bg-whatsapp-votos" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#151129"/><stop offset="1" stop-color="#0b0918"/>
+</linearGradient>
+<radialGradient id="halo-whatsapp-votos" cx="0.78" cy="0.18" r="0.75">
+<stop offset="0" stop-color="#25D366" stop-opacity="0.55"/>
+<stop offset="1" stop-color="#25D366" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="ink-whatsapp-votos" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#25D366"/><stop offset="1" stop-color="#ff2e93"/>
+</linearGradient>
+</defs>
+<rect width="600" height="400" fill="url(#bg-whatsapp-votos)"/>
+<rect width="600" height="400" fill="url(#halo-whatsapp-votos)"/>
+<circle cx="482" cy="86" r="118" fill="#25D366" opacity="0.13"/>
+<circle cx="96" cy="332" r="92" fill="#ff2e93" opacity="0.09"/>
+<g transform="translate(56 128) scale(3.4)">
+<path d="M16 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm-8 2a3 3 0 1 0-3-3 3 3 0 0 0 3 3Zm8 2c-3 0-9 1.5-9 4.5V22h18v-2.5c0-3-6-4.5-9-4.5Zm-8 .5c-2.7.4-6 1.7-6 4V22h5v-2.5c0-1.4.6-2.6 1.5-3.5Z" fill="url(#ink-whatsapp-votos)"/>
+</g>
+<text x="56" y="316" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="800" fill="#ffffff">Votos</text>
+<text x="56" y="352" font-family="system-ui,-apple-system,Segoe UI,Roboto,sans-serif" font-size="22" font-weight="600" fill="#25D366">para WhatsApp</text>
+</svg>

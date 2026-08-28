@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink-950: #08060f;
+  --color-ink-900: #0d0a1a;
+  --color-ink-800: #151129;
+  --color-ink-700: #1e1838;
+  --color-ink-600: #2b2350;
+  --color-ink-400: #6f6795;
+  --color-ink-200: #b9b4d4;
+
+  --color-brand-500: #7c3aed;
+  --color-brand-400: #9061ff;
+  --color-brand-300: #b18cff;
+  --color-accent-500: #ff2e93;
+  --color-accent-400: #ff5fae;
+  --color-lime-400: #b6ff3d;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+
+  --radius-xl2: 1.25rem;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-ink-950);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent-500);
+  color: #fff;
+}
+
+/* Fondo con dos halos; se pinta una sola vez y no repinta al hacer scroll. */
+.bg-halo {
+  background-image:
+    radial-gradient(60rem 40rem at 12% -10%, rgba(124, 58, 237, 0.28), transparent 60%),
+    radial-gradient(45rem 35rem at 95% 0%, rgba(255, 46, 147, 0.18), transparent 55%);
+}
+
+.card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-xl2);
+}
+
+.card-hover {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(176, 140, 255, 0.45);
+  box-shadow: 0 18px 40px -22px rgba(124, 58, 237, 0.85);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  border-radius: 0.85rem;
+  padding: 0.8rem 1.35rem;
+  transition: filter 0.15s ease, transform 0.12s ease, background-color 0.15s ease;
+  cursor: pointer;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-brand-500), var(--color-accent-500));
+  color: #fff;
+  box-shadow: 0 12px 30px -14px rgba(255, 46, 147, 0.9);
+}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.btn-ghost:hover:not(:disabled) { background: rgba(255, 255, 255, 0.11); }
+
+.field {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.field::placeholder { color: rgba(255, 255, 255, 0.35); }
+.field:focus {
+  border-color: var(--color-brand-400);
+  background: rgba(255, 255, 255, 0.07);
+}
+.field-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-ink-200);
+  margin-bottom: 0.35rem;
+}
+
+/* Contenido HTML editable desde el panel */
+.prose-ts h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 1.75rem 0 0.65rem;
+  color: #fff;
+}
+.prose-ts h3 { font-size: 1.1rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
+.prose-ts p { margin: 0.75rem 0; color: var(--color-ink-200); line-height: 1.75; }
+.prose-ts ul, .prose-ts ol { margin: 0.75rem 0 0.75rem 1.25rem; color: var(--color-ink-200); line-height: 1.8; }
+.prose-ts ul { list-style: disc; }
+.prose-ts ol { list-style: decimal; }
+.prose-ts a { color: var(--color-brand-300); text-decoration: underline; }
+.prose-ts strong { color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  html { scroll-behavior: auto; }
+}
+
+/* Panel admin: fondo claro, más legible para trabajar */
+.admin-shell {
+  background: #0b0a12;
+}
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.admin-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-ink-200);
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+.admin-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+.admin-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
