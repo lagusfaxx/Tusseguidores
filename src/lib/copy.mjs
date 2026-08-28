@@ -224,21 +224,38 @@ const CARD_LINE = {
   trafico: () => `Visitas reales, de distintos países y dispositivos.`,
 };
 
-export function buildCopy({ platform, type }) {
+export function buildCopy({ platform, type, orderKind = "default" }) {
   const p = PLATFORM_LABEL[platform] ?? platform;
-  const t = TYPE_LABEL[type] ?? type;
+  const custom = orderKind === "custom_comments";
+  const t = custom ? "Comentarios personalizados" : (TYPE_LABEL[type] ?? type);
   const name = `${t} para ${p}`;
-  const slug = `comprar-${type}-${platform}`;
+  const slug = custom ? `comprar-comentarios-personalizados-${platform}` : `comprar-${type}-${platform}`;
 
-  const intro = (INTRO[type] ?? INTRO.seguidores)(p);
-  const bullets = BULLETS[type] ?? BULLETS.seguidores;
+  const intro = custom
+    ? `Tú escribes los comentarios y nosotros los publicamos en tu publicación de ${p}. Uno por línea, en el orden que quieras: sirve igual para resolver dudas de un producto que para llenar de reacciones un lanzamiento.`
+    : (INTRO[type] ?? INTRO.seguidores)(p);
+  const bullets = custom
+    ? [
+        "Los comentarios los escribes tú, palabra por palabra",
+        "Se publican repartidos, no todos de golpe",
+        "Cuentas con foto y publicaciones, no perfiles vacíos",
+        "Puedes usar emojis y tildes sin problema",
+      ]
+    : (BULLETS[type] ?? BULLETS.seguidores);
 
   const descriptionHtml = [
     `<p>${intro}</p>`,
     `<h2>Cómo funciona</h2>`,
     `<ol>`,
-    `<li>Elige el pack de ${t.toLowerCase()} que necesitas.</li>`,
-    `<li>Pega tu ${POST_TYPES.has(type) ? "enlace de la publicación" : "usuario o enlace de perfil"} y tu correo.</li>`,
+    ...(custom
+      ? [
+          `<li>Escribe los comentarios que quieres, uno por línea.</li>`,
+          `<li>Pega el enlace de la publicación y tu correo. El precio se calcula según cuántos escribiste.</li>`,
+        ]
+      : [
+          `<li>Elige el pack de ${t.toLowerCase()} que necesitas.</li>`,
+          `<li>Pega tu ${POST_TYPES.has(type) ? "enlace de la publicación" : "usuario o enlace de perfil"} y tu correo.</li>`,
+        ]),
     `<li>Paga con Webpay, transferencia o Mercado Pago a través de Flow.</li>`,
     `<li>La entrega parte sola y puedes seguir el avance con el código de tu pedido.</li>`,
     `</ol>`,
@@ -248,7 +265,9 @@ export function buildCopy({ platform, type }) {
     `<p>Revisa que tu cuenta esté pública y que el enlace que entregas sea el correcto: una vez enviado el pedido al sistema de entrega no se puede cambiar el destino. Si tienes dudas, escríbenos antes de pagar y te ayudamos.</p>`,
   ].join("\n");
 
-  const seoTitle = `Comprar ${t.toLowerCase()} para ${p} en Chile | TusSeguidores.cl`;
+  const seoTitle = custom
+    ? `Comprar comentarios personalizados para ${p} en Chile | TusSeguidores.cl`
+    : `Comprar ${t.toLowerCase()} para ${p} en Chile | TusSeguidores.cl`;
   const seoDescription =
     `Compra ${t.toLowerCase()} para ${p} en pesos chilenos. Entrega automática en minutos, sin contraseña, pago seguro con Webpay o transferencia. Desde $1.990.`.slice(0, 158);
   const seoKeywords = [
@@ -259,15 +278,29 @@ export function buildCopy({ platform, type }) {
   ].join(", ");
 
   const linkSet = LINK_FIELD[platform] ?? LINK_FIELD.instagram;
-  const link = POST_TYPES.has(type) ? linkSet.post : linkSet.perfil;
+  const link = custom || POST_TYPES.has(type) ? linkSet.post : linkSet.perfil;
 
   return {
     name,
     slug,
-    shortDescription: (CARD_LINE[type] ?? CARD_LINE.seguidores)(p),
+    shortDescription: custom
+      ? "Tú escribes qué dicen y nosotros los publicamos."
+      : (CARD_LINE[type] ?? CARD_LINE.seguidores)(p),
     descriptionHtml,
     bullets,
-    faq: FAQ_COMMON(p, t),
+    faq: custom
+      ? [
+          {
+            q: "¿Puedo escribir lo que quiera?",
+            a: "Sí, mientras no sea insultos, spam ni datos de contacto de terceros. Escribe cada comentario en una línea distinta; el precio se ajusta solo según cuántos sean.",
+          },
+          {
+            q: "¿Se publican todos juntos?",
+            a: "No, se reparten en el tiempo para que la publicación se vea con conversación real y no con una avalancha de un minuto.",
+          },
+          ...FAQ_COMMON(p, t).slice(1),
+        ]
+      : FAQ_COMMON(p, t),
     seoTitle,
     seoDescription,
     seoKeywords,

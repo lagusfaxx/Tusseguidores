@@ -26,6 +26,7 @@ export async function startCheckout(
   const email = String(formData.get("email") ?? "");
   const phone = String(formData.get("phone") ?? "");
   const coupon = String(formData.get("coupon") ?? "");
+  const comments = String(formData.get("comments") ?? "");
 
   const product = getProductById(productId);
   if (!product) return { error: "El producto ya no está disponible." };
@@ -41,6 +42,7 @@ export async function startCheckout(
     productId,
     quantity,
     link,
+    comments,
     email,
     phone,
     couponCode: coupon,

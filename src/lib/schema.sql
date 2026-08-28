@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS provider_services (
   -- Se usan para no enrutar un producto a algo que no le corresponde.
   geo                  TEXT    NOT NULL DEFAULT 'global',
   variant              TEXT    NOT NULL DEFAULT '',
+  -- Cómo se le pide a la API: default, custom_comments, poll, package...
+  -- No todas las formas llevan "quantity".
+  order_kind           TEXT    NOT NULL DEFAULT 'default',
   provider_enabled     INTEGER NOT NULL DEFAULT 1,
   last_provider_update TEXT,
   synced_at            TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -39,7 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_ps_platform ON provider_services(platform, servic
 CREATE INDEX IF NOT EXISTS idx_ps_enabled  ON provider_services(provider_enabled);
 CREATE INDEX IF NOT EXISTS idx_ps_rate     ON provider_services(rate_usd_per_1000);
 -- Índice de la consulta que elige el mejor servicio para un producto.
-CREATE INDEX IF NOT EXISTS idx_ps_pick     ON provider_services(platform, service_type, variant, provider_enabled, drop_score, speed_score);
+CREATE INDEX IF NOT EXISTS idx_ps_pick     ON provider_services(platform, service_type, variant, order_kind, provider_enabled, drop_score, speed_score);
 
 -- Productos publicados en la tienda. Uno apunta a un servicio del proveedor.
 CREATE TABLE IF NOT EXISTS products (
@@ -119,6 +122,7 @@ CREATE TABLE IF NOT EXISTS orders (
   reference_service_id INTEGER,            -- servicio con el que se calculó el precio
   quantity            INTEGER NOT NULL,
   link                TEXT    NOT NULL,
+  comments            TEXT,                  -- comentarios personalizados, uno por línea
   email               TEXT    NOT NULL,
   phone               TEXT,
 

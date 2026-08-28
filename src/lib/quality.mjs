@@ -103,7 +103,7 @@ export function refillDaysFromName(name) {
 const GEO_PATTERNS = [
   ["latam", /\b(latin|latino|latam|spanish|espa|chile|chilean|mexic|argentin|colombia|peru|brazil|brasil|brazilian)\b/i],
   ["targeted", /\b(indian|india|bangladesh|bangla|pakistan|pakistani|indonesia|indonesian|arab|arabic|saudi|turkey|turkish|russia|russian|vietnam|nigeria|african|egypt|iran|iraq|malaysia|thailand|philippine|korea|japan|china|chinese)\b/i],
-  ["western", /\b(usa|u\.s\.a|united states|american|uk|england|british|europe|european|canada|canadian|australia|germany|france|italy|spain)\b/i],
+  ["western", /\b(usa|u\.s\.a|united states|american|uk|united kingdom|england|english|british|europe|european|canada|canadian|australia|australian|germany|german|france|french|italy|italian|spain|spanish|portugal|portuguese|dutch|polish|greek)\b/i],
 ];
 
 export function detectGeo(name) {
@@ -112,8 +112,14 @@ export function detectGeo(name) {
   return "global";
 }
 
-/** Geografías a las que se puede enrutar sin desvirtuar el producto. */
-export const ROUTABLE_GEOS = ["global", "latam", "western"];
+/**
+ * Geografías a las que se puede enrutar sin desvirtuar el producto.
+ *
+ * Solo lo neutro y lo regional. Un servicio marcado como estadounidense,
+ * italiano o indio es un producto distinto —se nota, sobre todo en los
+ * comentarios— y debe elegirse a mano, no caer por puntaje.
+ */
+export const ROUTABLE_GEOS = ["global", "latam"];
 
 /**
  * Subtipo del servicio dentro de su categoría.
@@ -137,4 +143,57 @@ export function detectVariant(name) {
   const n = String(name ?? "");
   for (const [variant, re] of VARIANT_PATTERNS) if (re.test(n)) return variant;
   return "";
+}
+
+/**
+ * Cómo hay que pedirle el servicio al proveedor.
+ *
+ * La API acepta varias formas de pedido y no todas llevan "quantity": los
+ * comentarios personalizados llevan el texto de cada comentario, las encuestas
+ * el número de la opción, los paquetes no llevan cantidad. Pedirle "quantity" a
+ * un servicio de comentarios personalizados entrega cualquier cosa, así que
+ * cada servicio queda marcado con su forma de pedido.
+ *
+ * Al sincronizar en vivo esto se reemplaza por el campo `type` que devuelve el
+ * proveedor, que es la fuente autoritativa; las reglas de abajo son para el
+ * catálogo importado desde la lista de precios, que no trae ese campo.
+ */
+export const ORDER_KINDS = {
+  DEFAULT: "default",
+  CUSTOM_COMMENTS: "custom_comments",
+  POLL: "poll",
+  MENTIONS: "mentions",
+  PACKAGE: "package",
+  SUBSCRIPTIONS: "subscriptions",
+  DRIP: "drip",
+};
+
+/** Formas de pedido que la tienda sabe vender hoy. */
+export const SUPPORTED_ORDER_KINDS = [ORDER_KINDS.DEFAULT, ORDER_KINDS.CUSTOM_COMMENTS];
+
+export function detectOrderKind(name, serviceType = "") {
+  const n = String(name ?? "");
+  if (/\bcustom\b/i.test(n) && (/comment/i.test(n) || serviceType === "comentarios")) {
+    return ORDER_KINDS.CUSTOM_COMMENTS;
+  }
+  if (/\bpoll\b|\banswer\s*number\b/i.test(n)) return ORDER_KINDS.POLL;
+  if (/\bmentions?\b/i.test(n)) return ORDER_KINDS.MENTIONS;
+  if (/\bpackage\b/i.test(n)) return ORDER_KINDS.PACKAGE;
+  if (/\bsubscriptions?\b/i.test(n)) return ORDER_KINDS.SUBSCRIPTIONS;
+  if (/\bdrip[-\s]?feed\b/i.test(n)) return ORDER_KINDS.DRIP;
+  return ORDER_KINDS.DEFAULT;
+}
+
+/** Traduce el campo `type` que devuelve la API del proveedor. */
+export function orderKindFromApiType(apiType, name = "", serviceType = "") {
+  const t = String(apiType ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  if (!t) return detectOrderKind(name, serviceType);
+  if (t.includes("customcomment")) return ORDER_KINDS.CUSTOM_COMMENTS;
+  if (t.includes("poll")) return ORDER_KINDS.POLL;
+  if (t.includes("mention")) return ORDER_KINDS.MENTIONS;
+  if (t.includes("package")) return ORDER_KINDS.PACKAGE;
+  if (t.includes("subscription")) return ORDER_KINDS.SUBSCRIPTIONS;
+  if (t.includes("dripfeed")) return ORDER_KINDS.DRIP;
+  if (t.includes("default")) return ORDER_KINDS.DEFAULT;
+  return detectOrderKind(name, serviceType);
 }

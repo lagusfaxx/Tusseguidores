@@ -227,6 +227,7 @@ export default async function ProductPage({ params }: Params) {
                 ratePer1000Clp={ratePer1000Clp}
                 minPriceClp={ctx.minPriceClp}
                 rounding={ctx.rounding}
+                orderKind={product.order_kind}
               />
             </div>
           </div>

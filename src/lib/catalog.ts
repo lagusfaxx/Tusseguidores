@@ -9,8 +9,9 @@ export type ProductWithService = Product & {
   provider_enabled: number;
   avg_minutes: number | null;
   provider_name: string;
-  /** Subtipo y calidad del servicio de referencia. */
+  /** Subtipo, forma de pedido y calidad del servicio de referencia. */
   variant: string;
+  order_kind: string;
   geo: string;
   drop_score: number;
   speed_score: number;
@@ -25,6 +26,7 @@ const PRODUCT_SELECT = `
          s.avg_minutes,
          s.name           AS provider_name,
          s.variant,
+         s.order_kind,
          s.geo,
          s.drop_score,
          s.speed_score

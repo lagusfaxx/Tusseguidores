@@ -50,6 +50,8 @@ function migrate(database: Database.Database) {
     ["provider_services", "speed_score", "INTEGER NOT NULL DEFAULT 50"],
     ["provider_services", "geo", "TEXT NOT NULL DEFAULT 'global'"],
     ["provider_services", "variant", "TEXT NOT NULL DEFAULT ''"],
+    ["provider_services", "order_kind", "TEXT NOT NULL DEFAULT 'default'"],
+    ["orders", "comments", "TEXT"],
     ["products", "auto_select", "INTEGER NOT NULL DEFAULT 1"],
     ["products", "max_cost_ratio", "REAL NOT NULL DEFAULT 1.35"],
     ["orders", "reference_service_id", "INTEGER"],

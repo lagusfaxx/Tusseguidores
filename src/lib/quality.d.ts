@@ -7,3 +7,7 @@ export const SPEED_WEIGHT: number;
 export function detectGeo(name: string): string;
 export function detectVariant(name: string): string;
 export const ROUTABLE_GEOS: string[];
+export const ORDER_KINDS: Record<string, string>;
+export const SUPPORTED_ORDER_KINDS: string[];
+export function detectOrderKind(name: string, serviceType?: string): string;
+export function orderKindFromApiType(apiType: string | undefined, name?: string, serviceType?: string): string;

@@ -8,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { PLATFORMS } from "../src/lib/taxonomy.mjs";
-import { PLATFORM_LABEL, TYPE_LABEL } from "./copy.mjs";
+import { PLATFORM_LABEL, TYPE_LABEL } from "../src/lib/copy.mjs";
 
 const root = process.cwd();
 const outDir = path.join(root, "public", "img", "productos");

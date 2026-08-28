@@ -82,6 +82,39 @@ precio mínimo de la tienda.
 
 Cada producto puede además tener su propio margen o precios totalmente manuales.
 
+### Agregar un producto
+
+**Panel → Productos → Agregar producto.** Eliges la red y qué quieres vender:
+las opciones que aparecen son las combinaciones que el proveedor realmente
+puede atender, no los casi 2.000 servicios sueltos. Cada tarjeta muestra el
+mejor servicio que encontró, cuántos hay de repuesto, la calidad y los precios
+que va a tener. Un clic en «Crear» deja el producto publicado con nombre,
+descripción, preguntas frecuentes y SEO en español, listos para editar.
+
+El catálogo del proveedor sigue disponible para cuando necesites un servicio
+concreto (un país específico, un subtipo raro), pero no es la vía normal.
+
+### Formas de pedido
+
+La API del proveedor no pide lo mismo para todos los servicios, y equivocarse
+entrega cualquier cosa. Cada servicio queda marcado con su forma de pedido
+(`order_kind`), leída del campo `type` que devuelve la API —o del nombre, para
+el catálogo importado desde la lista de precios:
+
+| Forma | Qué se le envía | Estado |
+|---|---|---|
+| `default` | `quantity` | Soportada |
+| `custom_comments` | `comments`, el texto de cada comentario | Soportada |
+| `poll`, `mentions`, `package`, `subscriptions`, `drip` | parámetros propios | No se venden |
+
+En **comentarios personalizados** el formulario cambia solo: el cliente escribe
+los comentarios en un cuadro de texto, uno por línea, y la cantidad —y el
+precio— salen de cuántas líneas escribió. Al despachar se envía `comments` y
+nunca `quantity`.
+
+Las formas que la tienda no implementa quedan fuera del enrutado y del creador
+de productos, para que no se puedan vender por accidente.
+
 ### Elección del servicio del proveedor
 
 El cliente elige **un producto** ("Seguidores para Instagram"), nunca un servicio
@@ -102,9 +135,10 @@ que:
 - están **activos** en el proveedor (los desactivados quedan fuera solos);
 - aceptan la cantidad pedida;
 - son del **mismo subtipo** (los likes de una publicación no se enrutan a likes
-  de transmisión en vivo);
-- apuntan a una **audiencia usable** (global, Latinoamérica u occidental: nada de
-  cuentas de India o Bangladesh para una tienda chilena);
+  de transmisión en vivo) y de la **misma forma de pedido**;
+- apuntan a una **audiencia neutra** (global o latinoamericana): un servicio
+  marcado como estadounidense, italiano o indio es otro producto —se nota, sobre
+  todo en los comentarios— y hay que elegirlo a mano;
 - no cuestan más que el servicio de referencia por el **presupuesto** del
   producto (1,35× por defecto), para que el margen no se caiga.
 
@@ -191,8 +225,10 @@ src/
     schema.sql                  esquema de la base de datos
     pricing.ts                  motor de precios
     provider.ts                 cliente de honestsmm
-    quality.mjs                 puntajes de retención, velocidad, región y subtipo
+    quality.mjs                 retención, velocidad, región, subtipo y forma de pedido
     routing.ts                  elección del servicio al que se despacha
+    offers.ts                   combinaciones vendibles para el creador de productos
+    copy.mjs                    textos y SEO en español de cada producto
     flow.ts                     cliente de Flow
     orders.ts                   ciclo de vida de los pedidos
     taxonomy.mjs                clasificación de servicios

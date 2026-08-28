@@ -1,5 +1,5 @@
 import { all, get } from "./db";
-import { DROP_WEIGHT, SPEED_WEIGHT, ROUTABLE_GEOS } from "./quality.mjs";
+import { DROP_WEIGHT, SPEED_WEIGHT, ROUTABLE_GEOS, SUPPORTED_ORDER_KINDS } from "./quality.mjs";
 import type { ProviderService } from "./types";
 
 /**
@@ -28,6 +28,12 @@ export type RoutingInput = {
   maxCostRatio: number;
   /** Subtipo del servicio de referencia: solo enrutamos dentro del mismo. */
   variant?: string;
+  /**
+   * Forma de pedido del producto. Nunca se enruta entre formas distintas: un
+   * servicio de comentarios personalizados espera el texto de los comentarios,
+   * no una cantidad.
+   */
+  orderKind?: string;
 };
 
 const GEO_MARKS = ROUTABLE_GEOS.map(() => "?").join(",");
@@ -38,7 +44,8 @@ const GEO_MARKS = ROUTABLE_GEOS.map(() => "?").join(",");
  * Se descarta lo que no corresponde aunque puntúe alto: servicios apuntados a
  * un país que no es el público de la tienda y subtipos distintos al del
  * producto (likes de transmisión en vivo cuando lo que se vendió son likes de
- * una publicación, por ejemplo).
+ * una publicación, por ejemplo), y formas de pedido distintas a la del
+ * producto.
  */
 export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
   const budget = input.referenceRateUsd * Math.max(1, input.maxCostRatio);
@@ -49,6 +56,7 @@ export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
         AND s.platform = ?
         AND s.service_type = ?
         AND s.variant = ?
+        AND s.order_kind = ?
         AND s.geo IN (${GEO_MARKS})
         AND s.min_qty <= ?
         AND s.max_qty >= ?
@@ -57,7 +65,8 @@ export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
       ORDER BY score DESC, s.rate_usd_per_1000 ASC
       LIMIT ?`,
     [
-      input.platform, input.serviceType, input.variant ?? "", ...ROUTABLE_GEOS,
+      input.platform, input.serviceType, input.variant ?? "",
+      input.orderKind ?? "default", ...ROUTABLE_GEOS,
       input.quantity, input.quantity, budget, limit,
     ],
   );
@@ -80,6 +89,9 @@ export function pickService(input: RoutingInput, autoSelect: boolean): Routed | 
     "SELECT * FROM provider_services WHERE service_id = ?",
     [input.referenceServiceId],
   );
+
+  // Solo sabemos vender las formas de pedido que la tienda implementa.
+  if (reference && !SUPPORTED_ORDER_KINDS.includes(reference.order_kind)) return null;
 
   const referenceUsable =
     reference != null &&
@@ -136,8 +148,9 @@ export function routingForProduct(
     max_cost_ratio: number;
     auto_select: number;
     min_qty: number;
-    /** Subtipo del servicio de referencia. */
+    /** Subtipo y forma de pedido del servicio de referencia. */
     variant?: string;
+    order_kind?: string;
   },
   referenceRateUsd: number,
   quantity?: number,
@@ -151,6 +164,7 @@ export function routingForProduct(
       referenceRateUsd,
       maxCostRatio: product.max_cost_ratio,
       variant: product.variant ?? "",
+      orderKind: product.order_kind ?? "default",
     },
     product.auto_select === 1,
   );

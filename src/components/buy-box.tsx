@@ -25,6 +25,11 @@ type Props = {
   ratePer1000Clp: number;
   minPriceClp: number;
   rounding: number;
+  /**
+   * "custom_comments" cambia el formulario entero: el cliente escribe los
+   * comentarios y la cantidad son las líneas que escribió.
+   */
+  orderKind: string;
 };
 
 /** Misma terminación comercial que aplica el servidor en src/lib/pricing.ts */
@@ -38,11 +43,15 @@ function roundToEnding(value: number, ending: number): number {
 const clp = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 const num = new Intl.NumberFormat("es-CL");
 
-function SubmitButton({ price }: { price: number }) {
+function SubmitButton({ price, disabled, label }: { price: number; disabled?: boolean; label?: string }) {
   const { pending } = useFormStatus();
   return (
-    <button type="submit" className="btn btn-primary mt-5 w-full text-base" disabled={pending}>
-      {pending ? "Redirigiendo al pago…" : `Pagar ${clp.format(price)}`}
+    <button
+      type="submit"
+      className="btn btn-primary mt-5 w-full text-base"
+      disabled={pending || disabled}
+    >
+      {pending ? "Redirigiendo al pago…" : disabled && label ? label : `Pagar ${clp.format(price)}`}
     </button>
   );
 }
@@ -51,11 +60,24 @@ export function BuyBox(props: Props) {
   const { tiers, minQty, maxQty, ratePer1000Clp, minPriceClp } = props;
   const defaultTier = tiers.find((t) => t.popular) ?? tiers[0];
 
+  const isCustomComments = props.orderKind === "custom_comments";
+
   const [selected, setSelected] = useState<number | "custom">(defaultTier?.id ?? "custom");
   const [customQty, setCustomQty] = useState<number>(defaultTier?.quantity ?? minQty);
+  const [comments, setComments] = useState("");
   const [state, formAction] = useActionState<CheckoutState, FormData>(startCheckout, {});
 
+  const commentLines = useMemo(
+    () => comments.split("\n").map((line) => line.trim()).filter(Boolean),
+    [comments],
+  );
+
   const { quantity, price } = useMemo(() => {
+    if (isCustomComments) {
+      const qty = commentLines.length;
+      const raw = (qty / 1000) * ratePer1000Clp;
+      return { quantity: qty, price: Math.max(minPriceClp, roundToEnding(raw, props.rounding)) };
+    }
     if (selected === "custom") {
       const qty = Math.min(maxQty, Math.max(minQty, Math.round(customQty) || minQty));
       const raw = (qty / 1000) * ratePer1000Clp;
@@ -63,13 +85,44 @@ export function BuyBox(props: Props) {
     }
     const tier = tiers.find((t) => t.id === selected) ?? defaultTier;
     return { quantity: tier?.quantity ?? minQty, price: tier?.priceClp ?? minPriceClp };
-  }, [selected, customQty, tiers, defaultTier, minQty, maxQty, ratePer1000Clp, minPriceClp, props.rounding]);
+  }, [isCustomComments, commentLines.length, selected, customQty, tiers, defaultTier,
+      minQty, maxQty, ratePer1000Clp, minPriceClp, props.rounding]);
 
   return (
     <form action={formAction} className="card p-5 sm:p-6">
       <input type="hidden" name="productId" value={props.productId} />
       <input type="hidden" name="quantity" value={quantity} />
 
+      {isCustomComments ? (
+        <>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">
+            Escribe tus comentarios
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-ink-400">
+            Uno por línea. Se publican en el orden que los escribas, repartidos en el tiempo.
+            Entre {num.format(minQty)} y {num.format(maxQty)}.
+          </p>
+          <textarea
+            name="comments"
+            rows={7}
+            required
+            className="field mt-3 leading-relaxed"
+            placeholder={"Qué buena foto\nMe encanta 😍\n¿Dónde lo compraste?\nTe quedó increíble"}
+            value={comments}
+            onChange={(event) => setComments(event.target.value)}
+          />
+          <p className="mt-1.5 text-xs text-ink-400">
+            {commentLines.length === 0
+              ? "Todavía no escribes ninguno."
+              : `${num.format(commentLines.length)} comentario${commentLines.length === 1 ? "" : "s"}`}
+            {commentLines.length > 0 && commentLines.length < minQty
+              ? ` · te faltan ${num.format(minQty - commentLines.length)} para el mínimo`
+              : ""}
+            {commentLines.length > maxQty ? ` · te pasaste del máximo (${num.format(maxQty)})` : ""}
+          </p>
+        </>
+      ) : (
+        <>
       <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">Elige la cantidad</h2>
 
       <div className="mt-4 grid grid-cols-2 gap-2.5">
@@ -113,7 +166,10 @@ export function BuyBox(props: Props) {
         </button>
       </div>
 
-      {selected === "custom" ? (
+        </>
+      )}
+
+      {!isCustomComments && selected === "custom" ? (
         <div className="mt-4">
           <label className="field-label" htmlFor="customQty">
             Cantidad exacta (entre {num.format(minQty)} y {num.format(maxQty)})
@@ -168,7 +224,9 @@ export function BuyBox(props: Props) {
 
       <div className="mt-5 flex items-center justify-between rounded-xl border border-white/10 bg-white/4 px-4 py-3">
         <div>
-          <span className="block text-xs text-ink-400">{num.format(quantity)} unidades</span>
+          <span className="block text-xs text-ink-400">
+            {num.format(quantity)} {isCustomComments ? "comentarios" : "unidades"}
+          </span>
           <span className="text-2xl font-extrabold">{clp.format(price)}</span>
         </div>
         <span className="text-right text-xs leading-relaxed text-ink-400">
@@ -183,7 +241,15 @@ export function BuyBox(props: Props) {
         </p>
       ) : null}
 
-      <SubmitButton price={price} />
+      <SubmitButton
+        price={price}
+        disabled={isCustomComments && (commentLines.length < minQty || commentLines.length > maxQty)}
+        label={
+          commentLines.length > maxQty
+            ? `Máximo ${num.format(maxQty)} comentarios`
+            : `Escribe al menos ${num.format(minQty)} comentario${minQty === 1 ? "" : "s"}`
+        }
+      />
 
       <ul className="mt-4 space-y-1.5 text-xs text-ink-400">
         <li className="flex items-center gap-1.5"><LockIcon className="h-3.5 w-3.5 text-lime-400" /> Pago seguro con Flow: Webpay, transferencia o Mercado Pago</li>

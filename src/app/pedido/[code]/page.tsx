@@ -77,6 +77,14 @@ export default async function OrderPage({ params, searchParams }: Params) {
                 <dt className="text-ink-400">Última actualización</dt>
                 <dd>{formatDateCl(order.updated_at)}</dd>
               </div>
+              {order.comments ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-ink-400">Tus comentarios ({order.comments.split("\n").length})</dt>
+                  <dd className="mt-1 max-h-44 overflow-y-auto whitespace-pre-line rounded-lg border border-white/10 bg-white/4 p-3 text-xs leading-relaxed text-ink-200">
+                    {order.comments}
+                  </dd>
+                </div>
+              ) : null}
               {order.start_count != null ? (
                 <div>
                   <dt className="text-ink-400">Conteo inicial</dt>

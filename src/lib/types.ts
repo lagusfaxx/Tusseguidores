@@ -17,6 +17,7 @@ export type ProviderService = {
   speed_score: number;
   geo: string;
   variant: string;
+  order_kind: string;
   provider_enabled: number;
   last_provider_update: string | null;
   synced_at: string;
@@ -87,6 +88,7 @@ export type Order = {
   reference_service_id: number | null;
   quantity: number;
   link: string;
+  comments: string | null;
   email: string;
   phone: string | null;
   amount_clp: number;

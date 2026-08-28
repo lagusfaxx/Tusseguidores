@@ -81,6 +81,16 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
                   </dd>
                 </div>
               ) : null}
+              {order.comments ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-ink-400">
+                    Comentarios del cliente ({order.comments.split("\n").length})
+                  </dt>
+                  <dd className="mt-1 max-h-52 overflow-y-auto whitespace-pre-line rounded-lg border border-white/10 bg-white/4 p-3 text-xs leading-relaxed">
+                    {order.comments}
+                  </dd>
+                </div>
+              ) : null}
               {order.provider_error ? (
                 <div className="sm:col-span-2">
                   <dt className="text-ink-400">Error del proveedor</dt>

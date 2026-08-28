@@ -8,10 +8,12 @@ import { setSettings, invalidateSettings } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
 import {
-  dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant,
+  dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
 } from "@/lib/quality.mjs";
 import { sendToProvider, setStatus, syncOpenOrders, logEvent, markPaid } from "@/lib/orders";
 import { sanitizeHtml, slugify } from "@/lib/utils";
+import { buildCopy } from "@/lib/copy.mjs";
+import { findOffer, ladderFor } from "@/lib/offers";
 import type { OrderStatus } from "@/lib/types";
 
 export type ActionState = { ok?: string; error?: string };
@@ -237,7 +239,78 @@ export async function deleteProduct(formData: FormData) {
   redirect("/admin/productos?eliminado=1");
 }
 
-/** Crea un producto en blanco a partir de un servicio del proveedor. */
+/**
+ * Crea un producto listo a partir de "red social + qué vendes".
+ *
+ * Es la vía normal para agregar productos: la tienda busca el mejor servicio,
+ * arma la escalera de cantidades, escribe los textos y el SEO en español y deja
+ * el producto publicado. Después se puede afinar en el editor.
+ */
+export async function createProductFromOffer(formData: FormData) {
+  await guard();
+
+  const platform = String(formData.get("platform") ?? "");
+  const serviceType = String(formData.get("service_type") ?? "");
+  const orderKind = String(formData.get("order_kind") ?? "default");
+  const publish = formData.get("publish") ? 1 : 0;
+
+  const offer = findOffer(platform, serviceType, orderKind);
+  if (!offer) redirect("/admin/productos/nuevo?error=sin-servicio");
+
+  const copy = buildCopy({ platform, type: serviceType, orderKind });
+  let slug = copy.slug;
+  if (get("SELECT 1 FROM products WHERE slug = ?", [slug])) {
+    slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
+  }
+
+  const ladder = ladderFor(offer);
+  const days = refillDaysFromName(offer.best_name);
+
+  const create = db.transaction(() => {
+    const info = db.prepare(
+      `INSERT INTO products
+         (slug, name, platform, service_type, provider_service_id, short_description,
+          description_html, bullets_json, faq_json, seo_title, seo_description, seo_keywords,
+          image_url, min_qty, max_qty, link_label, link_placeholder, link_help,
+          delivery_label, quality_label, refill_days, guarantee_text,
+          auto_select, max_cost_ratio, published, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1.35, ?, 100)`,
+    ).run(
+      slug, copy.name, platform, serviceType, offer.best_service_id,
+      copy.shortDescription, copy.descriptionHtml,
+      JSON.stringify(copy.bullets), JSON.stringify(copy.faq),
+      copy.seoTitle, copy.seoDescription, copy.seoKeywords,
+      `/img/productos/${platform}-${serviceType}.svg`,
+      ladder[0], offer.best_max,
+      copy.link.label, copy.link.placeholder, copy.link.help,
+      "Inicio inmediato",
+      offer.score >= 80 ? "Alta calidad · sin caídas" : "Alta calidad",
+      days,
+      days >= 9999
+        ? "Reposición de por vida si bajan"
+        : days > 0
+          ? `Reposición gratis por ${days} días`
+          : "Reembolso si el pedido no se entrega",
+      publish,
+    );
+
+    const productId = Number(info.lastInsertRowid);
+    const popular = Math.min(2, ladder.length - 1);
+    ladder.forEach((quantity, i) =>
+      run("INSERT INTO product_tiers (product_id, quantity, popular, sort_order) VALUES (?, ?, ?, ?)", [
+        productId, quantity, i === popular ? 1 : 0, i,
+      ]),
+    );
+    return productId;
+  });
+
+  const productId = create();
+  refreshStore(`/producto/${slug}`);
+  revalidatePath("/admin/productos");
+  redirect(`/admin/productos/${productId}?creado=1`);
+}
+
+/** Crea un producto en blanco a partir de un servicio suelto del proveedor. */
 export async function createFromService(formData: FormData) {
   await guard();
   const serviceId = Number(formData.get("service_id"));
@@ -364,10 +437,10 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
     INSERT INTO provider_services
       (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
        min_qty, max_qty, refill, cancel, refill_days, drop_score, speed_score, geo, variant,
-       provider_enabled, synced_at)
+       order_kind, provider_enabled, synced_at)
     VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
             @min_qty, @max_qty, @refill, @cancel, @refill_days, @drop_score, @speed_score,
-            @geo, @variant, 1, datetime('now'))
+            @geo, @variant, @order_kind, 1, datetime('now'))
     ON CONFLICT(service_id) DO UPDATE SET
       name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
       platform = excluded.platform, service_type = excluded.service_type,
@@ -376,6 +449,7 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
       refill = excluded.refill, cancel = excluded.cancel,
       refill_days = excluded.refill_days, drop_score = excluded.drop_score,
       speed_score = excluded.speed_score, geo = excluded.geo, variant = excluded.variant,
+      order_kind = excluded.order_kind,
       provider_enabled = 1, synced_at = datetime('now')
   `);
 
@@ -387,13 +461,14 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
       seen.push(serviceId);
       const clean = normalizeText(row.name);
       const days = refillDaysFromName(clean);
+      const serviceType = detectServiceType(row.name, row.category);
       upsert.run({
         service_id: serviceId,
         name: row.name,
         clean_name: clean,
         category: normalizeText(row.category) || String(row.category ?? ""),
         platform: detectPlatform(row.name, row.category),
-        service_type: detectServiceType(row.name, row.category),
+        service_type: serviceType,
         rate: Number(row.rate) || 0,
         min_qty: Number(row.min) || 1,
         max_qty: Number(row.max) || 1000,
@@ -404,6 +479,9 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
         speed_score: speedScore(clean, knownAvg.get(serviceId) ?? null),
         geo: detectGeo(clean),
         variant: detectVariant(clean),
+        // El campo `type` de la API manda: dice si el servicio espera texto,
+        // un número de opción o simplemente una cantidad.
+        order_kind: orderKindFromApiType(row.type, clean, serviceType),
       });
     }
     // Lo que el proveedor ya no lista queda deshabilitado, no se borra: así los

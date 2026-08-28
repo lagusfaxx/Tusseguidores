@@ -8,6 +8,15 @@ import { orderCode } from "./utils";
 import { pickService } from "./routing";
 import type { Order, OrderStatus } from "./types";
 
+/** Comentarios escritos por el cliente: una línea por comentario, sin vacías. */
+export function cleanComments(raw: string): string[] {
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(0, 5000);
+}
+
 export function logEvent(orderId: number, type: string, message: string) {
   run("INSERT INTO order_events (order_id, type, message) VALUES (?, ?, ?)", [orderId, type, message]);
 }
@@ -52,6 +61,8 @@ export type CreateOrderInput = {
   productId: number;
   quantity: number;
   link: string;
+  /** Solo para servicios de comentarios personalizados: uno por línea. */
+  comments?: string;
   email: string;
   phone?: string;
   couponCode?: string;
@@ -68,9 +79,23 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
 
   const min = Math.max(product.min_qty, product.provider_min);
   const max = Math.min(product.max_qty, product.provider_max);
-  const quantity = Math.round(input.quantity);
+
+  // En los comentarios personalizados manda el texto: la cantidad es cuántas
+  // líneas escribió el cliente, no un número que él elija aparte.
+  const isCustomComments = product.order_kind === "custom_comments";
+  const commentLines = isCustomComments ? cleanComments(input.comments ?? "") : [];
+  if (isCustomComments && commentLines.length === 0) {
+    return { ok: false, error: "Escribe al menos un comentario, uno por línea." };
+  }
+  const quantity = isCustomComments ? commentLines.length : Math.round(input.quantity);
+
   if (!Number.isFinite(quantity) || quantity < min || quantity > max) {
-    return { ok: false, error: `La cantidad debe estar entre ${min} y ${max}.` };
+    return {
+      ok: false,
+      error: isCustomComments
+        ? `Tienes que escribir entre ${min} y ${max} comentarios (uno por línea). Escribiste ${quantity}.`
+        : `La cantidad debe estar entre ${min} y ${max}.`,
+    };
   }
 
   // El servicio definitivo se elige al despachar, pero comprobamos ya que
@@ -85,6 +110,7 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
       referenceRateUsd: product.rate_usd_per_1000,
       maxCostRatio: product.max_cost_ratio,
       variant: product.variant,
+      orderKind: product.order_kind,
     },
     product.auto_select === 1,
   );
@@ -108,12 +134,13 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const info = run(
     `INSERT INTO orders
        (code, product_id, product_name, provider_service_id, reference_service_id, quantity,
-        link, email, phone, amount_clp, discount_clp, coupon_code, cost_usd,
+        link, comments, email, phone, amount_clp, discount_clp, coupon_code, cost_usd,
         status, payment_status, ip)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
     [
       code, product.id, product.name, routed.service.service_id, product.provider_service_id,
-      quantity, input.link.trim(), input.email.trim().toLowerCase(), input.phone?.trim() || null,
+      quantity, input.link.trim(), commentLines.length ? commentLines.join("\n") : null,
+      input.email.trim().toLowerCase(), input.phone?.trim() || null,
       amount, coupon?.discountClp ?? 0, coupon?.code ?? null,
       costUsd(routed.service.rate_usd_per_1000, quantity), input.ip ?? null,
     ],
@@ -176,6 +203,7 @@ function resolveDispatchService(order: Order): number {
       referenceRateUsd: product.rate_usd_per_1000,
       maxCostRatio: product.max_cost_ratio,
       variant: product.variant,
+      orderKind: product.order_kind,
     },
     product.auto_select === 1,
   );
@@ -218,11 +246,13 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
   const serviceId = resolveDispatchService(order);
 
   try {
-    const response = await provider.addOrder({
-      service: serviceId,
-      link: order.link,
-      quantity: order.quantity,
-    });
+    // Los comentarios personalizados van como texto y sin "quantity": el
+    // proveedor cuenta las líneas.
+    const response = await provider.addOrder(
+      order.comments
+        ? { service: serviceId, link: order.link, comments: order.comments }
+        : { service: serviceId, link: order.link, quantity: order.quantity },
+    );
     const providerOrderId = Number(response.order);
     if (!providerOrderId) throw new ProviderError("El proveedor no devolvió un número de pedido.");
 

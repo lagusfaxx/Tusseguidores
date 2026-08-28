@@ -14,9 +14,9 @@ import Database from "better-sqlite3";
 import { detectPlatform, detectServiceType, normalizeText } from "../src/lib/taxonomy.mjs";
 import {
   dropScore, speedScore, overallScore, refillDaysFromName,
-  detectGeo, detectVariant, ROUTABLE_GEOS,
+  detectGeo, detectVariant, detectOrderKind, ROUTABLE_GEOS, SUPPORTED_ORDER_KINDS,
 } from "../src/lib/quality.mjs";
-import { buildCopy, POST_TYPES, PLATFORM_LABEL, TYPE_LABEL } from "./copy.mjs";
+import { buildCopy } from "../src/lib/copy.mjs";
 
 const root = process.cwd();
 const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(root, "data");
@@ -43,11 +43,11 @@ const upsertService = db.prepare(`
   INSERT INTO provider_services
     (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
      min_qty, max_qty, avg_minutes, refill, cancel, provider_description,
-     refill_days, drop_score, speed_score, geo, variant,
+     refill_days, drop_score, speed_score, geo, variant, order_kind,
      provider_enabled, last_provider_update, synced_at)
   VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
           @min_qty, @max_qty, @avg_minutes, @refill, @cancel, @provider_description,
-          @refill_days, @drop_score, @speed_score, @geo, @variant,
+          @refill_days, @drop_score, @speed_score, @geo, @variant, @order_kind,
           @provider_enabled, @last_provider_update, datetime('now'))
   ON CONFLICT(service_id) DO UPDATE SET
     name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
@@ -61,6 +61,7 @@ const upsertService = db.prepare(`
     speed_score = excluded.speed_score,
     geo = excluded.geo,
     variant = excluded.variant,
+    order_kind = excluded.order_kind,
     provider_enabled = excluded.provider_enabled,
     last_provider_update = excluded.last_provider_update,
     synced_at = datetime('now')
@@ -92,6 +93,7 @@ const importAll = db.transaction((rows) => {
       speed_score: speedScore(clean, row.avgMinutes),
       geo: detectGeo(clean),
       variant: detectVariant(clean),
+      order_kind: detectOrderKind(clean, serviceType),
       provider_enabled: row.providerEnabled,
       last_provider_update: row.lastProviderUpdate,
     });
@@ -131,6 +133,7 @@ const LADDERS = {
   vistas: [1000, 2500, 5000, 10000, 25000, 50000],
   reproducciones: [1000, 2500, 5000, 10000, 25000],
   comentarios: [10, 25, 50, 100, 250],
+  custom_comments: [5, 10, 20, 50],
   compartidos: [100, 250, 500, 1000, 2500],
   guardados: [100, 250, 500, 1000, 2500],
   historias: [500, 1000, 2500, 5000, 10000],
@@ -152,11 +155,13 @@ const BADGES = {
 /** Qué publicamos de entrada. El resto queda importado y oculto. */
 const CURATED = [
   ["instagram", "seguidores", 1], ["instagram", "likes", 1], ["instagram", "vistas", 1],
-  ["instagram", "comentarios", 0], ["instagram", "guardados", 0], ["instagram", "historias", 0],
+  ["instagram", "comentarios", 0], ["instagram", "comentarios", 0, "custom_comments"],
+  ["instagram", "guardados", 0], ["instagram", "historias", 0],
   ["tiktok", "seguidores", 1], ["tiktok", "likes", 1], ["tiktok", "vistas", 1],
-  ["tiktok", "comentarios", 0], ["tiktok", "compartidos", 0],
+  ["tiktok", "comentarios", 0], ["tiktok", "comentarios", 0, "custom_comments"],
+  ["tiktok", "compartidos", 0],
   ["youtube", "suscriptores", 1], ["youtube", "vistas", 1], ["youtube", "likes", 0],
-  ["youtube", "comentarios", 0],
+  ["youtube", "comentarios", 0], ["youtube", "comentarios", 0, "custom_comments"],
   ["facebook", "seguidores", 0], ["facebook", "likes", 0], ["facebook", "vistas", 0],
   ["twitter", "seguidores", 0], ["twitter", "likes", 0], ["twitter", "vistas", 0],
   ["telegram", "miembros", 0], ["telegram", "vistas", 0], ["telegram", "reacciones", 0],
@@ -172,6 +177,7 @@ const candidates = db.prepare(`
   SELECT * FROM provider_services
    WHERE platform = ? AND service_type = ? AND provider_enabled = 1
      AND variant = '' AND geo IN (${geoMarks})
+     AND order_kind = ?
      AND rate_usd_per_1000 > 0 AND min_qty <= ?
    ORDER BY rate_usd_per_1000 ASC
 `);
@@ -184,10 +190,10 @@ const candidates = db.prepare(`
  * precio queda competitivo y, al despachar, el enrutado automático todavía
  * tiene presupuesto para subir a algo aún mejor si aparece.
  */
-function pickService(platform, type, ladder) {
+function pickService(platform, type, ladder, orderKind = "default") {
   const minNeeded = Math.min(...ladder);
-  let rows = candidates.all(platform, type, ...ROUTABLE_GEOS, minNeeded);
-  if (!rows.length) rows = candidates.all(platform, type, ...ROUTABLE_GEOS, minNeeded * 10);
+  let rows = candidates.all(platform, type, ...ROUTABLE_GEOS, orderKind, minNeeded);
+  if (!rows.length) rows = candidates.all(platform, type, ...ROUTABLE_GEOS, orderKind, minNeeded * 10);
   if (!rows.length) return null;
 
   const usable = rows.filter((r) => r.max_qty >= Math.max(...ladder) / 2);
@@ -252,20 +258,21 @@ let skipped = [];
 
 const seedProducts = db.transaction(() => {
   let order = 10;
-  for (const [platform, type, featured] of CURATED) {
-    const ladderBase = LADDERS[type] ?? LADDERS.seguidores;
-    const service = pickService(platform, type, ladderBase);
+  for (const [platform, type, featured, orderKind = "default"] of CURATED) {
+    const ladderBase =
+      (orderKind === "custom_comments" ? LADDERS.custom_comments : LADDERS[type]) ?? LADDERS.seguidores;
+    const service = pickService(platform, type, ladderBase, orderKind);
     if (!service) {
       skipped.push(`${platform}/${type}`);
       continue;
     }
-    const ladder = ladderFor(type, service);
+    const ladder = ladderFor(orderKind === "custom_comments" ? "custom_comments" : type, service);
     if (!ladder.length) {
       skipped.push(`${platform}/${type} (sin cantidades compatibles)`);
       continue;
     }
 
-    const copy = buildCopy({ platform, type });
+    const copy = buildCopy({ platform, type, orderKind });
     const existing = findProduct.get(copy.slug);
     const days = refillDays(service.clean_name);
 
