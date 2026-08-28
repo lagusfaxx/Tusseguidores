@@ -6,9 +6,6 @@ const nextConfig: NextConfig = {
   compress: true,
   reactStrictMode: true,
   serverExternalPackages: ["better-sqlite3"],
-  experimental: {
-    optimizePackageImports: [],
-  },
   async headers() {
     return [
       {
