@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, hashPassword } from "@/lib/auth";
-import { all, db, get, run } from "@/lib/db";
+import { all, db, get, run, rescoreServices } from "@/lib/db";
 import { setSettings, invalidateSettings } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
@@ -18,12 +18,52 @@ import type { OrderStatus } from "@/lib/types";
 
 export type ActionState = { ok?: string; error?: string };
 
+/**
+ * `redirect()` y `notFound()` funcionan lanzando un error especial. Al envolver
+ * una acción en try/catch hay que dejarlos pasar o el redirect nunca ocurre.
+ */
+function isControlFlowError(error: unknown): boolean {
+  const digest = (error as { digest?: unknown })?.digest;
+  return typeof digest === "string" && (digest.startsWith("NEXT_REDIRECT") || digest === "NEXT_NOT_FOUND");
+}
+
+/**
+ * Envuelve una acción de formulario que no devuelve estado. Si algo falla, en
+ * vez de tumbar la página con un error de servidor volvemos a la pantalla de
+ * origen con el motivo escrito.
+ */
+async function withErrorRedirect(backTo: string, action: () => Promise<void> | void) {
+  try {
+    await action();
+  } catch (error) {
+    if (isControlFlowError(error)) throw error;
+    const message = error instanceof Error ? error.message : "Error inesperado.";
+    console.error(`[admin] ${backTo}:`, error);
+    redirect(`${backTo}${backTo.includes("?") ? "&" : "?"}error=${encodeURIComponent(message.slice(0, 200))}`);
+  }
+}
+
 async function guard() {
   try {
     await requireUser();
   } catch {
     redirect("/admin/login");
   }
+}
+
+/** Enlace de producto libre: si choca, se le agrega un sufijo. */
+function uniqueSlug(base: string, ignoreId = 0): string {
+  const root = slugify(base) || `producto-${Date.now().toString(36)}`;
+  let candidate = root;
+  for (let i = 2; i < 50; i++) {
+    const clash = get<{ id: number }>("SELECT id FROM products WHERE slug = ? AND id != ?", [
+      candidate,
+      ignoreId,
+    ]);
+    if (!clash) return candidate;
+    candidate = `${root}-${i}`;
+  }
+  return `${root}-${Date.now().toString(36).slice(-5)}`;
 }
 
 function refreshStore(extra?: string) {
@@ -107,10 +147,7 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "El producto necesita un nombre." };
 
-  let slug = slugify(String(formData.get("slug") ?? "") || name);
-  if (!slug) return { error: "El enlace (slug) no puede quedar vacío." };
-  const clash = get<{ id: number }>("SELECT id FROM products WHERE slug = ? AND id != ?", [slug, id]);
-  if (clash) slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
+  const slug = uniqueSlug(String(formData.get("slug") ?? "") || name, id);
 
   const bullets = String(formData.get("bullets") ?? "")
     .split("\n").map((line) => line.trim()).filter(Boolean);
@@ -221,22 +258,26 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
 }
 
 export async function togglePublished(formData: FormData) {
-  await guard();
-  const id = Number(formData.get("id"));
-  run(
-    "UPDATE products SET published = CASE published WHEN 1 THEN 0 ELSE 1 END, updated_at = datetime('now') WHERE id = ?",
-    [id],
-  );
-  refreshStore();
-  revalidatePath("/admin/productos");
+  await withErrorRedirect("/admin/productos", async () => {
+    await guard();
+    const id = Number(formData.get("id"));
+    run(
+      "UPDATE products SET published = CASE published WHEN 1 THEN 0 ELSE 1 END, updated_at = datetime('now') WHERE id = ?",
+      [id],
+    );
+    refreshStore();
+    revalidatePath("/admin/productos");
+  });
 }
 
 export async function deleteProduct(formData: FormData) {
-  await guard();
-  const id = Number(formData.get("id"));
-  run("DELETE FROM products WHERE id = ?", [id]);
-  refreshStore();
-  redirect("/admin/productos?eliminado=1");
+  await withErrorRedirect("/admin/productos", async () => {
+    await guard();
+    const id = Number(formData.get("id"));
+    run("DELETE FROM products WHERE id = ?", [id]);
+    refreshStore();
+    redirect("/admin/productos?eliminado=1");
+  });
 }
 
 /**
@@ -247,156 +288,182 @@ export async function deleteProduct(formData: FormData) {
  * el producto publicado. Después se puede afinar en el editor.
  */
 export async function createProductFromOffer(formData: FormData) {
-  await guard();
+  await withErrorRedirect("/admin/productos/nuevo", async () => {
+    await guard();
 
-  const platform = String(formData.get("platform") ?? "");
-  const serviceType = String(formData.get("service_type") ?? "");
-  const orderKind = String(formData.get("order_kind") ?? "default");
-  const publish = formData.get("publish") ? 1 : 0;
+    const platform = String(formData.get("platform") ?? "");
+    const serviceType = String(formData.get("service_type") ?? "");
+    const orderKind = String(formData.get("order_kind") ?? "default");
+    const publish = formData.get("publish") ? 1 : 0;
 
-  const offer = findOffer(platform, serviceType, orderKind);
-  if (!offer) redirect("/admin/productos/nuevo?error=sin-servicio");
+    const offer = findOffer(platform, serviceType, orderKind);
+    if (!offer) redirect("/admin/productos/nuevo?error=sin-servicio");
 
-  const copy = buildCopy({ platform, type: serviceType, orderKind });
-  let slug = copy.slug;
-  if (get("SELECT 1 FROM products WHERE slug = ?", [slug])) {
-    slug = `${slug}-${Date.now().toString(36).slice(-4)}`;
-  }
+    const copy = buildCopy({ platform, type: serviceType, orderKind });
+    const slug = uniqueSlug(copy.slug);
 
-  const ladder = ladderFor(offer);
-  const days = refillDaysFromName(offer.best_name);
+    const ladder = ladderFor(offer);
+    const days = refillDaysFromName(offer.best_name);
 
-  const create = db.transaction(() => {
-    const info = db.prepare(
-      `INSERT INTO products
-         (slug, name, platform, service_type, provider_service_id, short_description,
-          description_html, bullets_json, faq_json, seo_title, seo_description, seo_keywords,
-          image_url, min_qty, max_qty, link_label, link_placeholder, link_help,
-          delivery_label, quality_label, refill_days, guarantee_text,
-          auto_select, max_cost_ratio, published, sort_order)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1.35, ?, 100)`,
-    ).run(
-      slug, copy.name, platform, serviceType, offer.best_service_id,
-      copy.shortDescription, copy.descriptionHtml,
-      JSON.stringify(copy.bullets), JSON.stringify(copy.faq),
-      copy.seoTitle, copy.seoDescription, copy.seoKeywords,
-      `/img/productos/${platform}-${serviceType}.svg`,
-      ladder[0], offer.best_max,
-      copy.link.label, copy.link.placeholder, copy.link.help,
-      "Inicio inmediato",
-      offer.score >= 80 ? "Alta calidad · sin caídas" : "Alta calidad",
-      days,
-      days >= 9999
-        ? "Reposición de por vida si bajan"
-        : days > 0
-          ? `Reposición gratis por ${days} días`
-          : "Reembolso si el pedido no se entrega",
-      publish,
-    );
+    const create = db.transaction(() => {
+      const info = db.prepare(
+        `INSERT INTO products
+           (slug, name, platform, service_type, provider_service_id, short_description,
+            description_html, bullets_json, faq_json, seo_title, seo_description, seo_keywords,
+            image_url, min_qty, max_qty, link_label, link_placeholder, link_help,
+            delivery_label, quality_label, refill_days, guarantee_text,
+            auto_select, max_cost_ratio, published, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1.35, ?, 100)`,
+      ).run(
+        slug, copy.name, platform, serviceType, offer.best_service_id,
+        copy.shortDescription, copy.descriptionHtml,
+        JSON.stringify(copy.bullets), JSON.stringify(copy.faq),
+        copy.seoTitle, copy.seoDescription, copy.seoKeywords,
+        `/img/productos/${platform}-${serviceType}.svg`,
+        ladder[0], offer.best_max,
+        copy.link.label, copy.link.placeholder, copy.link.help,
+        "Inicio inmediato",
+        offer.score >= 80 ? "Alta calidad · sin caídas" : "Alta calidad",
+        days,
+        days >= 9999
+          ? "Reposición de por vida si bajan"
+          : days > 0
+            ? `Reposición gratis por ${days} días`
+            : "Reembolso si el pedido no se entrega",
+        publish,
+      );
 
-    const productId = Number(info.lastInsertRowid);
-    const popular = Math.min(2, ladder.length - 1);
-    ladder.forEach((quantity, i) =>
-      run("INSERT INTO product_tiers (product_id, quantity, popular, sort_order) VALUES (?, ?, ?, ?)", [
-        productId, quantity, i === popular ? 1 : 0, i,
-      ]),
-    );
-    return productId;
+      const productId = Number(info.lastInsertRowid);
+      const popular = Math.min(2, ladder.length - 1);
+      ladder.forEach((quantity, i) =>
+        run("INSERT INTO product_tiers (product_id, quantity, popular, sort_order) VALUES (?, ?, ?, ?)", [
+          productId, quantity, i === popular ? 1 : 0, i,
+        ]),
+      );
+      return productId;
+    });
+
+    const productId = create();
+    refreshStore(`/producto/${slug}`);
+    revalidatePath("/admin/productos");
+    redirect(`/admin/productos/${productId}?creado=1`);
   });
-
-  const productId = create();
-  refreshStore(`/producto/${slug}`);
-  revalidatePath("/admin/productos");
-  redirect(`/admin/productos/${productId}?creado=1`);
 }
 
-/** Crea un producto en blanco a partir de un servicio suelto del proveedor. */
+/**
+ * Crea un producto en blanco a partir de un servicio suelto del proveedor.
+ *
+ * Si ese servicio ya tiene un producto, no se crea otro: se abre el que existe.
+ * Antes esto reventaba con un error de servidor porque el enlace del producto
+ * se derivaba del número de servicio y chocaba consigo mismo.
+ */
 export async function createFromService(formData: FormData) {
-  await guard();
-  const serviceId = Number(formData.get("service_id"));
-  const service = get<{
-    service_id: number; clean_name: string; platform: string; service_type: string;
-    min_qty: number; max_qty: number; avg_minutes: number | null;
-  }>("SELECT * FROM provider_services WHERE service_id = ?", [serviceId]);
-  if (!service) redirect("/admin/catalogo?error=1");
+  await withErrorRedirect("/admin/catalogo", async () => {
+    await guard();
+    const serviceId = Number(formData.get("service_id"));
+    const service = get<{
+      service_id: number; clean_name: string; platform: string; service_type: string;
+      min_qty: number; max_qty: number; avg_minutes: number | null; order_kind: string;
+    }>("SELECT * FROM provider_services WHERE service_id = ?", [serviceId]);
+    if (!service) redirect("/admin/catalogo?error=Ese+servicio+ya+no+existe+en+el+cat%C3%A1logo.");
 
-  const base = slugify(`${service.service_type}-${service.platform}-${service.service_id}`);
-  const info = db.prepare(
-    `INSERT INTO products
-       (slug, name, platform, service_type, provider_service_id, short_description,
-        image_url, min_qty, max_qty, published, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 100)`,
-  ).run(
-    base,
-    service.clean_name.slice(0, 90),
-    service.platform,
-    service.service_type,
-    service.service_id,
-    "",
-    `/img/productos/${service.platform}-${service.service_type}.svg`,
-    service.min_qty,
-    service.max_qty,
-  );
+    const existing = get<{ id: number }>(
+      "SELECT id FROM products WHERE provider_service_id = ? ORDER BY id LIMIT 1",
+      [serviceId],
+    );
+    if (existing) redirect(`/admin/productos/${existing.id}?ya-existia=1`);
 
-  const productId = Number(info.lastInsertRowid);
-  // Escalera inicial razonable dentro de los límites del servicio.
-  const ladder = [100, 250, 500, 1000, 2500, 5000]
-    .filter((q) => q >= service.min_qty && q <= service.max_qty)
-    .slice(0, 6);
-  (ladder.length ? ladder : [service.min_qty]).forEach((q, i) =>
-    run("INSERT INTO product_tiers (product_id, quantity, popular, sort_order) VALUES (?, ?, ?, ?)", [
-      productId, q, i === 2 ? 1 : 0, i,
-    ]),
-  );
+    const slug = uniqueSlug(`${service.service_type}-${service.platform}-${service.service_id}`);
+    const name = service.clean_name.trim().slice(0, 90) || `Servicio ${service.service_id}`;
 
-  redirect(`/admin/productos/${productId}?creado=1`);
+    const create = db.transaction(() => {
+      const info = db.prepare(
+        `INSERT INTO products
+           (slug, name, platform, service_type, provider_service_id, short_description,
+            image_url, min_qty, max_qty, auto_select, published, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 100)`,
+      ).run(
+        slug,
+        name,
+        service.platform,
+        service.service_type,
+        service.service_id,
+        "",
+        `/img/productos/${service.platform}-${service.service_type}.svg`,
+        service.min_qty,
+        service.max_qty,
+        // Un servicio elegido a mano se respeta: no lo reemplazamos por otro.
+        0,
+      );
+
+      const productId = Number(info.lastInsertRowid);
+      const ladder = [100, 250, 500, 1000, 2500, 5000]
+        .filter((q) => q >= service.min_qty && q <= service.max_qty)
+        .slice(0, 6);
+      const rows = ladder.length ? ladder : [Math.max(1, service.min_qty)];
+      const popular = Math.min(2, rows.length - 1);
+      rows.forEach((q, i) =>
+        run("INSERT INTO product_tiers (product_id, quantity, popular, sort_order) VALUES (?, ?, ?, ?)", [
+          productId, q, i === popular ? 1 : 0, i,
+        ]),
+      );
+      return productId;
+    });
+
+    const productId = create();
+    revalidatePath("/admin/productos");
+    revalidatePath("/admin/catalogo");
+    redirect(`/admin/productos/${productId}?creado=1`);
+  });
 }
 
 // ------------------------------------------------------------------ pedidos
 export async function orderAction(formData: FormData) {
-  await guard();
-  const id = Number(formData.get("order_id"));
-  const action = String(formData.get("action"));
+  await withErrorRedirect("/admin/pedidos", async () => {
+    await guard();
+    const id = Number(formData.get("order_id"));
+    const action = String(formData.get("action"));
 
-  if (action === "send") {
-    await sendToProvider(id);
-  } else if (action === "mark_paid") {
-    await markPaid(id, "manual");
-  } else if (action === "note") {
-    const note = String(formData.get("admin_note") ?? "").trim();
-    run("UPDATE orders SET admin_note = ?, updated_at = datetime('now') WHERE id = ?", [note, id]);
-  } else if (action === "status") {
-    const status = String(formData.get("status")) as OrderStatus;
-    setStatus(id, status, `Estado cambiado a mano desde el panel: ${status}.`);
-  } else if (action === "refill") {
-    const order = get<{ provider_order_id: number | null }>(
-      "SELECT provider_order_id FROM orders WHERE id = ?", [id],
-    );
-    if (order?.provider_order_id) {
-      try {
-        const result = await provider.refill(order.provider_order_id);
-        logEvent(id, "refill", `Reposición solicitada al proveedor (ID ${result.refill}).`);
-      } catch (error) {
-        logEvent(id, "error", `No se pudo pedir la reposición: ${(error as Error).message}`);
+    if (action === "send") {
+      await sendToProvider(id);
+    } else if (action === "mark_paid") {
+      await markPaid(id, "manual");
+    } else if (action === "note") {
+      const note = String(formData.get("admin_note") ?? "").trim();
+      run("UPDATE orders SET admin_note = ?, updated_at = datetime('now') WHERE id = ?", [note, id]);
+    } else if (action === "status") {
+      const status = String(formData.get("status")) as OrderStatus;
+      setStatus(id, status, `Estado cambiado a mano desde el panel: ${status}.`);
+    } else if (action === "refill") {
+      const order = get<{ provider_order_id: number | null }>(
+        "SELECT provider_order_id FROM orders WHERE id = ?", [id],
+      );
+      if (order?.provider_order_id) {
+        try {
+          const result = await provider.refill(order.provider_order_id);
+          logEvent(id, "refill", `Reposición solicitada al proveedor (ID ${result.refill}).`);
+        } catch (error) {
+          logEvent(id, "error", `No se pudo pedir la reposición: ${(error as Error).message}`);
+        }
       }
-    }
-  } else if (action === "cancel") {
-    const order = get<{ provider_order_id: number | null }>(
-      "SELECT provider_order_id FROM orders WHERE id = ?", [id],
-    );
-    if (order?.provider_order_id) {
-      try {
-        await provider.cancel([order.provider_order_id]);
-        logEvent(id, "cancel", "Cancelación solicitada al proveedor.");
-      } catch (error) {
-        logEvent(id, "error", `No se pudo cancelar: ${(error as Error).message}`);
+    } else if (action === "cancel") {
+      const order = get<{ provider_order_id: number | null }>(
+        "SELECT provider_order_id FROM orders WHERE id = ?", [id],
+      );
+      if (order?.provider_order_id) {
+        try {
+          await provider.cancel([order.provider_order_id]);
+          logEvent(id, "cancel", "Cancelación solicitada al proveedor.");
+        } catch (error) {
+          logEvent(id, "error", `No se pudo cancelar: ${(error as Error).message}`);
+        }
       }
+      setStatus(id, "canceled", "Pedido cancelado desde el panel.");
     }
-    setStatus(id, "canceled", "Pedido cancelado desde el panel.");
-  }
 
-  revalidatePath("/admin/pedidos");
-  revalidatePath(`/admin/pedidos/${id}`);
+    revalidatePath("/admin/pedidos");
+    revalidatePath(`/admin/pedidos/${id}`);
+  });
 }
 
 export async function syncOrders() {
@@ -512,6 +579,18 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
   };
 }
 
+/**
+ * Vuelve a puntuar todo el catálogo a partir del nombre de cada servicio.
+ * Sirve después de una actualización, o si las clasificaciones quedaron viejas.
+ */
+export async function rescoreCatalog(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const total = rescoreServices();
+  refreshStore();
+  revalidatePath("/admin/catalogo");
+  return { ok: `Recalculados ${total} servicios.` };
+}
+
 // ------------------------------------------------------------------ cupones
 export async function saveCoupon(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await guard();
@@ -543,8 +622,10 @@ export async function saveCoupon(_prev: ActionState, formData: FormData): Promis
 }
 
 export async function deleteCoupon(formData: FormData) {
-  await guard();
-  run("DELETE FROM coupons WHERE code = ?", [String(formData.get("code"))]);
-  revalidatePath("/admin/cupones");
+  await withErrorRedirect("/admin/cupones", async () => {
+    await guard();
+    run("DELETE FROM coupons WHERE code = ?", [String(formData.get("code"))]);
+    revalidatePath("/admin/cupones");
+  });
 }
 

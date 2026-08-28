@@ -1,6 +1,9 @@
 import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import {
+  dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, detectOrderKind,
+} from "./quality.mjs";
 
 export const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
@@ -57,11 +60,59 @@ function migrate(database: Database.Database) {
     ["orders", "reference_service_id", "INTEGER"],
   ];
 
+  const added: string[] = [];
   for (const [table, column, definition] of additions) {
     if (!columns(table).has(column)) {
       database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      added.push(`${table}.${column}`);
     }
   }
+
+  // Las columnas nuevas quedan con su valor por defecto, que para los puntajes
+  // de calidad sería mentira (todo 50/50, todo "default"). Las recalculamos a
+  // partir del nombre del servicio, que es de donde salen igual.
+  const quality = [
+    "provider_services.refill_days", "provider_services.drop_score",
+    "provider_services.speed_score", "provider_services.geo",
+    "provider_services.variant", "provider_services.order_kind",
+  ];
+  if (added.some((column) => quality.includes(column))) {
+    rescoreServices(database);
+  }
+}
+
+/** Recalcula los puntajes y las clasificaciones de todos los servicios. */
+export function rescoreServices(database: Database.Database = db): number {
+  const rows = database
+    .prepare("SELECT service_id, clean_name, name, service_type, avg_minutes, refill FROM provider_services")
+    .all() as {
+      service_id: number; clean_name: string; name: string;
+      service_type: string; avg_minutes: number | null; refill: number;
+    }[];
+
+  const update = database.prepare(
+    `UPDATE provider_services
+        SET refill_days = ?, drop_score = ?, speed_score = ?, geo = ?, variant = ?, order_kind = ?
+      WHERE service_id = ?`,
+  );
+
+  const apply = database.transaction(() => {
+    for (const row of rows) {
+      const name = row.clean_name || row.name || "";
+      const days = refillDaysFromName(name);
+      update.run(
+        days,
+        dropScore(name, days || (row.refill ? 30 : 0)),
+        speedScore(name, row.avg_minutes),
+        detectGeo(name),
+        detectVariant(name),
+        detectOrderKind(name, row.service_type),
+        row.service_id,
+      );
+    }
+  });
+  apply();
+  return rows.length;
 }
 
 export const db: Database.Database = globalThis.__tsDb ?? open();

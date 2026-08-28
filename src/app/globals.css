@@ -161,3 +161,13 @@ body {
   vertical-align: middle;
 }
 .admin-table tr:hover td { background: rgba(255, 255, 255, 0.03); }
+
+/* Columna de acciones fija al borde derecho cuando la tabla no cabe. */
+.admin-table th.sticky,
+.admin-table td.sticky {
+  position: sticky;
+  right: 0;
+  background: #101020;
+  box-shadow: -12px 0 12px -12px rgba(0, 0, 0, 0.9);
+}
+.admin-table tr:hover td.sticky { background: #16162a; }

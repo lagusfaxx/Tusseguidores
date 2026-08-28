@@ -46,9 +46,11 @@ export default async function NewProductPage({
         </p>
       </div>
 
-      {error === "sin-servicio" ? (
+      {error ? (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
-          Ya no hay servicios activos para esa combinación. Sincroniza el catálogo del proveedor.
+          {error === "sin-servicio"
+            ? "Ya no hay servicios activos para esa combinación. Sincroniza el catálogo del proveedor."
+            : error}
         </p>
       ) : null}
 

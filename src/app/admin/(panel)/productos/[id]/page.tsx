@@ -16,10 +16,10 @@ export default async function EditProductPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ creado?: string }>;
+  searchParams: Promise<{ creado?: string; "ya-existia"?: string }>;
 }) {
   const { id } = await params;
-  const { creado } = await searchParams;
+  const { creado, "ya-existia": yaExistia } = await searchParams;
   const product = getProductById(Number(id));
   if (!product) notFound();
 
@@ -90,6 +90,12 @@ export default async function EditProductPage({
           <button type="submit" className="text-sm text-red-300 hover:text-red-200">Eliminar producto</button>
         </form>
       </div>
+
+      {yaExistia ? (
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
+          Ese servicio ya tenía este producto, así que te traje al que existe en vez de crear uno repetido.
+        </p>
+      ) : null}
 
       {creado ? (
         <p className="mt-4 rounded-lg border border-lime-500/30 bg-lime-500/10 px-4 py-2.5 text-sm text-lime-200">

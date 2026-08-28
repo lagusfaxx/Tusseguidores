@@ -45,9 +45,9 @@ function ScoreBar({ value }: { value: number }) {
 export default async function AdminCatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; red?: string; tipo?: string; estado?: string; p?: string }>;
+  searchParams: Promise<{ q?: string; red?: string; tipo?: string; estado?: string; p?: string; error?: string }>;
 }) {
-  const { q, red, tipo, estado, p } = await searchParams;
+  const { q, red, tipo, estado, p, error } = await searchParams;
   const page = Math.max(1, Number(p) || 1);
 
   const where: string[] = [];
@@ -98,6 +98,12 @@ export default async function AdminCatalogPage({
         <SyncCatalogButton />
       </div>
 
+      {error ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+          {error}
+        </p>
+      ) : null}
+
       <form className="mt-6 flex flex-wrap gap-3">
         <input name="q" defaultValue={q ?? ""} className="field max-w-xs" placeholder="Buscar por nombre o ID" />
         <select name="red" defaultValue={red ?? ""} className="field max-w-[170px]">
@@ -127,14 +133,15 @@ export default async function AdminCatalogPage({
             <tr>
               <th>ID</th><th>Servicio</th><th>Red</th><th>Tipo</th>
               <th>Retención</th><th>Velocidad</th>
-              <th>Costo /1.000</th><th>Venta 1.000</th><th>Rango</th><th></th>
+              <th>Costo /1.000</th><th>Venta 1.000</th><th>Rango</th>
+              <th className="sticky right-0 bg-ink-900 text-right">Acción</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.service_id} className={row.provider_enabled ? "" : "opacity-50"}>
                 <td className="font-mono text-xs">{row.service_id}</td>
-                <td className="max-w-[380px]">
+                <td className="max-w-[320px] min-w-[220px]">
                   <div className="truncate">{row.clean_name}</div>
                   <div className="truncate text-[11px] text-ink-400">{row.category}</div>
                 </td>
@@ -158,14 +165,22 @@ export default async function AdminCatalogPage({
                   {formatNumber(row.min_qty)} – {formatNumber(row.max_qty)}
                   {row.refill ? <span className="ml-1 text-lime-400">♻</span> : null}
                 </td>
-                <td className="text-right">
-                  {row.used > 0 ? (
-                    <span className="text-[11px] text-ink-400">{row.used} producto(s)</span>
-                  ) : null}
-                  <form action={createFromService} className="inline">
+                <td className="sticky right-0 bg-ink-900 text-right">
+                  <form action={createFromService} className="inline-flex items-center gap-2">
                     <input type="hidden" name="service_id" value={row.service_id} />
-                    <button type="submit" className="ml-2 whitespace-nowrap text-xs text-brand-300 hover:text-white">
-                      Crear producto
+                    {row.used > 0 ? (
+                      <span
+                        className="rounded bg-white/8 px-1.5 py-0.5 text-[11px] text-ink-400"
+                        title={`Ya hay ${row.used} producto(s) usando este servicio`}
+                      >
+                        {row.used}
+                      </span>
+                    ) : null}
+                    <button
+                      type="submit"
+                      className="whitespace-nowrap rounded-lg border border-white/12 bg-white/6 px-2.5 py-1.5 text-xs text-ink-200 hover:border-brand-400/50 hover:text-white"
+                    >
+                      {row.used > 0 ? "Abrir" : "Crear"}
                     </button>
                   </form>
                 </td>
