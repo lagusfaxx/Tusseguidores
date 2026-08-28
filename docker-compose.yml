@@ -1,0 +1,35 @@
+# Despliegue en Coolify (o en cualquier host con Docker).
+# En Coolify: nuevo recurso -> Docker Compose -> apunta a este repositorio.
+services:
+  tusseguidores:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      # Coolify inyecta el dominio; si no, define SITE_URL a mano.
+      - SITE_URL=${SITE_URL:-https://tusseguidores.cl}
+      - DATA_DIR=/app/data
+      # Credenciales del primer arranque. Cambia la contraseña al entrar.
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@tusseguidores.cl}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-cambiaesta123}
+      # Opcionales: tienen prioridad sobre lo guardado en el panel.
+      - PROVIDER_API_KEY=${PROVIDER_API_KEY:-}
+      - FLOW_API_KEY=${FLOW_API_KEY:-}
+      - FLOW_SECRET_KEY=${FLOW_SECRET_KEY:-}
+      - FLOW_SANDBOX=${FLOW_SANDBOX:-1}
+      - CRON_SECRET=${CRON_SECRET:-}
+    ports:
+      - "3000:3000"
+    volumes:
+      # Aquí viven la base de datos y las fotos subidas: no lo borres.
+      - tusseguidores-data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  tusseguidores-data:
