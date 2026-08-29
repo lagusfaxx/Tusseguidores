@@ -10,18 +10,60 @@ import { getSetting, getBoolSetting } from "./settings";
  * nombre+valor sin separadores y se firma con HMAC-SHA256 usando la secretKey.
  */
 
-const SANDBOX_URL = "https://sandbox.flow.cl/api";
+const SANDBOX_URL = process.env.FLOW_SANDBOX_URL || "https://sandbox.flow.cl/api";
 const PROD_URL = "https://www.flow.cl/api";
 
-export class FlowError extends Error {}
+export class FlowError extends Error {
+  /** Mensaje crudo de Flow, para el registro y el panel. */
+  constructor(message: string, readonly detail?: string) {
+    super(message);
+    this.name = "FlowError";
+  }
+}
 
-function config() {
-  const apiKey = process.env.FLOW_API_KEY || getSetting("flow_api_key", "");
-  const secretKey = process.env.FLOW_SECRET_KEY || getSetting("flow_secret_key", "");
+export type FlowConfig = {
+  apiKey: string;
+  secretKey: string;
+  sandbox: boolean;
+  baseUrl: string;
+};
+
+export function config(): FlowConfig {
+  // Un espacio o un salto de línea pegado junto a la clave hace que Flow
+  // responda "apiKey not found", que no dice nada del problema real.
+  const apiKey = (process.env.FLOW_API_KEY || getSetting("flow_api_key", "")).trim();
+  const secretKey = (process.env.FLOW_SECRET_KEY || getSetting("flow_secret_key", "")).trim();
   const sandbox = process.env.FLOW_SANDBOX
-    ? process.env.FLOW_SANDBOX === "1"
+    ? process.env.FLOW_SANDBOX.trim() === "1"
     : getBoolSetting("flow_sandbox", true);
-  return { apiKey, secretKey, baseUrl: sandbox ? SANDBOX_URL : PROD_URL };
+  return { apiKey, secretKey, sandbox, baseUrl: sandbox ? SANDBOX_URL : PROD_URL };
+}
+
+/**
+ * Traduce los errores de Flow a algo accionable.
+ *
+ * El más común de lejos es "apiKey not found": las credenciales de
+ * sandbox.flow.cl y las de flow.cl son distintas, y usar unas con el otro
+ * entorno da exactamente ese mensaje.
+ */
+export function explainFlowError(raw: string, sandbox: boolean): string {
+  const message = raw.toLowerCase();
+  const entorno = sandbox ? "pruebas (sandbox.flow.cl)" : "producción (flow.cl)";
+  const otro = sandbox ? "producción" : "pruebas";
+
+  if (message.includes("apikey not found") || message.includes("api key not found")) {
+    return `Flow no reconoce la API key en el entorno de ${entorno}. Las credenciales de pruebas y las de producción son distintas: revisa que la key sea la del entorno correcto, o cambia el modo de pruebas en Ajustes si esa key es de ${otro}.`;
+  }
+  if (message.includes("invalid signature") || message.includes("firma")) {
+    return `La secret key de Flow no corresponde a la API key configurada (entorno de ${entorno}). Copia las dos del mismo lugar.`;
+  }
+  if (message.includes("amount")) {
+    return "Flow rechazó el monto del pedido. Revisa el precio mínimo en Ajustes.";
+  }
+  if (message.includes("commerceorder")) {
+    return "Flow rechazó el número de pedido porque ya existía. Vuelve a intentar la compra.";
+  }
+  return raw;
 }
 
 export function flowConfigured(): boolean {
@@ -38,7 +80,7 @@ function sign(params: Record<string, string>, secretKey: string): string {
 }
 
 async function request<T>(endpoint: string, params: Record<string, string>, method: "GET" | "POST"): Promise<T> {
-  const { apiKey, secretKey, baseUrl } = config();
+  const { apiKey, secretKey, baseUrl, sandbox } = config();
   if (!apiKey || !secretKey) throw new FlowError("Flow no está configurado. Agrega la API key y la secret key en /admin/ajustes.");
 
   const payload = { ...params, apiKey };
@@ -74,8 +116,8 @@ async function request<T>(endpoint: string, params: Record<string, string>, meth
     throw new FlowError(`Respuesta inesperada de Flow (${response.status}).`);
   }
   if (!response.ok) {
-    const message = (data as { message?: string })?.message ?? `Flow respondió ${response.status}`;
-    throw new FlowError(message);
+    const raw = (data as { message?: string })?.message ?? `Flow respondió ${response.status}`;
+    throw new FlowError(explainFlowError(raw, sandbox), raw);
   }
   return data as T;
 }
@@ -121,6 +163,50 @@ export async function getPaymentStatus(token: string): Promise<FlowStatus> {
 /** URL a la que hay que enviar al comprador. */
 export function checkoutUrl(payment: FlowPayment): string {
   return `${payment.url}?token=${payment.token}`;
+}
+
+export type FlowTest =
+  | { ok: true; sandbox: boolean; message: string }
+  | { ok: false; sandbox: boolean; message: string; detail?: string };
+
+/**
+ * Comprueba las credenciales sin cobrar nada.
+ *
+ * Flow valida la API key antes que el token, así que preguntamos por el estado
+ * de un token inventado: si contesta que el token no existe, las credenciales
+ * están bien; si contesta que no encuentra la apiKey, están mal.
+ */
+export async function testCredentials(): Promise<FlowTest> {
+  const { apiKey, secretKey, sandbox } = config();
+  if (!apiKey || !secretKey) {
+    return { ok: false, sandbox, message: "Falta la API key o la secret key de Flow." };
+  }
+
+  try {
+    await getPaymentStatus("prueba-de-credenciales-tusseguidores");
+    return {
+      ok: true,
+      sandbox,
+      message: `Credenciales correctas en el entorno de ${sandbox ? "pruebas" : "producción"}.`,
+    };
+  } catch (error) {
+    const detail = error instanceof FlowError ? error.detail ?? error.message : String(error);
+    const low = detail.toLowerCase();
+    // Que no encuentre el token es justo lo que esperamos: la key sí sirvió.
+    if (low.includes("token") || low.includes("not found the payment") || low.includes("payment not found")) {
+      return {
+        ok: true,
+        sandbox,
+        message: `Credenciales correctas en el entorno de ${sandbox ? "pruebas" : "producción"}.`,
+      };
+    }
+    return {
+      ok: false,
+      sandbox,
+      message: error instanceof FlowError ? error.message : "No se pudo hablar con Flow.",
+      detail,
+    };
+  }
 }
 
 export const FLOW_STATUS = {

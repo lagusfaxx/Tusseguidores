@@ -77,10 +77,15 @@ export async function startCheckout(
     logEvent(order.id, "info", "Redirigido a Flow para el pago.");
     url = checkoutUrl(payment);
   } catch (error) {
-    const message = error instanceof FlowError ? error.message : "No pudimos iniciar el pago.";
-    setStatus(order.id, "failed", `Error al crear el pago: ${message}`);
+    // El detalle técnico queda en el historial del pedido y en el registro del
+    // servidor; al comprador no le sirve leer "apiKey not found".
+    const detail = error instanceof FlowError ? (error.detail ?? error.message) : String(error);
+    console.error("[checkout] Flow:", detail);
+    setStatus(order.id, "failed", `No se pudo crear el pago en Flow: ${detail}`);
     return {
-      error: `${message} Escríbenos a ${settings.contact_email} con el código ${order.code} y lo resolvemos.`,
+      error:
+        `No pudimos abrir el pago en este momento. Tu pedido quedó guardado con el código ${order.code}: ` +
+        `escríbenos a ${settings.contact_email} y lo resolvemos, o inténtalo de nuevo en unos minutos.`,
     };
   }
 

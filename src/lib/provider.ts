@@ -45,8 +45,9 @@ export class ProviderError extends Error {
 }
 
 function credentials() {
-  const url = getSetting("provider_url", "https://honestsmm.com/api/v2");
-  const key = process.env.PROVIDER_API_KEY || getSetting("provider_key", "");
+  const url = getSetting("provider_url", "https://honestsmm.com/api/v2").trim();
+  // Igual que con Flow: un espacio pegado a la clave da errores que no dicen nada.
+  const key = (process.env.PROVIDER_API_KEY || getSetting("provider_key", "")).trim();
   if (!key) throw new ProviderError("Falta la API key del proveedor. Configúrala en /admin/ajustes.");
   return { url, key };
 }
@@ -96,7 +97,7 @@ async function call<T>(params: Record<string, string | number | undefined>): Pro
 }
 
 export function providerConfigured(): boolean {
-  return Boolean(process.env.PROVIDER_API_KEY || getSetting("provider_key", ""));
+  return Boolean((process.env.PROVIDER_API_KEY || getSetting("provider_key", "")).trim());
 }
 
 export const provider = {

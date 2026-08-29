@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { saveSettings, changePassword, type ActionState } from "@/app/admin/actions";
+import { saveSettings, changePassword, testFlow, type ActionState } from "@/app/admin/actions";
 import { Feedback, SubmitButton } from "./admin-ui";
 
 type Props = {
@@ -50,6 +50,8 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
 export function SettingsForm({ settings, defaultMinRates, providerBalance, providerBalanceError }: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
   const [passwordState, passwordAction] = useActionState<ActionState, FormData>(changePassword, {});
+  const [flowState, flowAction] = useActionState<ActionState>(testFlow, {});
+  const sandbox = settings.flow_sandbox === "1";
 
   return (
     <>
@@ -110,14 +112,28 @@ export function SettingsForm({ settings, defaultMinRates, providerBalance, provi
         </Section>
 
         <Section title="Pagos (Flow.cl)">
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-100">
+            <strong>Las credenciales de pruebas y las de producción son distintas.</strong> Ahora estás
+            en <strong>{sandbox ? "modo de pruebas" : "producción"}</strong>, así que la API key y la
+            secret key tienen que ser las de{" "}
+            <code className="font-mono">{sandbox ? "sandbox.flow.cl" : "www.flow.cl"}</code>. Si las
+            mezclas, Flow responde «apiKey not found» y el cliente no puede pagar.
+          </div>
+
           <Field label="API key" name="flow_api_key" type="password" value={settings.flow_api_key} />
           <Field label="Secret key" name="flow_secret_key" type="password" value={settings.flow_secret_key} />
-          <Check label="Modo de pruebas (sandbox)" name="flow_sandbox" checked={settings.flow_sandbox === "1"}
-            hint="Desmárcalo para cobrar de verdad. En sandbox se usa sandbox.flow.cl." />
+          <Check label="Modo de pruebas (sandbox)" name="flow_sandbox" checked={sandbox}
+            hint="Desmárcalo para cobrar de verdad. Al cambiarlo también tienes que cambiar las credenciales." />
+
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
             En el panel de Flow configura la URL de confirmación como{" "}
             <code className="text-brand-300">{settings.site_url}/api/flow/confirmar</code> y la de retorno como{" "}
             <code className="text-brand-300">{settings.site_url}/pago/retorno</code>.
+          </p>
+
+          <p className="text-xs text-ink-400">
+            Guarda primero los cambios y después prueba las credenciales; el botón usa lo que está
+            guardado, no lo que tienes escrito en pantalla.
           </p>
         </Section>
 
@@ -155,6 +171,17 @@ export function SettingsForm({ settings, defaultMinRates, providerBalance, provi
         <div className="sticky bottom-0 -mx-4 flex items-center gap-4 border-t border-white/10 bg-ink-950/95 px-4 py-4 backdrop-blur lg:col-span-2">
           <SubmitButton>Guardar ajustes</SubmitButton>
           <Feedback state={state} />
+        </div>
+      </form>
+
+      <form action={flowAction} className="card mt-6 p-6">
+        <h2 className="font-bold">Probar las credenciales de Flow</h2>
+        <p className="mt-1 text-sm text-ink-400">
+          Consulta a Flow sin cobrar nada y te dice exactamente qué está fallando.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <SubmitButton className="btn btn-ghost text-sm">Probar ahora</SubmitButton>
+          <Feedback state={flowState} />
         </div>
       </form>
 

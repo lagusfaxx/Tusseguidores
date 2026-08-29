@@ -6,6 +6,7 @@ import { requireUser, hashPassword } from "@/lib/auth";
 import { all, db, get, run, rescoreServices } from "@/lib/db";
 import { setSettings, invalidateSettings } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
+import { testCredentials } from "@/lib/flow";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
@@ -111,6 +112,14 @@ export async function changePassword(_prev: ActionState, formData: FormData): Pr
 
   run("UPDATE admin_users SET password_hash = ? WHERE id = ?", [hashPassword(password), user.id]);
   return { ok: "Contraseña actualizada." };
+}
+
+/** Comprueba las credenciales de Flow sin cobrar nada. */
+export async function testFlow(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const result = await testCredentials();
+  if (result.ok) return { ok: result.message };
+  return { error: result.detail ? `${result.message} (Flow dijo: "${result.detail}")` : result.message };
 }
 
 // ----------------------------------------------------------------- productos

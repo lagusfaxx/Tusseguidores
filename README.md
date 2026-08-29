@@ -60,6 +60,12 @@ En el panel de **Flow** configura:
 - URL de confirmación: `https://tusseguidores.cl/api/flow/confirmar`
 - URL de retorno: `https://tusseguidores.cl/pago/retorno`
 
+> **Las credenciales de pruebas y las de producción son distintas.** Las de
+> `sandbox.flow.cl` no sirven en `www.flow.cl` ni al revés: si las mezclas, Flow
+> responde `apiKey not found` y nadie puede pagar. En **Ajustes** hay un botón
+> «Probar las credenciales de Flow» que consulta sin cobrar nada y te dice si el
+> problema es el entorno, la secret key o la conexión.
+
 ---
 
 ## Cómo funciona
