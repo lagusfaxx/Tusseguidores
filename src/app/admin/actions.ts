@@ -80,6 +80,8 @@ const SETTING_KEYS = [
   "contact_email", "contact_whatsapp",
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
+  "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
+  "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "auto_seo_text",
@@ -107,7 +109,9 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   }
   if (Object.keys(minRates).length) values.min_rate_json = JSON.stringify(minRates);
   // Las casillas no envían nada cuando están apagadas.
-  for (const flag of ["auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text"]) {
+  for (const flag of [
+    "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
+  ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
   setSettings(values);
@@ -450,7 +454,8 @@ export async function orderAction(formData: FormData) {
     if (action === "send") {
       await sendToProvider(id);
     } else if (action === "mark_paid") {
-      await markPaid(id, "manual");
+      const referencia = String(formData.get("admin_note") ?? "").trim();
+      await markPaid(id, referencia || "manual");
     } else if (action === "note") {
       const note = String(formData.get("admin_note") ?? "").trim();
       run("UPDATE orders SET admin_note = ?, updated_at = datetime('now') WHERE id = ?", [note, id]);

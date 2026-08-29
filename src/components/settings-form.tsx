@@ -191,6 +191,45 @@ export function SettingsForm({
           </p>
         </Section>
 
+        <Section
+          title="Transferencia bancaria"
+          hint="Un segundo botón en la ficha del producto. El pedido queda reservado y no sale al proveedor hasta que tú confirmes que llegó la plata."
+        >
+          <Check
+            label="Aceptar pagos por transferencia"
+            name="transfer_enabled"
+            checked={settings.transfer_enabled === "1"}
+            hint="El botón solo aparece si además están el banco, el número de cuenta y el titular."
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Banco" name="transfer_bank" value={settings.transfer_bank} placeholder="Banco de Chile" />
+            <Field label="Tipo de cuenta" name="transfer_account_type" value={settings.transfer_account_type} />
+          </div>
+          <Field label="Número de cuenta" name="transfer_account_number" value={settings.transfer_account_number} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Titular" name="transfer_holder" value={settings.transfer_holder} />
+            <Field label="RUT" name="transfer_rut" value={settings.transfer_rut} placeholder="12.345.678-9" />
+          </div>
+          <Field label="Correo para el comprobante" name="transfer_email" type="email"
+            value={settings.transfer_email}
+            hint="Si lo dejas vacío se usa el correo de contacto de la tienda." />
+          <div>
+            <label className="field-label" htmlFor="transfer_instructions">Instrucciones adicionales</label>
+            <textarea id="transfer_instructions" name="transfer_instructions" rows={3}
+              defaultValue={settings.transfer_instructions} className="field"
+              placeholder="Ej: Confirmamos las transferencias de lunes a viernes entre 9 y 19 h." />
+            <p className="mt-1 text-xs text-ink-400">
+              Se muestran bajo los datos de la cuenta. Sirve para fijar expectativas de horario.
+            </p>
+          </div>
+          <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
+            El cliente ve estos datos con su código de pedido como mensaje. Cuando avisa que
+            transfirió, aparece una alerta en el resumen y el pedido queda en{" "}
+            <strong className="text-white">Transferencias por confirmar</strong>. Revisas tu cuenta,
+            confirmas, y recién ahí sale al proveedor.
+          </p>
+        </Section>
+
         <Section title="SEO de la portada">
           <Field label="Título" name="seo_home_title" value={settings.seo_home_title} />
           <div>

@@ -15,6 +15,7 @@ import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/s
 import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
 import { getBoolSetting } from "@/lib/settings";
+import { transferenciaDisponible } from "@/lib/transfer";
 import type { FaqItem } from "@/lib/types";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -260,6 +261,7 @@ export default async function ProductPage({ params }: Params) {
                 minPriceClp={ctx.minPriceClp}
                 rounding={ctx.rounding}
                 orderKind={product.order_kind}
+                transferencia={transferenciaDisponible()}
               />
             </div>
           </div>

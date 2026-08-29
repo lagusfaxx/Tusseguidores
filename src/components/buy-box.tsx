@@ -30,6 +30,8 @@ type Props = {
    * comentarios y la cantidad son las líneas que escribió.
    */
   orderKind: string;
+  /** Si está activo, se muestra el segundo botón de pago por transferencia. */
+  transferencia: boolean;
 };
 
 /** Misma terminación comercial que aplica el servidor en src/lib/pricing.ts */
@@ -43,16 +45,48 @@ function roundToEnding(value: number, ending: number): number {
 const clp = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 const num = new Intl.NumberFormat("es-CL");
 
-function SubmitButton({ price, disabled, label }: { price: number; disabled?: boolean; label?: string }) {
+function BotonesDePago({
+  price, disabled, label, transferencia,
+}: {
+  price: number;
+  disabled?: boolean;
+  label?: string;
+  transferencia: boolean;
+}) {
   const { pending } = useFormStatus();
+
+  if (disabled && label) {
+    return (
+      <button type="button" className="btn btn-primary mt-5 w-full text-base" disabled>
+        {label}
+      </button>
+    );
+  }
+
   return (
-    <button
-      type="submit"
-      className="btn btn-primary mt-5 w-full text-base"
-      disabled={pending || disabled}
-    >
-      {pending ? "Redirigiendo al pago…" : disabled && label ? label : `Pagar ${clp.format(price)}`}
-    </button>
+    <div className="mt-5 space-y-2.5">
+      <button
+        type="submit"
+        name="metodo"
+        value="flow"
+        className="btn btn-primary w-full text-base"
+        disabled={pending}
+      >
+        {pending ? "Un momento…" : `Pagar ${clp.format(price)} con Webpay`}
+      </button>
+
+      {transferencia ? (
+        <button
+          type="submit"
+          name="metodo"
+          value="transferencia"
+          className="btn btn-ghost w-full text-base"
+          disabled={pending}
+        >
+          Pagar por transferencia
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -213,7 +247,11 @@ export function BuyBox(props: Props) {
             className="field"
             placeholder="tucorreo@ejemplo.cl"
           />
-          <p className="mt-1.5 text-xs text-ink-400">Flow te manda ahí el comprobante del pago. Tu código de seguimiento te lo mostramos apenas termines.</p>
+          <p className="mt-1.5 text-xs text-ink-400">
+            {props.transferencia
+              ? "Lo usamos para identificar tu pedido. Tu código de seguimiento te lo mostramos apenas termines."
+              : "Flow te manda ahí el comprobante del pago. Tu código de seguimiento te lo mostramos apenas termines."}
+          </p>
         </div>
 
         <details className="text-sm">
@@ -241,8 +279,9 @@ export function BuyBox(props: Props) {
         </p>
       ) : null}
 
-      <SubmitButton
+      <BotonesDePago
         price={price}
+        transferencia={props.transferencia}
         disabled={isCustomComments && (commentLines.length < minQty || commentLines.length > maxQty)}
         label={
           commentLines.length > maxQty
@@ -252,7 +291,16 @@ export function BuyBox(props: Props) {
       />
 
       <ul className="mt-4 space-y-1.5 text-xs text-ink-400">
-        <li className="flex items-center gap-1.5"><LockIcon className="h-3.5 w-3.5 text-lime-400" /> Pago seguro con Flow: Webpay, transferencia o Mercado Pago</li>
+        <li className="flex items-center gap-1.5">
+          <LockIcon className="h-3.5 w-3.5 text-lime-400" />
+          Webpay procesa el pago al instante y tu pedido sale solo
+        </li>
+        {props.transferencia ? (
+          <li className="flex items-center gap-1.5">
+            <CheckIcon className="h-3.5 w-3.5 text-lime-400" />
+            Por transferencia te damos los datos y confirmamos en cuanto llegue
+          </li>
+        ) : null}
         <li className="flex items-center gap-1.5"><CheckIcon className="h-3.5 w-3.5 text-lime-400" /> Nunca pedimos tu contraseña</li>
       </ul>
     </form>

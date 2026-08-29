@@ -97,7 +97,9 @@ export type Order = {
   cost_usd: number;
   status: OrderStatus;
   payment_status: "pending" | "paid" | "failed";
-  payment_provider: string;
+  payment_provider: "flow" | "transferencia" | string;
+  transfer_notified_at: string | null;
+  transfer_reference: string | null;
   payment_ref: string | null;
   payment_token: string | null;
   provider_order_id: number | null;

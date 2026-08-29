@@ -67,6 +67,8 @@ export type CreateOrderInput = {
   phone?: string;
   couponCode?: string;
   ip?: string;
+  /** "flow" cobra en línea; "transferencia" queda esperando tu confirmación. */
+  paymentProvider?: "flow" | "transferencia";
 };
 
 export type CreateOrderResult =
@@ -135,19 +137,25 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
     `INSERT INTO orders
        (code, product_id, product_name, provider_service_id, reference_service_id, quantity,
         link, comments, email, phone, amount_clp, discount_clp, coupon_code, cost_usd,
-        status, payment_status, ip)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
+        payment_provider, status, payment_status, ip)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
     [
       code, product.id, product.name, routed.service.service_id, product.provider_service_id,
       quantity, input.link.trim(), commentLines.length ? commentLines.join("\n") : null,
       input.email.trim().toLowerCase(), input.phone?.trim() || null,
       amount, coupon?.discountClp ?? 0, coupon?.code ?? null,
-      costUsd(routed.service.rate_usd_per_1000, quantity), input.ip ?? null,
+      costUsd(routed.service.rate_usd_per_1000, quantity),
+      input.paymentProvider ?? "flow", input.ip ?? null,
     ],
   );
 
   const order = getOrderById(Number(info.lastInsertRowid))!;
-  logEvent(order.id, "created", `Pedido creado por ${amount.toLocaleString("es-CL")} CLP.`);
+  logEvent(
+    order.id,
+    "created",
+    `Pedido creado por ${amount.toLocaleString("es-CL")} CLP` +
+      (order.payment_provider === "transferencia" ? ", a pagar por transferencia." : "."),
+  );
   if (coupon) run("UPDATE coupons SET used = used + 1 WHERE code = ?", [coupon.code]);
   return { ok: true, order };
 }
@@ -177,7 +185,13 @@ export async function markPaid(orderId: number, paymentRef: string): Promise<voi
       WHERE id = ?`,
     [paymentRef, orderId],
   );
-  logEvent(orderId, "paid", `Pago confirmado (referencia ${paymentRef}).`);
+  logEvent(
+    orderId,
+    "paid",
+    order.payment_provider === "transferencia"
+      ? `Transferencia confirmada a mano${paymentRef && paymentRef !== "manual" ? ` (${paymentRef})` : ""}.`
+      : `Pago confirmado (referencia ${paymentRef}).`,
+  );
 
   if (getBoolSetting("auto_send_to_provider", true)) {
     await sendToProvider(orderId);
@@ -390,8 +404,31 @@ export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
   refunded: "bg-white/8 text-ink-200 border-white/15",
 };
 
+/** Transferencias que el cliente dice haber hecho y esperan tu confirmación. */
+export function transferenciasPendientes(limit = 100): Order[] {
+  return all<Order>(
+    `SELECT * FROM orders
+      WHERE payment_provider = 'transferencia' AND payment_status = 'pending'
+        AND status NOT IN ('canceled', 'refunded')
+      ORDER BY (transfer_notified_at IS NULL), created_at ASC
+      LIMIT ?`,
+    [limit],
+  );
+}
+
 export function orderStats() {
   return {
+    transferenciasPorConfirmar: get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE payment_provider = 'transferencia' AND payment_status = 'pending'
+          AND status NOT IN ('canceled', 'refunded')`,
+    )?.n ?? 0,
+    transferenciasAvisadas: get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE payment_provider = 'transferencia' AND payment_status = 'pending'
+          AND transfer_notified_at IS NOT NULL
+          AND status NOT IN ('canceled', 'refunded')`,
+    )?.n ?? 0,
     // Pagados que nunca salieron: plata cobrada sin entregar.
     sinEnviar: get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM orders

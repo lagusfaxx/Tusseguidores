@@ -133,7 +133,9 @@ CREATE TABLE IF NOT EXISTS orders (
 
   status              TEXT    NOT NULL DEFAULT 'pending',
   payment_status      TEXT    NOT NULL DEFAULT 'pending',
-  payment_provider    TEXT    NOT NULL DEFAULT 'flow',
+  payment_provider    TEXT    NOT NULL DEFAULT 'flow',   -- flow | transferencia
+  transfer_notified_at TEXT,                              -- el cliente avisó que transfirió
+  transfer_reference  TEXT,                               -- número de comprobante que dejó
   payment_ref         TEXT,
   payment_token       TEXT,
 

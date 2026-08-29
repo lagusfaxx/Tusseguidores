@@ -7,6 +7,7 @@ import { createPayment, checkoutUrl, flowConfigured, FlowError } from "@/lib/flo
 import { absoluteUrl } from "@/lib/seo";
 import { getSettings, getBoolSetting } from "@/lib/settings";
 import { getProductById } from "@/lib/catalog";
+import { transferenciaDisponible } from "@/lib/transfer";
 import { isValidEmail, normalizeTarget } from "@/lib/utils";
 import { run } from "@/lib/db";
 
@@ -27,6 +28,8 @@ export async function startCheckout(
   const phone = String(formData.get("phone") ?? "");
   const coupon = String(formData.get("coupon") ?? "");
   const comments = String(formData.get("comments") ?? "");
+  // El botón que se apretó decide el camino.
+  const metodo = String(formData.get("metodo") ?? "flow") === "transferencia" ? "transferencia" : "flow";
 
   const product = getProductById(productId);
   if (!product) return { error: "El producto ya no está disponible." };
@@ -38,11 +41,16 @@ export async function startCheckout(
   const headerList = await headers();
   const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 
+  if (metodo === "transferencia" && !transferenciaDisponible()) {
+    return { error: "El pago por transferencia no está disponible ahora. Usa Webpay." };
+  }
+
   const created = createOrder({
     productId,
     quantity,
     link,
     comments,
+    paymentProvider: metodo,
     email,
     phone,
     couponCode: coupon,
@@ -52,6 +60,12 @@ export async function startCheckout(
 
   const order = created.order;
   const settings = getSettings();
+
+  if (metodo === "transferencia") {
+    // No se cobra nada acá: el pedido espera a que el dueño vea la plata.
+    logEvent(order.id, "info", "Esperando la transferencia del cliente.");
+    redirect(`/pedido/${order.code}?estado=transferencia`);
+  }
 
   if (!flowConfigured()) {
     // Sin pasarela configurada el pedido queda pendiente y se aprueba a mano

@@ -36,6 +36,15 @@ export default async function AdminDashboard() {
   const lowBalance = getNumberSetting("low_balance_usd", 10);
 
   const alerts = [
+    stats.transferenciasAvisadas > 0 && {
+      text: `${stats.transferenciasAvisadas} cliente(s) avisaron que transfirieron y esperan tu confirmación.`,
+      href: "/admin/pedidos?estado=transferencias",
+      urgente: true,
+    },
+    stats.transferenciasPorConfirmar > stats.transferenciasAvisadas && {
+      text: `${stats.transferenciasPorConfirmar - stats.transferenciasAvisadas} pedido(s) por transferencia esperando el pago.`,
+      href: "/admin/pedidos?estado=transferencias",
+    },
     stats.sinEnviar > 0 && {
       text:
         `${stats.sinEnviar} pedido(s) ya pagado(s) por ${formatClp(stats.sinEnviarClp)} todavía no salen al proveedor` +

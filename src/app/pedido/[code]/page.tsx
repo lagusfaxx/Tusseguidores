@@ -8,17 +8,22 @@ import { getOrderByCode, getOrderEvents } from "@/lib/orders";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { getSettings } from "@/lib/settings";
+import { datosTransferencia } from "@/lib/transfer";
+import { TransferPanel } from "@/components/transfer-panel";
 
 export const metadata: Metadata = {
   title: "Estado de tu pedido",
   robots: { index: false, follow: false },
 };
 
-type Params = { params: Promise<{ code: string }>; searchParams: Promise<{ estado?: string }> };
+type Params = {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ estado?: string; aviso?: string }>;
+};
 
 export default async function OrderPage({ params, searchParams }: Params) {
   const { code } = await params;
-  const { estado } = await searchParams;
+  const { estado, aviso } = await searchParams;
   const order = getOrderByCode(decodeURIComponent(code));
   if (!order) notFound();
 
@@ -38,6 +43,13 @@ export default async function OrderPage({ params, searchParams }: Params) {
       <SiteHeader />
       <main className="bg-halo">
         <div className="mx-auto max-w-2xl px-4 py-14">
+          {estado === "transferencia" ? (
+            <div className="mb-6 rounded-xl border border-lime-500/30 bg-lime-500/10 p-4 text-sm text-lime-100">
+              Tu pedido quedó reservado. Sigue las instrucciones de más abajo para transferir; en
+              cuanto confirmemos el pago sale a entrega.
+            </div>
+          ) : null}
+
           {estado === "manual" ? (
             <div className="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">
               Tu pedido quedó registrado, pero todavía no está pagado. Escríbenos a{" "}
@@ -114,6 +126,10 @@ export default async function OrderPage({ params, searchParams }: Params) {
               </div>
             ) : null}
           </div>
+
+          {order.payment_provider === "transferencia" ? (
+            <TransferPanel order={order} datos={datosTransferencia()} aviso={aviso === "1"} />
+          ) : null}
 
           <section className="card mt-6 p-6">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">Historial</h2>

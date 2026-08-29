@@ -140,11 +140,31 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
             <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">Acciones</h2>
 
             {order.payment_status !== "paid" ? (
-              <form action={orderAction}>
+              <form action={orderAction} className="space-y-2">
                 <input type="hidden" name="order_id" value={order.id} />
                 <input type="hidden" name="action" value="mark_paid" />
+                {order.payment_provider === "transferencia" ? (
+                  <>
+                    <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-100">
+                      {order.transfer_notified_at
+                        ? `El cliente avisó que transfirió el ${formatDateCl(order.transfer_notified_at)}${
+                            order.transfer_reference ? ` (comprobante ${order.transfer_reference})` : ""
+                          }.`
+                        : "El cliente todavía no avisa que transfirió."}{" "}
+                      Revisa tu cuenta antes de confirmar: al hacerlo el pedido sale al proveedor y
+                      se gasta tu saldo.
+                    </p>
+                    <input
+                      name="admin_note"
+                      className="field text-xs"
+                      placeholder="Referencia de la transferencia (opcional)"
+                    />
+                  </>
+                ) : null}
                 <button type="submit" className="btn btn-primary w-full text-sm">
-                  Marcar como pagado y enviar
+                  {order.payment_provider === "transferencia"
+                    ? "Confirmar transferencia y enviar"
+                    : "Marcar como pagado y enviar"}
                 </button>
               </form>
             ) : null}

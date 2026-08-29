@@ -22,7 +22,11 @@ export default async function AdminOrdersPage({
 
   const where: string[] = [];
   const params: unknown[] = [];
-  if (estado === "sin-enviar") {
+  if (estado === "transferencias") {
+    where.push(
+      "payment_provider = 'transferencia' AND payment_status = 'pending' AND status NOT IN ('canceled','refunded')",
+    );
+  } else if (estado === "sin-enviar") {
     // Pagados que nunca salieron al proveedor: lo que hay que mirar primero.
     where.push(
       "payment_status = 'paid' AND provider_order_id IS NULL AND status NOT IN ('canceled','refunded')",
@@ -68,6 +72,7 @@ export default async function AdminOrdersPage({
         />
         <select name="estado" defaultValue={estado ?? "todos"} className="field max-w-[180px]">
           <option value="todos">Todos los estados</option>
+          <option value="transferencias">Transferencias por confirmar</option>
           <option value="sin-enviar">Pagados sin enviar</option>
           {statuses.map((status) => (
             <option key={status} value={status}>{ORDER_STATUS_LABEL[status]}</option>
@@ -81,7 +86,7 @@ export default async function AdminOrdersPage({
           <thead>
             <tr>
               <th>Código</th><th>Producto</th><th>Destino</th><th>Cantidad</th>
-              <th>Total</th><th>Estado</th><th>Proveedor</th><th>Fecha</th>
+              <th>Total</th><th>Pago</th><th>Estado</th><th>Proveedor</th><th>Fecha</th>
             </tr>
           </thead>
           <tbody>
@@ -97,6 +102,20 @@ export default async function AdminOrdersPage({
                 <td className="max-w-[180px] truncate text-xs text-ink-400">{order.link}</td>
                 <td>{formatNumber(order.quantity)}</td>
                 <td className="font-semibold">{formatClp(order.amount_clp)}</td>
+                <td className="text-xs">
+                  {order.payment_provider === "transferencia" ? (
+                    <span className="whitespace-nowrap">
+                      Transferencia
+                      {order.payment_status !== "paid" && order.transfer_notified_at ? (
+                        <span className="ml-1 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">
+                          avisó
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-ink-400">Webpay</span>
+                  )}
+                </td>
                 <td><StatusBadge status={order.status} /></td>
                 <td className="text-xs text-ink-400">
                   {order.provider_order_id ? `#${order.provider_order_id}` : order.provider_error ? "Error" : "—"}
@@ -105,7 +124,7 @@ export default async function AdminOrdersPage({
               </tr>
             ))}
             {orders.length === 0 ? (
-              <tr><td colSpan={8} className="py-10 text-center text-ink-400">No hay pedidos con ese filtro.</td></tr>
+              <tr><td colSpan={9} className="py-10 text-center text-ink-400">No hay pedidos con ese filtro.</td></tr>
             ) : null}
           </tbody>
         </table>

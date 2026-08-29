@@ -191,6 +191,30 @@ Todo esto se ve y se ajusta por producto en **Panel → Productos → Elección 
 servicio**, que muestra a qué servicio se enviaría un pedido hecho ahora mismo y
 las alternativas que se consideraron.
 
+### Dos formas de pagar
+
+En la ficha del producto hay dos botones. El de **Webpay** es el camino
+automático de siempre: Flow cobra y el pedido sale solo al proveedor.
+
+El de **transferencia** no cobra nada: reserva el pedido, le muestra al cliente
+los datos de tu cuenta con su código de pedido como mensaje, y ahí se detiene.
+El pedido **no sale al proveedor hasta que tú lo confirmes** en el panel.
+
+1. El cliente elige transferencia y ve tus datos bancarios y el monto exacto.
+2. Cuando transfiere puede apretar «Ya transferí» y dejar el número de
+   comprobante. Eso no confirma nada: solo te avisa.
+3. En el resumen aparece una alerta y el pedido queda en el filtro
+   **Transferencias por confirmar**.
+4. Revisas tu cuenta y aprietas «Confirmar transferencia y enviar». Recién ahí
+   se despacha al proveedor y se gasta tu saldo.
+
+El cron nunca despacha una transferencia sin confirmar: solo reintenta pedidos
+que ya están pagados.
+
+Se activa en **Ajustes → Transferencia bancaria**, y el botón solo aparece si
+están el banco, el número de cuenta y el titular: un botón que lleva a una
+pantalla sin datos pierde la venta.
+
 ### Pedido, de principio a fin
 
 1. El cliente elige un pack (o una cantidad libre) y deja su enlace y correo.

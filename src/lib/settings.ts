@@ -29,6 +29,17 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // Aviso cuando el saldo del proveedor baja de este monto, en dólares.
   low_balance_usd: "10",
 
+  // Transferencia bancaria: el pedido queda esperando tu confirmación y no
+  // sale al proveedor hasta que la marques como recibida.
+  transfer_enabled: "0",
+  transfer_bank: "",
+  transfer_account_type: "Cuenta Corriente",
+  transfer_account_number: "",
+  transfer_holder: "",
+  transfer_rut: "",
+  transfer_email: "",
+  transfer_instructions: "",
+
   // Flow.cl
   flow_api_key: "",
   flow_secret_key: "",
