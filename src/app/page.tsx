@@ -10,6 +10,8 @@ import { formatClp } from "@/lib/pricing";
 import { buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { PlatformIcon } from "@/components/icons";
 import { sanitizeHtml } from "@/lib/utils";
+import { textoDePortada } from "@/lib/seo-text";
+import { getBoolSetting } from "@/lib/settings";
 
 export function generateMetadata(): Metadata {
   const s = getSettings();
@@ -61,6 +63,12 @@ export default function HomePage() {
   const desde = prices.length ? Math.min(...prices) : 1990;
 
   const whatsapp = settings.contact_whatsapp.replace(/\D/g, "");
+
+  const cuerpoSeo = settings.seo_home_text
+    ? sanitizeHtml(settings.seo_home_text)
+    : getBoolSetting("auto_seo_text", true)
+      ? textoDePortada()
+      : null;
 
   return (
     <>
@@ -246,10 +254,10 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* Texto SEO editable desde el panel */}
-        {settings.seo_home_text ? (
-          <section className="mx-auto max-w-6xl px-4 pb-14">
-            <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: sanitizeHtml(settings.seo_home_text) }} />
+        {/* Texto SEO: manual si lo escribiste, generado si no. */}
+        {cuerpoSeo ? (
+          <section className="mx-auto max-w-6xl border-t border-white/8 px-4 py-14">
+            <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
           </section>
         ) : null}
       </main>

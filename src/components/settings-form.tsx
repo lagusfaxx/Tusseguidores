@@ -199,12 +199,12 @@ export function SettingsForm({
               defaultValue={settings.seo_home_description} className="field" />
           </div>
           <Field label="Palabras clave" name="seo_home_keywords" value={settings.seo_home_keywords} />
-          <div>
-            <label className="field-label" htmlFor="seo_home_text">Texto SEO al pie de la portada (HTML)</label>
-            <textarea id="seo_home_text" name="seo_home_text" rows={8}
-              defaultValue={settings.seo_home_text} className="field font-mono text-xs" />
-            <p className="mt-1 text-xs text-ink-400">Opcional. Se muestra al final de la portada.</p>
-          </div>
+          <Check
+            label="Generar el texto SEO automáticamente"
+            name="auto_seo_text"
+            checked={settings.auto_seo_text === "1"}
+            hint="La portada y cada página de red social muestran un texto armado con sus precios, plazos y garantías reales. Se actualiza solo cuando cambias precios. Lo editas en la sección SEO del menú."
+          />
           <Field label="Verificación de Google Search Console" name="google_site_verification"
             value={settings.google_site_verification}
             hint="Solo el valor del meta tag google-site-verification." />

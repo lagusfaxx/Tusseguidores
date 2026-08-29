@@ -82,6 +82,7 @@ const SETTING_KEYS = [
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
+  "auto_seo_text",
   "google_site_verification", "google_analytics_id",
   "cron_secret", "orders_enabled",
 ];
@@ -106,7 +107,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   }
   if (Object.keys(minRates).length) values.min_rate_json = JSON.stringify(minRates);
   // Las casillas no envían nada cuando están apagadas.
-  for (const flag of ["auto_send_to_provider", "flow_sandbox", "orders_enabled"]) {
+  for (const flag of ["auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text"]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
   setSettings(values);
@@ -626,6 +627,20 @@ export async function rescoreCatalog(_prev: ActionState): Promise<ActionState> {
   refreshStore();
   revalidatePath("/admin/catalogo");
   return { ok: `Recalculados ${total} servicios.` };
+}
+
+/** Guarda o borra el texto SEO propio de una página. */
+export async function saveSeoText(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await guard();
+  const clave = String(formData.get("clave") ?? "");
+  if (!/^seo_text_[a-z0-9-]{2,30}$|^seo_home_text$/.test(clave)) {
+    return { error: "Página desconocida." };
+  }
+  const html = sanitizeHtml(String(formData.get("html") ?? "").trim());
+  setSettings({ [clave]: html });
+  refreshStore();
+  revalidatePath("/admin/seo");
+  return { ok: html ? "Texto guardado. Esta página ya no usa el automático." : "Texto borrado: vuelve al automático." };
 }
 
 // ------------------------------------------------------------------ cupones

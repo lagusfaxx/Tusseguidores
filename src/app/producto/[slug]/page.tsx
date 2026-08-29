@@ -14,6 +14,7 @@ import { formatClp, formatNumber, formatDuration, pricingContext } from "@/lib/p
 import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
+import { getBoolSetting } from "@/lib/settings";
 import type { FaqItem } from "@/lib/types";
 
 type Params = { params: Promise<{ slug: string }> };
@@ -71,6 +72,35 @@ export default async function ProductPage({ params }: Params) {
   const related = getProductsByPlatform(product.platform)
     .filter((p) => p.id !== product.id)
     .slice(0, 4);
+
+  /**
+   * Bloque con los datos concretos de este producto. Es lo que evita que la
+   * ficha de Instagram y la de TikTok sean el mismo texto con otro nombre:
+   * los precios, los plazos y la garantía son distintos en cada una y se
+   * actualizan solos cuando cambia el catálogo.
+   */
+  const datos =
+    getBoolSetting("auto_seo_text", true) && tiers.length
+      ? [
+          `<h2>Cuánto cuesta y cuánto demora</h2>`,
+          // El pack más chico es el de menor cantidad, no el de menor precio:
+          // los primeros suelen empatar en el ticket mínimo de la tienda.
+          `<p>El pack más chico son ${formatNumber(tiers[0].quantity)} unidades por ` +
+            `${formatClp(tiers[0].priceClp)}, y el más grande ` +
+            `${formatNumber(tiers[tiers.length - 1].quantity)} por ` +
+            `${formatClp(tiers[tiers.length - 1].priceClp)}. También puedes pedir una cantidad exacta entre ` +
+            `${formatNumber(minQty)} y ${formatNumber(maxQty)}: el precio se ajusta solo.</p>`,
+          `<p>${deliveryLabel === "Inicio inmediato"
+            ? "La entrega empieza apenas se confirma el pago"
+            : `El plazo promedio de entrega es de ${deliveryLabel.replace(/^Entrega en ~?/, "")}`}` +
+            `, y el pedido se envía al servicio más rápido y con menos caída que tengamos activo ` +
+            `en ese momento. ${refillDays >= 9999
+              ? "Este pack incluye reposición de por vida: si bajan, los reponemos."
+              : refillDays > 0
+                ? `Este pack incluye ${refillDays} días de reposición sin costo.`
+                : "Si el pedido no se entrega, te devolvemos el dinero."}</p>`,
+        ].join("\n")
+      : null;
 
   const productLd = {
     "@context": "https://schema.org",
@@ -160,7 +190,9 @@ export default async function ProductPage({ params }: Params) {
 
               <article
                 className="prose-ts mt-10 max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description_html) }}
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(product.description_html) + (datos ?? ""),
+                }}
               />
 
               {/* Tabla de precios: buena para SEO y para comparar de un vistazo */}

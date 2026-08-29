@@ -210,6 +210,23 @@ y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rot
 
 ### SEO
 
+**El texto largo se escribe solo.** La portada y cada página de red social
+llevan un cuerpo de 250 a 320 palabras armado con los datos reales de la
+tienda: los precios de partida de cada servicio, los plazos de entrega que
+promete el servicio que se va a usar, los días de reposición y cuántos
+servicios hay. Como los números son distintos en cada red, las páginas son
+distintas de verdad —no plantillas con sinónimos cambiados— y se actualizan
+solas cuando cambias precios o publicas productos.
+
+Cada red además trae sus propias preguntas frecuentes, que es donde vive la
+búsqueda de cola larga: monetización en YouTube, el Para Ti en TikTok, cuentas
+privadas en Instagram. Van marcadas como `FAQPage` para Google.
+
+En **Panel → SEO** ves cuántas palabras tiene cada página, si usa el texto
+generado o uno tuyo, y puedes reemplazar cualquiera por el que quieras (el
+generado te queda a mano para copiarlo y editarlo). Se apaga entero desde
+Ajustes → SEO.
+
 - Metadatos, canonical y Open Graph por página, editables por producto.
 - JSON-LD: `Organization`, `WebSite`, `Product` con `AggregateOffer`,
   `BreadcrumbList` y `FAQPage`.

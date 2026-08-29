@@ -133,6 +133,32 @@ body {
 .prose-ts a { color: var(--color-brand-300); text-decoration: underline; }
 .prose-ts strong { color: #fff; }
 
+/* Tablas dentro del texto SEO generado. */
+.prose-ts table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.prose-ts th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-ink-200);
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.prose-ts td {
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--color-ink-200);
+}
+.prose-ts tbody tr:last-child td { border-bottom: none; }
+.prose-ts td a { color: var(--color-brand-300); text-decoration: none; }
+.prose-ts td a:hover { text-decoration: underline; }
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
   html { scroll-behavior: auto; }

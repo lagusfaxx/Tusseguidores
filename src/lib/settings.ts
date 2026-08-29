@@ -41,6 +41,9 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   seo_home_keywords:
     "comprar seguidores chile, seguidores instagram, likes tiktok, visualizaciones youtube",
   seo_home_text: "",
+  // Cuando está activo, las páginas sin texto propio lo generan con los datos
+  // reales de la tienda. Escribir uno a mano siempre manda sobre esto.
+  auto_seo_text: "1",
   google_site_verification: "",
   google_analytics_id: "",
 

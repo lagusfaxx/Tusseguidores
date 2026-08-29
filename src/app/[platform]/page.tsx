@@ -7,7 +7,10 @@ import { ProductCard } from "@/components/product-card";
 import { PlatformIcon } from "@/components/icons";
 import { getPlatformsWithProducts, getProductsByPlatform } from "@/lib/catalog";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
-import { breadcrumbLd, buildMetadata, jsonLd } from "@/lib/seo";
+import { breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
+import { textoDeRed } from "@/lib/seo-text";
+import { getSetting, getBoolSetting } from "@/lib/settings";
+import { sanitizeHtml } from "@/lib/utils";
 
 type Params = { params: Promise<{ platform: string }> };
 
@@ -50,6 +53,13 @@ export default async function PlatformPage({ params }: Params) {
 
   const products = getProductsByPlatform(platform);
   const label = platformLabel(platform);
+
+  // Texto SEO: el que hayas escrito a mano para esta red manda; si no, se
+  // genera con los precios y tiempos reales de la tienda.
+  const manual = getSetting(`seo_text_${platform}`, "");
+  const generado = getBoolSetting("auto_seo_text", true) ? textoDeRed(platform) : null;
+  const cuerpoSeo = manual ? sanitizeHtml(manual) : generado?.html ?? null;
+  const faqSeo = manual ? [] : generado?.faq ?? [];
 
   // Agrupamos por tipo de servicio para que la página no sea una lista plana.
   const groups = new Map<string, typeof products>();
@@ -97,6 +107,29 @@ export default async function PlatformPage({ params }: Params) {
             </section>
           ))}
 
+          {cuerpoSeo ? (
+            <section className="mt-16 border-t border-white/8 pt-12">
+              <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
+            </section>
+          ) : null}
+
+          {faqSeo.length ? (
+            <section className="mt-12 max-w-3xl">
+              <h2 className="text-xl font-bold">Preguntas sobre {label}</h2>
+              <div className="mt-5 divide-y divide-white/8 border-y border-white/8">
+                {faqSeo.map((item) => (
+                  <details key={item.q} className="group py-4 [&_summary::-webkit-details-marker]:hidden">
+                    <summary className="flex cursor-pointer items-center justify-between gap-4 text-sm font-semibold">
+                      {item.q}
+                      <span className="shrink-0 text-lg leading-none text-ink-400 transition-transform group-open:rotate-45">+</span>
+                    </summary>
+                    <p className="mt-3 text-sm leading-relaxed text-ink-200">{item.a}</p>
+                  </details>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
           {products.length === 0 ? (
             <p className="mt-10 rounded-xl border border-white/10 bg-white/4 p-6 text-ink-400">
               Todavía no hay productos publicados para {label}.
@@ -107,12 +140,13 @@ export default async function PlatformPage({ params }: Params) {
       <SiteFooter />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={jsonLd(
+        dangerouslySetInnerHTML={jsonLd([
           breadcrumbLd([
             { name: "Inicio", path: "/" },
             { name: label, path: `/${platform}` },
           ]),
-        )}
+          ...(faqSeo.length ? [faqLd(faqSeo)] : []),
+        ])}
       />
     </>
   );
