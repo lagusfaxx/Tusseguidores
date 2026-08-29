@@ -267,9 +267,58 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error desconocido del proveedor.";
     run("UPDATE orders SET provider_error = ?, updated_at = datetime('now') WHERE id = ?", [message, orderId]);
-    logEvent(orderId, "error", `No se pudo enviar al proveedor: ${message}`);
+    logEvent(
+      orderId,
+      "error",
+      isFundsError(message)
+        ? `Sin saldo en el proveedor: ${message}. El pedido se reintenta solo al recargar.`
+        : `No se pudo enviar al proveedor: ${message}`,
+    );
     return { ok: false, error: message };
   }
+}
+
+/** ¿El proveedor rechazó el pedido por falta de saldo? */
+export function isFundsError(message: string): boolean {
+  return /not enough funds|insufficient|balance|saldo|fondos/i.test(message);
+}
+
+/**
+ * Pedidos que el cliente pagó pero que nunca salieron al proveedor.
+ *
+ * Es el estado más peligroso de la tienda: la plata ya se cobró y no se está
+ * entregando nada. Pasa sobre todo cuando el proveedor se queda sin saldo.
+ */
+export function undispatchedOrders(limit = 100): Order[] {
+  return all<Order>(
+    `SELECT * FROM orders
+      WHERE payment_status = 'paid'
+        AND provider_order_id IS NULL
+        AND status NOT IN ('canceled', 'refunded')
+      ORDER BY paid_at ASC LIMIT ?`,
+    [limit],
+  );
+}
+
+/**
+ * Reintenta enviar los pedidos pagados que quedaron sin despachar. Lo llama el
+ * cron, así que en cuanto recargas el saldo salen solos, sin tocar nada.
+ */
+export async function retryUndispatched(limit = 25): Promise<{ intentados: number; enviados: number }> {
+  if (!providerConfigured()) return { intentados: 0, enviados: 0 };
+  const pending = undispatchedOrders(limit);
+  let enviados = 0;
+
+  for (const order of pending) {
+    const result = await sendToProvider(order.id);
+    if (result.ok) {
+      enviados++;
+      continue;
+    }
+    // Si es falta de saldo, el resto va a fallar igual: no insistimos.
+    if (isFundsError(result.error)) break;
+  }
+  return { intentados: pending.length, enviados };
 }
 
 /** Consulta al proveedor el estado de los pedidos en curso y los actualiza. */
@@ -343,6 +392,24 @@ export const ORDER_STATUS_TONE: Record<OrderStatus, string> = {
 
 export function orderStats() {
   return {
+    // Pagados que nunca salieron: plata cobrada sin entregar.
+    sinEnviar: get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND status NOT IN ('canceled', 'refunded')`,
+    )?.n ?? 0,
+    sinEnviarClp: get<{ v: number }>(
+      `SELECT COALESCE(SUM(amount_clp), 0) AS v FROM orders
+        WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND status NOT IN ('canceled', 'refunded')`,
+    )?.v ?? 0,
+    sinSaldo: get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM orders
+        WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND provider_error IS NOT NULL
+          AND (provider_error LIKE '%funds%' OR provider_error LIKE '%balance%'
+               OR provider_error LIKE '%saldo%' OR provider_error LIKE '%insufficient%')`,
+    )?.n ?? 0,
     total: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders")?.n ?? 0,
     paid: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE payment_status = 'paid'")?.n ?? 0,
     pending: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'")?.n ?? 0,

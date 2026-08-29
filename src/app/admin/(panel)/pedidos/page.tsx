@@ -4,6 +4,7 @@ import { StatusBadge } from "@/components/order-status";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { syncOrders } from "@/app/admin/actions";
+import { RetryStuckButton } from "@/components/retry-stuck";
 import { ORDER_STATUS_LABEL } from "@/lib/orders";
 import type { Order, OrderStatus } from "@/lib/types";
 
@@ -21,7 +22,12 @@ export default async function AdminOrdersPage({
 
   const where: string[] = [];
   const params: unknown[] = [];
-  if (estado && estado !== "todos") {
+  if (estado === "sin-enviar") {
+    // Pagados que nunca salieron al proveedor: lo que hay que mirar primero.
+    where.push(
+      "payment_status = 'paid' AND provider_order_id IS NULL AND status NOT IN ('canceled','refunded')",
+    );
+  } else if (estado && estado !== "todos") {
     where.push("status = ?");
     params.push(estado);
   }
@@ -45,9 +51,12 @@ export default async function AdminOrdersPage({
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Pedidos <span className="text-ink-400">({total})</span></h1>
-        <form action={syncOrders}>
-          <button type="submit" className="btn btn-ghost text-sm">Actualizar estados</button>
-        </form>
+        <div className="flex flex-wrap items-center gap-3">
+          <RetryStuckButton />
+          <form action={syncOrders}>
+            <button type="submit" className="btn btn-ghost text-sm">Actualizar estados</button>
+          </form>
+        </div>
       </div>
 
       <form className="mt-6 flex flex-wrap gap-3">
@@ -59,6 +68,7 @@ export default async function AdminOrdersPage({
         />
         <select name="estado" defaultValue={estado ?? "todos"} className="field max-w-[180px]">
           <option value="todos">Todos los estados</option>
+          <option value="sin-enviar">Pagados sin enviar</option>
           {statuses.map((status) => (
             <option key={status} value={status}>{ORDER_STATUS_LABEL[status]}</option>
           ))}

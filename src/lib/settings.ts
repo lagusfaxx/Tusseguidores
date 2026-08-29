@@ -24,6 +24,10 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   provider_url: "https://honestsmm.com/api/v2",
   provider_key: "",
   auto_send_to_provider: "1",
+  provider_balance: "",
+  provider_balance_at: "",
+  // Aviso cuando el saldo del proveedor baja de este monto, en dólares.
+  low_balance_usd: "10",
 
   // Flow.cl
   flow_api_key: "",

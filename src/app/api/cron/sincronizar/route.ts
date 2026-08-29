@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { syncOpenOrders } from "@/lib/orders";
+import { syncOpenOrders, retryUndispatched } from "@/lib/orders";
 import { getSetting } from "@/lib/settings";
 
 export const runtime = "nodejs";
@@ -20,15 +20,20 @@ function authorized(request: Request): boolean {
 }
 
 /**
- * Actualiza el estado de los pedidos en curso preguntándole al proveedor.
- * Pensado para llamarse cada 10 minutos desde un cron de Coolify.
+ * Mantenimiento periódico de los pedidos. Pensado para llamarse cada 10
+ * minutos desde un cron de Coolify.
+ *
+ * 1. Reintenta los pedidos pagados que nunca salieron al proveedor. Es lo que
+ *    hace que, al recargar saldo, los pedidos atascados se envíen solos.
+ * 2. Actualiza el avance de los que ya están en curso.
  */
 export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   }
-  const result = await syncOpenOrders(200);
-  return NextResponse.json({ ok: true, ...result });
+  const reenvios = await retryUndispatched(25);
+  const estados = await syncOpenOrders(200);
+  return NextResponse.json({ ok: true, reenvios, estados });
 }
 
 export const POST = GET;

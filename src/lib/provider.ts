@@ -123,6 +123,33 @@ export const provider = {
   refillStatus: (refillId: number) => call<{ status: string }>({ action: "refill_status", refill: refillId }),
 };
 
+/**
+ * Saldo del proveedor, guardado para no llamar a su API en cada pantalla.
+ * Lo refresca el cron y la página de ajustes.
+ */
+export async function refreshBalance(): Promise<number | null> {
+  if (!providerConfigured()) return null;
+  try {
+    const result = await provider.balance();
+    const value = Number(result.balance);
+    if (!Number.isFinite(value)) return null;
+    const { setSettings } = await import("./settings");
+    setSettings({ provider_balance: String(value), provider_balance_at: new Date().toISOString() });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export function cachedBalance(): { usd: number | null; at: string | null } {
+  const raw = getSetting("provider_balance", "");
+  const value = Number(raw);
+  return {
+    usd: raw !== "" && Number.isFinite(value) ? value : null,
+    at: getSetting("provider_balance_at", "") || null,
+  };
+}
+
 /** Normaliza el estado del proveedor al vocabulario interno de la tienda. */
 export function mapProviderStatus(raw: string | undefined): string {
   const s = (raw ?? "").toLowerCase();

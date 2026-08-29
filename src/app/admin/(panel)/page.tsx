@@ -5,9 +5,9 @@ import { syncOrders } from "@/app/admin/actions";
 import { StatusBadge } from "@/components/order-status";
 import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
-import { getSettings } from "@/lib/settings";
+import { getSettings, getNumberSetting } from "@/lib/settings";
 import { flowConfigured } from "@/lib/flow";
-import { providerConfigured } from "@/lib/provider";
+import { providerConfigured, cachedBalance, refreshBalance } from "@/lib/provider";
 import type { Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +15,9 @@ export const dynamic = "force-dynamic";
 export default async function AdminDashboard() {
   const stats = orderStats();
   const ctx = pricingContext();
+  // El saldo se refresca aquí y queda guardado para las demás pantallas.
+  await refreshBalance();
+  const balance = cachedBalance();
   const settings = getSettings();
   const recent = all<Order>("SELECT * FROM orders ORDER BY id DESC LIMIT 8");
 
@@ -30,7 +33,21 @@ export default async function AdminDashboard() {
   const costClp = stats.cost * ctx.usdClp;
   const margin = stats.revenue > 0 ? Math.round(((stats.revenue - costClp) / stats.revenue) * 100) : 0;
 
+  const lowBalance = getNumberSetting("low_balance_usd", 10);
+
   const alerts = [
+    stats.sinEnviar > 0 && {
+      text:
+        `${stats.sinEnviar} pedido(s) ya pagado(s) por ${formatClp(stats.sinEnviarClp)} todavía no salen al proveedor` +
+        (stats.sinSaldo > 0 ? " — el proveedor rechazó por falta de saldo." : "."),
+      href: "/admin/pedidos?estado=sin-enviar",
+      urgente: true,
+    },
+    balance.usd != null && balance.usd <= lowBalance && {
+      text: `Te queda US$${balance.usd.toFixed(2)} de saldo en el proveedor. Recarga antes de que se caigan las entregas.`,
+      href: "/admin/ajustes",
+      urgente: true,
+    },
     !providerConfigured() && {
       text: "Falta la API key del proveedor: los pedidos pagados no se enviarán solos.",
       href: "/admin/ajustes",
@@ -47,7 +64,7 @@ export default async function AdminDashboard() {
       text: `${broken.length} producto(s) publicado(s) apuntan a servicios que el proveedor desactivó.`,
       href: "/admin/productos?problema=1",
     },
-  ].filter(Boolean) as { text: string; href: string }[];
+  ].filter(Boolean) as { text: string; href: string; urgente?: boolean }[];
 
   return (
     <>
@@ -66,7 +83,11 @@ export default async function AdminDashboard() {
             <Link
               key={alert.text}
               href={alert.href}
-              className="block rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100 hover:bg-amber-500/15"
+              className={`block rounded-lg border px-4 py-2.5 text-sm ${
+                alert.urgente
+                  ? "border-red-500/40 bg-red-500/10 text-red-100 hover:bg-red-500/15"
+                  : "border-amber-500/30 bg-amber-500/10 text-amber-100 hover:bg-amber-500/15"
+              }`}
             >
               {alert.text} →
             </Link>
@@ -79,7 +100,13 @@ export default async function AdminDashboard() {
           { label: "Ventas totales", value: formatClp(stats.revenue), hint: `${stats.paid} pedidos pagados` },
           { label: "Ventas de hoy", value: formatClp(stats.revenueToday), hint: `${stats.today} pedidos hoy` },
           { label: "Margen estimado", value: `${margin}%`, hint: `Costo ${formatClp(costClp)}` },
-          { label: "En proceso", value: formatNumber(stats.processing), hint: `${stats.pending} esperando pago` },
+          {
+            label: "Saldo del proveedor",
+            value: balance.usd != null ? `US$${balance.usd.toFixed(2)}` : "—",
+            hint: balance.usd != null
+              ? `${formatNumber(stats.processing)} pedidos en proceso`
+              : "Configura la API key para verlo",
+          },
         ].map((card) => (
           <div key={card.label} className="card p-5">
             <p className="text-xs uppercase tracking-wider text-ink-400">{card.label}</p>

@@ -121,6 +121,9 @@ export function SettingsForm({
           {providerKeyFromEnv ? <EnvNotice name="PROVIDER_API_KEY" /> : null}
           <Check label="Enviar los pedidos automáticamente al confirmar el pago"
             name="auto_send_to_provider" checked={settings.auto_send_to_provider === "1"} />
+          <Field label="Avisar cuando el saldo baje de (US$)" name="low_balance_usd" type="number"
+            value={settings.low_balance_usd}
+            hint="Aparece una alerta roja en el resumen. Si el proveedor se queda sin saldo, los pedidos ya pagados quedan en espera y se reenvían solos al recargar." />
           {providerBalance ? (
             <p className="rounded-lg border border-lime-500/30 bg-lime-500/10 px-3 py-2 text-sm text-lime-200">
               Saldo en el proveedor: <strong>{providerBalance}</strong>

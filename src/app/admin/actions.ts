@@ -11,7 +11,9 @@ import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
 } from "@/lib/quality.mjs";
-import { sendToProvider, setStatus, syncOpenOrders, logEvent, markPaid } from "@/lib/orders";
+import {
+  sendToProvider, setStatus, syncOpenOrders, logEvent, markPaid, retryUndispatched,
+} from "@/lib/orders";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
@@ -77,7 +79,7 @@ const SETTING_KEYS = [
   "site_name", "site_domain", "site_url", "site_tagline", "site_description",
   "contact_email", "contact_whatsapp",
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "min_rate_json",
-  "provider_url", "provider_key", "auto_send_to_provider",
+  "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "google_site_verification", "google_analytics_id",
@@ -473,6 +475,21 @@ export async function orderAction(formData: FormData) {
     revalidatePath("/admin/pedidos");
     revalidatePath(`/admin/pedidos/${id}`);
   });
+}
+
+/** Reintenta de una todos los pedidos pagados que no salieron. */
+export async function retryStuckOrders(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const { intentados, enviados } = await retryUndispatched(50);
+  revalidatePath("/admin/pedidos");
+  revalidatePath("/admin");
+  if (intentados === 0) return { ok: "No hay pedidos pendientes de enviar." };
+  if (enviados === 0) {
+    return {
+      error: `Ninguno de los ${intentados} pedidos pudo enviarse. Revisa el saldo del proveedor y el detalle de un pedido para ver el motivo exacto.`,
+    };
+  }
+  return { ok: `Enviados ${enviados} de ${intentados} pedidos pendientes.` };
 }
 
 export async function syncOrders() {

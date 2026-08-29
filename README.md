@@ -33,13 +33,34 @@ Tienda de servicios para redes sociales conectada a la API del proveedor
 
 ### Cron de seguimiento de pedidos
 
-Para que los pedidos se actualicen solos, define una clave en
-**Ajustes → Operación** (o la variable `CRON_SECRET`) y programa en Coolify una
-tarea cada 10 minutos:
+Define una clave en **Ajustes → Operación** (o la variable `CRON_SECRET`) y
+programa en Coolify una tarea cada 10 minutos:
 
 ```
 curl -fsS "https://tusseguidores.cl/api/cron/sincronizar?key=TU_CLAVE"
 ```
+
+Ese cron hace dos cosas: reintenta los pedidos pagados que no alcanzaron a
+salir al proveedor y actualiza el avance de los que ya están en curso. **No es
+opcional**: es lo que rescata los pedidos que quedaron atascados.
+
+### Si el proveedor se queda sin saldo
+
+El cobro y la entrega son dos cosas separadas: Flow cobra, y recién después la
+tienda le pide el pedido al proveedor. Si en ese momento no hay saldo, el
+proveedor lo rechaza y el pedido queda **pagado sin enviar**. No se pierde:
+
+- Queda registrado el motivo exacto en el historial del pedido.
+- El resumen del panel muestra una alerta roja con cuántos son y por cuánta
+  plata, más el saldo actual del proveedor.
+- El cron los reintenta en cada pasada, así que **al recargar el saldo salen
+  solos**, sin tocar nada.
+- También puedes forzarlo con «Reintentar pedidos sin enviar» en la lista de
+  pedidos, o enviar uno suelto desde su ficha.
+
+En **Ajustes → Proveedor** se configura a partir de qué monto avisar (por
+defecto US$10). Y en **Ajustes → La tienda** puedes desmarcar «Recibir pedidos»
+para dejar de vender mientras recargas.
 
 ---
 
