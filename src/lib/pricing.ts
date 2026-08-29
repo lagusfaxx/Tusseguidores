@@ -100,7 +100,10 @@ export type PriceBreakdown = {
   origen: "costo" | "piso" | "minimo";
   /** Cuántas veces el costo del proveedor es el precio de venta. */
   multiplo: number;
+  /** Lo que le pagas al proveedor por esa cantidad. */
   costoClp: number;
+  /** Lo que te queda: precio de venta menos costo. */
+  gananciaClp: number;
 };
 
 /**
@@ -133,6 +136,7 @@ export function priceBreakdown(
     origen,
     multiplo: costoClp > 0 ? priceClp / costoClp : 0,
     costoClp,
+    gananciaClp: priceClp - costoClp,
   };
 }
 

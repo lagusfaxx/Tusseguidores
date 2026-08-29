@@ -151,7 +151,7 @@ export default async function AdminCatalogPage({
             <tr>
               <th>ID</th><th>Servicio</th><th>Tipo</th>
               <th>Retención</th><th>Velocidad</th>
-              <th>Costo /1.000</th><th>Precio de venta</th><th>Ganancia</th><th>Rango</th>
+              <th>Costo /1.000</th><th>Precio de venta</th><th>Te queda</th><th>Rango</th>
               <th className="sticky right-0 bg-ink-900 text-right">Acción</th>
             </tr>
           </thead>
@@ -195,25 +195,22 @@ export default async function AdminCatalogPage({
                     ) : null}
                   </div>
                 </td>
-                <td className="whitespace-nowrap text-xs tabular-nums"
-                    title={`Costo del proveedor: ${formatClp(precios[row.service_id].costoClp)}`}>
-                  {precios[row.service_id].multiplo > 0 ? (
-                    <span
-                      className={
-                        precios[row.service_id].multiplo >= 4
-                          ? "text-lime-400"
-                          : precios[row.service_id].multiplo >= 2
-                            ? "text-ink-200"
-                            : "text-red-300"
-                      }
-                    >
-                      {precios[row.service_id].multiplo.toFixed(1)}×
-                    </span>
-                  ) : (
-                    "—"
-                  )}
+                <td className="whitespace-nowrap text-xs tabular-nums">
+                  {/* Lo primero es lo que se lleva al bolsillo; el múltiplo y el
+                      costo van abajo y rotulados, para que no se confundan. */}
+                  <span
+                    className={
+                      precios[row.service_id].gananciaClp > 0 ? "font-semibold text-lime-400" : "text-red-300"
+                    }
+                  >
+                    {precios[row.service_id].gananciaClp >= 0 ? "+" : "−"}
+                    {formatClp(Math.abs(precios[row.service_id].gananciaClp))}
+                  </span>
                   <div className="text-[11px] text-ink-400">
-                    {formatClp(precios[row.service_id].costoClp)}
+                    {precios[row.service_id].multiplo > 0
+                      ? `${precios[row.service_id].multiplo.toFixed(1)}× · `
+                      : ""}
+                    costo {formatClp(precios[row.service_id].costoClp)}
                   </div>
                 </td>
                 <td className="whitespace-nowrap text-[11px] text-ink-400">
