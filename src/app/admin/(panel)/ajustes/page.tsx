@@ -2,6 +2,7 @@ import { getSettings } from "@/lib/settings";
 import { DEFAULT_MIN_RATES } from "@/lib/pricing";
 import { SettingsForm } from "@/components/settings-form";
 import { providerConfigured, provider } from "@/lib/provider";
+import { config as flowConfig } from "@/lib/flow";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,8 @@ export default async function AdminSettingsPage() {
     }
   }
 
+  const flow = flowConfig();
+
   return (
     <>
       <h1 className="text-2xl font-bold">Ajustes</h1>
@@ -33,6 +36,9 @@ export default async function AdminSettingsPage() {
           defaultMinRates={JSON.stringify(DEFAULT_MIN_RATES, null, 2)}
           providerBalance={balance}
           providerBalanceError={balanceError}
+          flowSandbox={flow.sandbox}
+          flowForcedByEnv={flow.forcedByEnv}
+          providerKeyFromEnv={Boolean((process.env.PROVIDER_API_KEY ?? "").trim())}
         />
       </div>
     </>

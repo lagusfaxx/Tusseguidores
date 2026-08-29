@@ -52,13 +52,19 @@ Todo se configura en `/admin/ajustes`; no hace falta volver a desplegar.
 | **La tienda** | Nombre, dominio, correo de contacto y WhatsApp. |
 | **Precios** | Valor del dólar, margen global y precios mínimos. |
 | **Proveedor** | La API key de honestsmm (la sacas de tu página de cuenta). |
-| **Pagos** | API key y secret key de Flow. Desmarca «modo de pruebas» para cobrar de verdad. |
+| **Pagos** | API key y secret key de Flow. Arriba de la sección dice en qué entorno se está cobrando de verdad. |
 | **SEO** | Título, descripción y verificación de Google Search Console. |
 
 En el panel de **Flow** configura:
 
 - URL de confirmación: `https://tusseguidores.cl/api/flow/confirmar`
 - URL de retorno: `https://tusseguidores.cl/pago/retorno`
+
+> **Deja `FLOW_SANDBOX` sin definir en Coolify.** Si tiene un valor, manda sobre
+> la casilla «Modo de pruebas» del panel: la desmarcas, guardas, y el sitio
+> sigue cobrando en sandbox sin decir por qué. Lo mismo vale para
+> `FLOW_API_KEY`, `FLOW_SECRET_KEY` y `PROVIDER_API_KEY`. Cuando una variable
+> está pisando un valor, el panel ahora lo avisa junto al campo.
 
 > **Las credenciales de pruebas y las de producción son distintas.** Las de
 > `sandbox.flow.cl` no sirven en `www.flow.cl` ni al revés: si las mezclas, Flow

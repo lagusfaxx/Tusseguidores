@@ -26,17 +26,36 @@ export type FlowConfig = {
   secretKey: string;
   sandbox: boolean;
   baseUrl: string;
+  /**
+   * Qué valores vienen de una variable de entorno. Una variable manda sobre lo
+   * guardado en el panel, así que hay que decirlo en pantalla: si no, cambias
+   * la casilla, no pasa nada y no hay forma de saber por qué.
+   */
+  forcedByEnv: { apiKey: boolean; secretKey: boolean; sandbox: boolean };
 };
 
 export function config(): FlowConfig {
   // Un espacio o un salto de línea pegado junto a la clave hace que Flow
   // responda "apiKey not found", que no dice nada del problema real.
-  const apiKey = (process.env.FLOW_API_KEY || getSetting("flow_api_key", "")).trim();
-  const secretKey = (process.env.FLOW_SECRET_KEY || getSetting("flow_secret_key", "")).trim();
-  const sandbox = process.env.FLOW_SANDBOX
-    ? process.env.FLOW_SANDBOX.trim() === "1"
-    : getBoolSetting("flow_sandbox", true);
-  return { apiKey, secretKey, sandbox, baseUrl: sandbox ? SANDBOX_URL : PROD_URL };
+  const envApiKey = (process.env.FLOW_API_KEY ?? "").trim();
+  const envSecretKey = (process.env.FLOW_SECRET_KEY ?? "").trim();
+  const envSandbox = (process.env.FLOW_SANDBOX ?? "").trim();
+
+  const apiKey = envApiKey || getSetting("flow_api_key", "").trim();
+  const secretKey = envSecretKey || getSetting("flow_secret_key", "").trim();
+  const sandbox = envSandbox ? envSandbox === "1" : getBoolSetting("flow_sandbox", true);
+
+  return {
+    apiKey,
+    secretKey,
+    sandbox,
+    baseUrl: sandbox ? SANDBOX_URL : PROD_URL,
+    forcedByEnv: {
+      apiKey: Boolean(envApiKey),
+      secretKey: Boolean(envSecretKey),
+      sandbox: Boolean(envSandbox),
+    },
+  };
 }
 
 /**
@@ -52,7 +71,10 @@ export function explainFlowError(raw: string, sandbox: boolean): string {
   const otro = sandbox ? "producción" : "pruebas";
 
   if (message.includes("apikey not found") || message.includes("api key not found")) {
-    return `Flow no reconoce la API key en el entorno de ${entorno}. Las credenciales de pruebas y las de producción son distintas: revisa que la key sea la del entorno correcto, o cambia el modo de pruebas en Ajustes si esa key es de ${otro}.`;
+    const forzado = config().forcedByEnv.sandbox
+      ? " Ojo: el entorno está fijado por la variable de entorno FLOW_SANDBOX, así que la casilla del panel no lo cambia; hay que editarla en el servidor."
+      : "";
+    return `Flow no reconoce la API key en el entorno de ${entorno}. Las credenciales de pruebas y las de producción son distintas: revisa que la key sea la del entorno correcto, o cambia el modo de pruebas en Ajustes si esa key es de ${otro}.${forzado}`;
   }
   if (message.includes("invalid signature") || message.includes("firma")) {
     return `La secret key de Flow no corresponde a la API key configurada (entorno de ${entorno}). Copia las dos del mismo lugar.`;

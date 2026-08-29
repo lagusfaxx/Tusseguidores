@@ -13,11 +13,16 @@ services:
       # Credenciales del primer arranque. Cambia la contraseña al entrar.
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@tusseguidores.cl}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-cambiaesta123}
-      # Opcionales: tienen prioridad sobre lo guardado en el panel.
+      # Opcionales. Ojo: si defines cualquiera de estas, MANDA sobre lo que
+      # guardes en el panel. Déjalas sin definir para administrar todo desde
+      # /admin/ajustes, que es lo recomendado.
+      #
+      # FLOW_SANDBOX en particular fija el entorno de cobro: si vale 1, la
+      # casilla "Modo de pruebas" del panel deja de tener efecto.
       - PROVIDER_API_KEY=${PROVIDER_API_KEY:-}
       - FLOW_API_KEY=${FLOW_API_KEY:-}
       - FLOW_SECRET_KEY=${FLOW_SECRET_KEY:-}
-      - FLOW_SANDBOX=${FLOW_SANDBOX:-1}
+      - FLOW_SANDBOX=${FLOW_SANDBOX:-}
       - CRON_SECRET=${CRON_SECRET:-}
     ports:
       - "3000:3000"

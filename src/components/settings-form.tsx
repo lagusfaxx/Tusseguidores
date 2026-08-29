@@ -9,7 +9,22 @@ type Props = {
   defaultMinRates: string;
   providerBalance: string | null;
   providerBalanceError: string | null;
+  /** Entorno de cobro que se está usando de verdad, no el guardado. */
+  flowSandbox: boolean;
+  flowForcedByEnv: { apiKey: boolean; secretKey: boolean; sandbox: boolean };
+  providerKeyFromEnv: boolean;
 };
+
+/** Marca los campos que una variable de entorno está pisando. */
+function EnvNotice({ name }: { name: string }) {
+  return (
+    <p className="mt-1 rounded bg-amber-500/10 px-2 py-1 text-xs text-amber-100">
+      Este valor viene de la variable de entorno <code className="font-mono">{name}</code> y manda
+      sobre lo que guardes aquí. Para cambiarlo, edítala en el servidor (en Coolify, en las
+      variables del recurso) o bórrala para administrarlo desde este panel.
+    </p>
+  );
+}
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -47,11 +62,16 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
   );
 }
 
-export function SettingsForm({ settings, defaultMinRates, providerBalance, providerBalanceError }: Props) {
+export function SettingsForm({
+  settings, defaultMinRates, providerBalance, providerBalanceError,
+  flowSandbox, flowForcedByEnv, providerKeyFromEnv,
+}: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
   const [passwordState, passwordAction] = useActionState<ActionState, FormData>(changePassword, {});
   const [flowState, flowAction] = useActionState<ActionState>(testFlow, {});
-  const sandbox = settings.flow_sandbox === "1";
+  // El entorno real, no el que dice la casilla: una variable de entorno puede
+  // estar pisándola.
+  const sandbox = flowSandbox;
 
   return (
     <>
@@ -97,7 +117,8 @@ export function SettingsForm({ settings, defaultMinRates, providerBalance, provi
         <Section title="Proveedor (honestsmm)">
           <Field label="URL de la API" name="provider_url" value={settings.provider_url} />
           <Field label="API key" name="provider_key" type="password" value={settings.provider_key}
-            hint="También puedes dejarla en la variable de entorno PROVIDER_API_KEY, que tiene prioridad." />
+            hint="La sacas de tu página de cuenta en el proveedor." />
+          {providerKeyFromEnv ? <EnvNotice name="PROVIDER_API_KEY" /> : null}
           <Check label="Enviar los pedidos automáticamente al confirmar el pago"
             name="auto_send_to_provider" checked={settings.auto_send_to_provider === "1"} />
           {providerBalance ? (
@@ -112,18 +133,38 @@ export function SettingsForm({ settings, defaultMinRates, providerBalance, provi
         </Section>
 
         <Section title="Pagos (Flow.cl)">
-          <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-xs leading-relaxed text-amber-100">
-            <strong>Las credenciales de pruebas y las de producción son distintas.</strong> Ahora estás
-            en <strong>{sandbox ? "modo de pruebas" : "producción"}</strong>, así que la API key y la
-            secret key tienen que ser las de{" "}
-            <code className="font-mono">{sandbox ? "sandbox.flow.cl" : "www.flow.cl"}</code>. Si las
-            mezclas, Flow responde «apiKey not found» y el cliente no puede pagar.
+          <div
+            className={`rounded-lg border px-3 py-2.5 text-sm leading-relaxed ${
+              sandbox
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-100"
+                : "border-lime-500/30 bg-lime-500/10 text-lime-100"
+            }`}
+          >
+            Ahora mismo se cobra en{" "}
+            <strong>{sandbox ? "PRUEBAS (sandbox.flow.cl)" : "PRODUCCIÓN (www.flow.cl)"}</strong>.
+            {sandbox ? " Ningún pago es real." : " Los pagos son reales."}
           </div>
 
-          <Field label="API key" name="flow_api_key" type="password" value={settings.flow_api_key} />
-          <Field label="Secret key" name="flow_secret_key" type="password" value={settings.flow_secret_key} />
-          <Check label="Modo de pruebas (sandbox)" name="flow_sandbox" checked={sandbox}
-            hint="Desmárcalo para cobrar de verdad. Al cambiarlo también tienes que cambiar las credenciales." />
+          <p className="text-xs leading-relaxed text-ink-400">
+            Las credenciales de pruebas y las de producción son distintas: la API key y la secret key
+            tienen que ser las de{" "}
+            <code className="font-mono text-brand-300">{sandbox ? "sandbox.flow.cl" : "www.flow.cl"}</code>.
+            Si las mezclas, Flow responde «apiKey not found» y nadie puede pagar.
+          </p>
+
+          <div>
+            <Field label="API key" name="flow_api_key" type="password" value={settings.flow_api_key} />
+            {flowForcedByEnv.apiKey ? <EnvNotice name="FLOW_API_KEY" /> : null}
+          </div>
+          <div>
+            <Field label="Secret key" name="flow_secret_key" type="password" value={settings.flow_secret_key} />
+            {flowForcedByEnv.secretKey ? <EnvNotice name="FLOW_SECRET_KEY" /> : null}
+          </div>
+          <div>
+            <Check label="Modo de pruebas (sandbox)" name="flow_sandbox" checked={settings.flow_sandbox === "1"}
+              hint="Desmárcalo para cobrar de verdad. Al cambiarlo también tienes que cambiar las credenciales." />
+            {flowForcedByEnv.sandbox ? <EnvNotice name="FLOW_SANDBOX" /> : null}
+          </div>
 
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
             En el panel de Flow configura la URL de confirmación como{" "}
