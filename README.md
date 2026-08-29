@@ -232,6 +232,27 @@ pantalla sin datos pierde la venta.
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
 y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rota.
 
+### En el teléfono
+
+La mayoría de las visitas llegan desde el celular, así que la tienda está
+pensada primero para esa pantalla:
+
+- **En la ficha de producto el formulario de compra va arriba**, justo después
+  del título. La descripción larga, la tabla de precios y las preguntas van
+  debajo. Antes había que bajar casi cuatro pantallas para encontrar el botón
+  de pagar; ahora está a menos de media.
+- **Las tarjetas del catálogo son filas compactas** bajo los 640px: foto chica
+  a la izquierda, precio a la derecha. La misma tarjeta vertical de siempre
+  desde ahí para arriba.
+- **Los bloques largos se recortan con un «leer más» de puro CSS.** El texto no
+  sale del HTML, así que Google lo sigue leyendo completo.
+- La portada y el catálogo muestran menos productos por sección en el teléfono,
+  con un enlace para ver el resto.
+- Los datos de la transferencia y el código de pedido traen botón de copiar.
+
+Ninguna página se desliza hacia el lado en 375, 390 ni 412 px de ancho, ni la
+tienda ni el panel.
+
 ### SEO
 
 **El texto largo se escribe solo.** La portada y cada página de red social

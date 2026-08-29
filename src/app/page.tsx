@@ -12,6 +12,7 @@ import { PlatformIcon } from "@/components/icons";
 import { sanitizeHtml } from "@/lib/utils";
 import { textoDePortada } from "@/lib/seo-text";
 import { getBoolSetting } from "@/lib/settings";
+import { LeerMas } from "@/components/leer-mas";
 
 export function generateMetadata(): Metadata {
   const s = getSettings();
@@ -76,7 +77,7 @@ export default function HomePage() {
       <main>
         {/* ---------------------------------------------------------- Hero */}
         <section className="border-b border-white/8">
-          <div className="mx-auto max-w-6xl px-4 pb-14 pt-14 sm:pt-20">
+          <div className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:pb-14 sm:pt-20">
             <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
               <div className="max-w-xl">
                 <h1 className="text-pretty text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
@@ -143,7 +144,7 @@ export default function HomePage() {
         </div>
 
         {/* -------------------------------------------------------- Catálogo */}
-        <section id="catalogo" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-14">
+        <section id="catalogo" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-10 sm:py-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo que más se vende</h2>
             <Link href="/catalogo" className="text-sm text-brand-300 hover:text-white">
@@ -151,11 +152,21 @@ export default function HomePage() {
             </Link>
           </div>
 
-          <div className="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+          <div className="mt-5 grid gap-3 sm:mt-7 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+            {products.map((product, i) => (
+              /* Cuatro en teléfono; el resto está a un toque en el catálogo. */
+              <div key={product.id} className={i >= 4 ? "hidden sm:block" : ""}>
+                <ProductCard product={product} />
+              </div>
             ))}
           </div>
+
+          <Link
+            href="/catalogo"
+            className="mt-4 flex items-center justify-center rounded-xl border border-white/12 bg-white/4 px-4 py-3 text-sm font-semibold text-ink-200 sm:hidden"
+          >
+            Ver los {all.length} servicios
+          </Link>
 
           {products.length === 0 ? (
             <p className="mt-8 rounded-xl border border-white/10 bg-white/4 p-6 text-center text-ink-400">
@@ -166,7 +177,7 @@ export default function HomePage() {
 
         {/* ------------------------------------- Cómo funciona + qué no hacemos */}
         <section className="border-y border-white/8 bg-ink-900/40">
-          <div className="mx-auto grid max-w-6xl gap-12 px-4 py-14 lg:grid-cols-2">
+          <div className="mx-auto grid max-w-6xl gap-10 px-4 py-10 sm:py-14 lg:grid-cols-2 lg:gap-12">
             <div>
               <h2 className="text-2xl font-bold tracking-tight">Cómo se compra</h2>
               <ol className="mt-6 space-y-5">
@@ -237,7 +248,7 @@ export default function HomePage() {
         </section>
 
         {/* ------------------------------------------------------------- FAQ */}
-        <section className="mx-auto max-w-6xl px-4 py-14">
+        <section className="mx-auto max-w-6xl px-4 py-10 sm:py-14">
           <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Preguntas que nos hacen siempre</h2>
           <div className="mt-7 max-w-3xl divide-y divide-white/8 border-y border-white/8">
             {HOME_FAQ.map((item) => (
@@ -256,8 +267,10 @@ export default function HomePage() {
 
         {/* Texto SEO: manual si lo escribiste, generado si no. */}
         {cuerpoSeo ? (
-          <section className="mx-auto max-w-6xl border-t border-white/8 px-4 py-14">
-            <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
+          <section className="mx-auto max-w-6xl border-t border-white/8 px-4 py-10 sm:py-14">
+            <LeerMas id="seo-portada" alto="20rem" etiqueta="Leer más">
+              <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
+            </LeerMas>
           </section>
         ) : null}
       </main>

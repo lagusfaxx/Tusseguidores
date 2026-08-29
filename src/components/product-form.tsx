@@ -361,7 +361,7 @@ export function ProductForm(props: Props) {
         </button>
       </Section>
 
-      <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-4 border-t border-white/10 bg-ink-950/95 px-4 py-4 backdrop-blur">
+      <div className="sticky bottom-0 flex flex-wrap items-center gap-4 border-t border-white/10 bg-ink-950/95 px-1 py-4 backdrop-blur">
         <SubmitButton>{product ? "Guardar cambios" : "Crear producto"}</SubmitButton>
         {product ? (
           <a href={`/producto/${product.slug}`} target="_blank" rel="noopener noreferrer" className="text-sm text-ink-400 hover:text-white">

@@ -28,8 +28,8 @@ export default function CatalogPage() {
       <SiteHeader />
       <main className="bg-halo">
         <div className="mx-auto max-w-6xl px-4 py-12">
-          <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">Catálogo completo</h1>
-          <p className="mt-2 max-w-2xl text-ink-200">
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl">Catálogo completo</h1>
+          <p className="mt-2 max-w-2xl text-sm text-ink-200 sm:text-base">
             {products.length} servicios listos para comprar, todos con entrega automática y precios en pesos chilenos.
           </p>
 
@@ -46,20 +46,38 @@ export default function CatalogPage() {
           </div>
 
           {platforms.map((p) => (
-            <section key={p.platform} id={p.platform} className="mt-12 scroll-mt-24">
+            <section key={p.platform} id={p.platform} className="mt-9 scroll-mt-24 lg:mt-12">
               <div className="flex items-end justify-between gap-4">
-                <h2 className="text-2xl font-bold">{platformLabel(p.platform)}</h2>
-                <Link href={`/${p.platform}`} className="text-sm text-brand-300 hover:text-white">
-                  Ver página de {platformLabel(p.platform)}
+                <h2 className="text-xl font-bold sm:text-2xl">{platformLabel(p.platform)}</h2>
+                <Link href={`/${p.platform}`} className="shrink-0 text-sm text-brand-300 hover:text-white">
+                  Ver <span className="hidden sm:inline">página de {platformLabel(p.platform)}</span>
+                  <span className="sm:hidden">todo</span>
                 </Link>
               </div>
-              <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {products
-                  .filter((product) => product.platform === p.platform)
-                  .map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-              </div>
+              {(() => {
+                const items = products.filter((product) => product.platform === p.platform);
+                return (
+                  <>
+                    <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                      {items.map((product, i) => (
+                        /* En teléfono mostramos los primeros cuatro: 35 tarjetas
+                           seguidas eran diez pantallas de scroll. */
+                        <div key={product.id} className={i >= 3 ? "hidden sm:block" : ""}>
+                          <ProductCard product={product} />
+                        </div>
+                      ))}
+                    </div>
+                    {items.length > 3 ? (
+                      <Link
+                        href={`/${p.platform}`}
+                        className="mt-3 flex items-center justify-center rounded-xl border border-white/12 bg-white/4 px-4 py-2.5 text-sm font-semibold text-ink-200 sm:hidden"
+                      >
+                        Ver los {items.length} de {platformLabel(p.platform)}
+                      </Link>
+                    ) : null}
+                  </>
+                );
+              })()}
             </section>
           ))}
         </div>

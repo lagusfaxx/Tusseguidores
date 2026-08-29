@@ -261,7 +261,7 @@ export function SettingsForm({
           </p>
         </Section>
 
-        <div className="sticky bottom-0 -mx-4 flex items-center gap-4 border-t border-white/10 bg-ink-950/95 px-4 py-4 backdrop-blur lg:col-span-2">
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-4 border-t border-white/10 bg-ink-950/95 px-1 py-4 backdrop-blur lg:col-span-2">
           <SubmitButton>Guardar ajustes</SubmitButton>
           <Feedback state={state} />
         </div>

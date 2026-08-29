@@ -8,6 +8,7 @@ import { getOrderByCode, getOrderEvents } from "@/lib/orders";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { getSettings } from "@/lib/settings";
+import { Copiar } from "@/components/copiar";
 import { datosTransferencia } from "@/lib/transfer";
 import { TransferPanel } from "@/components/transfer-panel";
 
@@ -42,7 +43,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
     <>
       <SiteHeader />
       <main className="bg-halo">
-        <div className="mx-auto max-w-2xl px-4 py-14">
+        <div className="mx-auto max-w-2xl px-4 py-8 sm:py-14">
           {estado === "transferencia" ? (
             <div className="mb-6 rounded-xl border border-lime-500/30 bg-lime-500/10 p-4 text-sm text-lime-100">
               Tu pedido quedó reservado. Sigue las instrucciones de más abajo para transferir; en
@@ -61,7 +62,10 @@ export default async function OrderPage({ params, searchParams }: Params) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <span className="text-xs uppercase tracking-wider text-ink-400">Pedido</span>
-              <h1 className="font-mono text-3xl font-extrabold tracking-tight">{order.code}</h1>
+              <h1 className="flex items-center gap-2 font-mono text-2xl font-extrabold tracking-tight sm:text-3xl">
+                {order.code}
+                <Copiar valor={order.code} />
+              </h1>
             </div>
             <StatusBadge status={order.status} />
           </div>

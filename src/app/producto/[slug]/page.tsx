@@ -137,20 +137,50 @@ export default async function ProductPage({ params }: Params) {
             <span className="text-ink-200">{product.name}</span>
           </nav>
 
-          <div className="mt-6 grid gap-10 lg:grid-cols-[1.15fr_0.85fr]">
-            {/* -------------------------------------------------- Columna izquierda */}
-            <div>
+          {/*
+            En teléfono el orden del DOM manda: título, formulario de compra y
+            recién después el contenido largo. Antes había que bajar casi cuatro
+            pantallas para encontrar el botón de pagar.
+          */}
+          <div className="mt-5 grid gap-8 lg:mt-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:gap-10">
+            {/* ------------------------------------------------------- Encabezado */}
+            <header className="lg:col-start-1 lg:row-start-1">
               <div className="flex items-center gap-2 text-sm font-semibold text-brand-300">
                 <PlatformIcon slug={product.platform} className="h-4 w-4" />
                 {platformLabel(product.platform)} · {serviceTypeLabel(product.service_type)}
               </div>
 
-              <h1 className="mt-2 text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+              <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
                 {product.name}
               </h1>
-              <p className="mt-3 max-w-2xl text-lg leading-relaxed text-ink-200">{product.short_description}</p>
+              <p className="mt-2 max-w-2xl leading-relaxed text-ink-200 lg:mt-3 lg:text-lg">
+                {product.short_description}
+              </p>
+            </header>
 
-              <div className="mt-6 overflow-hidden rounded-2xl border border-white/10">
+            {/* ------------------------------------------------------------ Compra */}
+            <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
+              <BuyBox
+                productId={product.id}
+                tiers={tiers}
+                minQty={minQty}
+                maxQty={maxQty}
+                linkLabel={product.link_label}
+                linkPlaceholder={product.link_placeholder}
+                linkHelp={product.link_help}
+                deliveryLabel={deliveryLabel}
+                guaranteeText={guaranteeText}
+                ratePer1000Clp={ratePer1000Clp}
+                minPriceClp={ctx.minPriceClp}
+                rounding={ctx.rounding}
+                orderKind={product.order_kind}
+                transferencia={transferenciaDisponible()}
+              />
+            </div>
+
+            {/* -------------------------------------------------- Contenido largo */}
+            <div className="lg:col-start-1 lg:row-start-2">
+              <div className="overflow-hidden rounded-2xl border border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={product.image_url || "/img/productos/generico.svg"}
@@ -158,22 +188,22 @@ export default async function ProductPage({ params }: Params) {
                   width={600}
                   height={400}
                   fetchPriority="high"
-                  className="aspect-[3/2] w-full object-cover"
+                  className="aspect-[5/2] w-full object-cover sm:aspect-[3/2]"
                 />
               </div>
 
-              <dl className="mt-6 grid gap-3 sm:grid-cols-3">
+              <dl className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
                 {[
                   { icon: BoltIcon, label: "Entrega", value: deliveryLabel },
                   { icon: CheckIcon, label: "Calidad", value: product.quality_label },
                   { icon: ShieldIcon, label: "Garantía", value: guaranteeText },
                 ].map(({ icon: Icon, label, value }) => (
-                  <div key={label} className="card p-4">
-                    <dt className="flex items-center gap-1.5 text-xs text-ink-400">
-                      <Icon className="h-3.5 w-3.5 text-brand-300" />
+                  <div key={label} className="card p-3 sm:p-4">
+                    <dt className="flex items-center gap-1.5 text-[11px] text-ink-400 sm:text-xs">
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-brand-300" />
                       {label}
                     </dt>
-                    <dd className="mt-1 text-sm font-semibold">{value}</dd>
+                    <dd className="mt-1 text-[13px] font-semibold leading-snug sm:text-sm">{value}</dd>
                   </div>
                 ))}
               </dl>
@@ -189,12 +219,26 @@ export default async function ProductPage({ params }: Params) {
                 </ul>
               ) : null}
 
-              <article
-                className="prose-ts mt-10 max-w-none"
-                dangerouslySetInnerHTML={{
-                  __html: sanitizeHtml(product.description_html) + (datos ?? ""),
-                }}
-              />
+              {/*
+                En teléfono la descripción se recorta con un "ver más" de puro
+                CSS. El texto sigue en el HTML, así que Google lo lee igual;
+                lo que se evita es empujar el resto de la página tres pantallas.
+              */}
+              <div className="mt-8 lg:mt-10">
+                <input type="checkbox" id="ver-mas" className="peer sr-only" />
+                <article
+                  className="prose-ts relative max-h-[22rem] max-w-none overflow-hidden peer-checked:max-h-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-24 after:bg-gradient-to-t after:from-ink-950 after:to-transparent peer-checked:after:hidden sm:max-h-none sm:after:hidden"
+                  dangerouslySetInnerHTML={{
+                    __html: sanitizeHtml(product.description_html) + (datos ?? ""),
+                  }}
+                />
+                <label
+                  htmlFor="ver-mas"
+                  className="mt-3 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3.5 py-2 text-sm font-semibold text-ink-200 peer-checked:hidden sm:hidden"
+                >
+                  Leer la descripción completa
+                </label>
+              </div>
 
               {/* Tabla de precios: buena para SEO y para comparar de un vistazo */}
               {tiers.length ? (
@@ -206,7 +250,7 @@ export default async function ProductPage({ params }: Params) {
                         <tr>
                           <th className="px-4 py-3 font-semibold">Cantidad</th>
                           <th className="px-4 py-3 font-semibold">Precio</th>
-                          <th className="px-4 py-3 font-semibold">Por unidad</th>
+                          <th className="hidden px-4 py-3 font-semibold sm:table-cell">Por unidad</th>
                           <th className="px-4 py-3 font-semibold">Entrega</th>
                         </tr>
                       </thead>
@@ -215,7 +259,7 @@ export default async function ProductPage({ params }: Params) {
                           <tr key={tier.id} className="border-t border-white/6">
                             <td className="px-4 py-3 font-semibold">{formatNumber(tier.quantity)}</td>
                             <td className="px-4 py-3 font-bold text-brand-300">{formatClp(tier.priceClp)}</td>
-                            <td className="px-4 py-3 text-ink-400">
+                            <td className="hidden px-4 py-3 text-ink-400 sm:table-cell">
                               ${tier.unitClp.toLocaleString("es-CL", { maximumFractionDigits: 2 })}
                             </td>
                             <td className="px-4 py-3 text-ink-400">{deliveryLabel}</td>
@@ -245,35 +289,18 @@ export default async function ProductPage({ params }: Params) {
               ) : null}
             </div>
 
-            {/* -------------------------------------------------- Compra */}
-            <div className="lg:sticky lg:top-24 lg:self-start">
-              <BuyBox
-                productId={product.id}
-                tiers={tiers}
-                minQty={minQty}
-                maxQty={maxQty}
-                linkLabel={product.link_label}
-                linkPlaceholder={product.link_placeholder}
-                linkHelp={product.link_help}
-                deliveryLabel={deliveryLabel}
-                guaranteeText={guaranteeText}
-                ratePer1000Clp={ratePer1000Clp}
-                minPriceClp={ctx.minPriceClp}
-                rounding={ctx.rounding}
-                orderKind={product.order_kind}
-                transferencia={transferenciaDisponible()}
-              />
-            </div>
           </div>
 
           {related.length ? (
-            <section className="mt-16">
+            <section className="mt-12 lg:mt-16">
               <h2 className="text-2xl font-extrabold tracking-tight">
                 Más para {platformLabel(product.platform)}
               </h2>
-              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-                {related.map((item) => (
-                  <ProductCard key={item.id} product={item} />
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                {related.map((item, i) => (
+                  <div key={item.id} className={i >= 2 ? "hidden sm:block" : ""}>
+                    <ProductCard product={item} />
+                  </div>
                 ))}
               </div>
             </section>

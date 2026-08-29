@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { Copiar } from "@/components/copiar";
 import { getPaymentStatus, FLOW_STATUS } from "@/lib/flow";
 import { getOrderByCode, markPaid, setStatus } from "@/lib/orders";
 import { get } from "@/lib/db";
@@ -79,7 +80,10 @@ export default async function PaymentReturnPage({
           {order ? (
             <>
               <p className="mt-6 text-sm text-ink-400">Tu código de pedido</p>
-              <p className="font-mono text-2xl font-extrabold text-brand-300">{order.code}</p>
+              <p className="flex items-center justify-center gap-2 font-mono text-2xl font-extrabold text-brand-300">
+                {order.code}
+                <Copiar valor={order.code} />
+              </p>
               <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-ink-400">
                 Anótalo o saca una foto: con este código sigues tu pedido cuando quieras.
                 Si lo pierdes, escríbenos desde el correo que usaste al comprar.

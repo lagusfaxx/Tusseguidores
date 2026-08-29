@@ -35,14 +35,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="admin-shell min-h-screen">
       <header className="sticky top-0 z-30 border-b border-white/8 bg-ink-950/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-4">
-          <Link href="/admin" className="flex items-center gap-2 font-bold">
+          <Link href="/admin" className="flex shrink-0 items-center gap-2 font-bold">
             <span className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-brand-500 to-accent-500 text-xs">
               TS
             </span>
             Panel
           </Link>
 
-          <nav className="ml-4 flex flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {/* min-w-0 es lo que deja que el menú se encoja y haga scroll propio.
+              Sin él, en el teléfono empujaba la página entera hacia el lado. */}
+          <nav className="ml-1 flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto sm:ml-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {NAV.map((item) => (
               <Link
                 key={item.href}
@@ -57,15 +59,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/" target="_blank" className="hidden text-sm text-ink-400 hover:text-white sm:block">
             Ver tienda ↗
           </Link>
-          <form action={signOut}>
-            <button type="submit" className="rounded-lg px-3 py-2 text-sm text-ink-400 hover:text-white">
+          <form action={signOut} className="shrink-0">
+            <button type="submit" className="rounded-lg px-2 py-2 text-sm text-ink-400 hover:text-white sm:px-3">
               Salir
             </button>
           </form>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:py-8">{children}</main>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { textoDeRed } from "@/lib/seo-text";
 import { getSetting, getBoolSetting } from "@/lib/settings";
 import { sanitizeHtml } from "@/lib/utils";
+import { LeerMas } from "@/components/leer-mas";
 
 type Params = { params: Promise<{ platform: string }> };
 
@@ -80,26 +81,26 @@ export default async function PlatformPage({ params }: Params) {
             <span className="text-ink-200">{label}</span>
           </nav>
 
-          <div className="mt-6 flex items-start gap-4">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-500/30 to-accent-500/25 text-brand-300">
-              <PlatformIcon slug={platform} className="h-7 w-7" />
+          <div className="mt-5 flex items-start gap-3 sm:gap-4">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500/30 to-accent-500/25 text-brand-300 sm:h-14 sm:w-14 sm:rounded-2xl">
+              <PlatformIcon slug={platform} className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">
+              <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl">
                 Comprar seguidores {label}
               </h1>
-              <p className="mt-2 max-w-2xl leading-relaxed text-ink-200">
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-ink-200 sm:text-base">
                 {INTRO[platform] ?? `Servicios para ${label} con entrega automática y precios en pesos chilenos.`}
               </p>
             </div>
           </div>
 
           {[...groups.entries()].map(([type, items]) => (
-            <section key={type} className="mt-12">
-              <h2 className="text-xl font-bold">
+            <section key={type} className="mt-9 lg:mt-12">
+              <h2 className="text-lg font-bold sm:text-xl">
                 {serviceTypeLabel(type)} para {label}
               </h2>
-              <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
                 {items.map((product) => (
                   <ProductCard key={product.id} product={product} />
                 ))}
@@ -108,8 +109,10 @@ export default async function PlatformPage({ params }: Params) {
           ))}
 
           {cuerpoSeo ? (
-            <section className="mt-16 border-t border-white/8 pt-12">
-              <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
+            <section className="mt-12 border-t border-white/8 pt-10 lg:mt-16 lg:pt-12">
+              <LeerMas id="seo-red" alto="20rem" etiqueta={`Leer más sobre ${label}`}>
+                <div className="prose-ts max-w-3xl" dangerouslySetInnerHTML={{ __html: cuerpoSeo }} />
+              </LeerMas>
             </section>
           ) : null}
 

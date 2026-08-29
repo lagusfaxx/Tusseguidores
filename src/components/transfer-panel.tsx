@@ -6,6 +6,7 @@ import { run } from "@/lib/db";
 import { getOrderByCode, logEvent } from "@/lib/orders";
 import type { DatosTransferencia } from "@/lib/transfer";
 import type { Order } from "@/lib/types";
+import { Copiar } from "./copiar";
 
 /** El cliente avisa que ya transfirió. Solo marca; no confirma nada. */
 async function avisarTransferencia(formData: FormData) {
@@ -34,12 +35,23 @@ async function avisarTransferencia(formData: FormData) {
   redirect(`/pedido/${order.code}?aviso=1`);
 }
 
-function Dato({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+function Dato({
+  etiqueta,
+  valor,
+  copiable,
+}: {
+  etiqueta: string;
+  valor: string;
+  copiable?: boolean;
+}) {
   if (!valor) return null;
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-white/8 py-2.5 last:border-0">
+    <div className="flex items-center justify-between gap-3 border-b border-white/8 py-2.5 last:border-0">
       <dt className="shrink-0 text-xs text-ink-400">{etiqueta}</dt>
-      <dd className="select-all text-right font-mono text-sm">{valor}</dd>
+      <dd className="flex min-w-0 items-center gap-2">
+        <span className="select-all truncate text-right font-mono text-sm">{valor}</span>
+        {copiable ? <Copiar valor={valor} /> : null}
+      </dd>
     </div>
   );
 }
@@ -68,12 +80,12 @@ export function TransferPanel({
       <dl className="mt-5 rounded-xl border border-white/10 bg-white/4 px-4 py-1">
         <Dato etiqueta="Banco" valor={datos.banco} />
         <Dato etiqueta="Tipo de cuenta" valor={datos.tipoCuenta} />
-        <Dato etiqueta="N° de cuenta" valor={datos.numero} />
+        <Dato etiqueta="N° de cuenta" valor={datos.numero} copiable />
         <Dato etiqueta="Titular" valor={datos.titular} />
-        <Dato etiqueta="RUT" valor={datos.rut} />
-        <Dato etiqueta="Correo" valor={datos.email} />
-        <Dato etiqueta="Monto" valor={formatClp(order.amount_clp)} />
-        <Dato etiqueta="Mensaje" valor={order.code} />
+        <Dato etiqueta="RUT" valor={datos.rut} copiable />
+        <Dato etiqueta="Correo" valor={datos.email} copiable />
+        <Dato etiqueta="Monto" valor={formatClp(order.amount_clp)} copiable />
+        <Dato etiqueta="Mensaje" valor={order.code} copiable />
       </dl>
 
       {datos.instrucciones ? (

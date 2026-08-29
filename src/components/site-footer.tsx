@@ -10,7 +10,7 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-white/8 bg-ink-900/60">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 sm:gap-10 sm:py-14 lg:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-extrabold">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-500 text-sm">
@@ -24,8 +24,9 @@ export function SiteFooter() {
         <div>
           <h3 className="text-sm font-semibold text-white">Redes</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
-            {platforms.slice(0, 8).map((p) => (
-              <li key={p.platform}>
+            {platforms.slice(0, 8).map((p, i) => (
+              /* En teléfono con cuatro redes basta: el resto está en el menú. */
+              <li key={p.platform} className={i >= 4 ? "hidden sm:list-item" : ""}>
                 <Link href={`/${p.platform}`} className="hover:text-white">
                   Comprar seguidores {platformLabel(p.platform)}
                 </Link>
