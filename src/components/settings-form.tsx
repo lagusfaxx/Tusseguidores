@@ -6,7 +6,7 @@ import { Feedback, SubmitButton } from "./admin-ui";
 
 type Props = {
   settings: Record<string, string>;
-  defaultMinRates: string;
+  minRates: { slug: string; label: string; value: number }[];
   providerBalance: string | null;
   providerBalanceError: string | null;
   /** Entorno de cobro que se está usando de verdad, no el guardado. */
@@ -63,7 +63,7 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
 }
 
 export function SettingsForm({
-  settings, defaultMinRates, providerBalance, providerBalanceError,
+  settings, minRates, providerBalance, providerBalanceError,
   flowSandbox, flowForcedByEnv, providerKeyFromEnv,
 }: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
@@ -99,18 +99,28 @@ export function SettingsForm({
           <Field label="Precio mínimo (CLP)" name="min_price_clp" type="number" value={settings.min_price_clp}
             hint="Ningún pedido se cobra por debajo de este monto." />
           <div>
-            <label className="field-label" htmlFor="min_rate_json">Precio mínimo por 1.000 unidades</label>
-            <textarea
-              id="min_rate_json"
-              name="min_rate_json"
-              rows={10}
-              defaultValue={settings.min_rate_json || defaultMinRates}
-              className="field font-mono text-xs"
-            />
-            <p className="mt-1 text-xs text-ink-400">
-              JSON por tipo de servicio, en pesos. Es el piso que mantiene los packs grandes más caros que
-              los chicos cuando el costo del proveedor es de centavos.
+            <label className="field-label">Precio mínimo por cada 1.000 unidades</label>
+            <p className="mb-3 text-xs leading-relaxed text-ink-400">
+              El piso de cada tipo de servicio. Cuando el costo del proveedor es de centavos,
+              este número es el que fija el precio, y por eso servicios de costo muy distinto
+              terminan valiendo lo mismo. Súbelo para ganar más; bájalo para dejar que mande el
+              margen sobre el costo.
             </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {minRates.map((rate) => (
+                <label key={rate.slug} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm text-ink-200">{rate.label}</span>
+                  <input
+                    name={`min_rate__${rate.slug}`}
+                    type="number"
+                    min={0}
+                    step={100}
+                    defaultValue={rate.value}
+                    className="field w-28 text-right tabular-nums"
+                  />
+                </label>
+              ))}
+            </div>
           </div>
         </Section>
 

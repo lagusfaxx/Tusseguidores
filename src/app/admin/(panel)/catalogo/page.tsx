@@ -2,8 +2,9 @@ import Link from "next/link";
 import { all, get } from "@/lib/db";
 import { createFromService } from "@/app/admin/actions";
 import { SyncCatalogButton } from "@/components/sync-catalog";
-import { platformLabel, serviceTypeLabel, PLATFORM_OPTIONS, SERVICE_TYPE_OPTIONS } from "@/lib/labels";
-import { formatClp, formatNumber, pricingContext, autoPriceClp } from "@/lib/pricing";
+import { serviceTypeLabel, PLATFORM_OPTIONS, SERVICE_TYPE_OPTIONS } from "@/lib/labels";
+import { formatClp, formatNumber, pricingContext, priceBreakdown } from "@/lib/pricing";
+import { cantidadDeReferencia } from "@/lib/offers";
 import { formatDateCl } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ type Row = {
   min_qty: number;
   max_qty: number;
   refill: number;
+  order_kind: string;
   drop_score: number;
   speed_score: number;
   geo: string;
@@ -74,6 +76,21 @@ export default async function AdminCatalogPage({
   );
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const ctx = pricingContext();
+
+  // El precio se calcula a la cantidad con la que se vende ese tipo de
+  // servicio, no siempre a 1.000: comparar comentarios de a mil no dice nada.
+  const precios = Object.fromEntries(
+    rows.map((row) => [
+      row.service_id,
+      priceBreakdown(
+        row.rate_usd_per_1000,
+        cantidadDeReferencia(row.service_type, row.order_kind),
+        row.order_kind === "custom_comments" ? "comentarios" : row.service_type,
+        ctx,
+      ),
+    ]),
+  );
+
   const lastSync = get<{ at: string }>("SELECT MAX(synced_at) AS at FROM provider_services")?.at;
 
   const query = (extra: Record<string, string | number>) => {
@@ -92,7 +109,8 @@ export default async function AdminCatalogPage({
         <div>
           <h1 className="text-2xl font-bold">Catálogo del proveedor</h1>
           <p className="mt-1 text-sm text-ink-400">
-            {formatNumber(total)} servicios · última sincronización {formatDateCl(lastSync)}
+            {formatNumber(total)} servicios · última sincronización {formatDateCl(lastSync)} ·
+          precios calculados con el dólar a {formatClp(ctx.usdClp)} y {ctx.marginPercent}% de margen
           </p>
         </div>
         <SyncCatalogButton />
@@ -131,9 +149,9 @@ export default async function AdminCatalogPage({
         <table className="admin-table">
           <thead>
             <tr>
-              <th>ID</th><th>Servicio</th><th>Red</th><th>Tipo</th>
+              <th>ID</th><th>Servicio</th><th>Tipo</th>
               <th>Retención</th><th>Velocidad</th>
-              <th>Costo /1.000</th><th>Venta 1.000</th><th>Rango</th>
+              <th>Costo /1.000</th><th>Precio de venta</th><th>Ganancia</th><th>Rango</th>
               <th className="sticky right-0 bg-ink-900 text-right">Acción</th>
             </tr>
           </thead>
@@ -141,11 +159,10 @@ export default async function AdminCatalogPage({
             {rows.map((row) => (
               <tr key={row.service_id} className={row.provider_enabled ? "" : "opacity-50"}>
                 <td className="font-mono text-xs">{row.service_id}</td>
-                <td className="max-w-[320px] min-w-[220px]">
+                <td className="max-w-[300px] min-w-[200px]">
                   <div className="truncate">{row.clean_name}</div>
                   <div className="truncate text-[11px] text-ink-400">{row.category}</div>
                 </td>
-                <td className="text-xs">{platformLabel(row.platform)}</td>
                 <td className="text-xs">
                   {serviceTypeLabel(row.service_type)}
                   {row.variant ? (
@@ -157,9 +174,47 @@ export default async function AdminCatalogPage({
                 </td>
                 <td><ScoreBar value={row.drop_score} /></td>
                 <td><ScoreBar value={row.speed_score} /></td>
-                <td className="text-xs">US${row.rate_usd_per_1000}</td>
-                <td className="text-xs font-semibold text-brand-300">
-                  {formatClp(autoPriceClp(row.rate_usd_per_1000, 1000, row.service_type, ctx))}
+                <td className="text-xs tabular-nums">US${row.rate_usd_per_1000}</td>
+                <td className="whitespace-nowrap text-xs">
+                  <span className="font-semibold tabular-nums text-brand-300">
+                    {formatClp(precios[row.service_id].priceClp)}
+                  </span>
+                  <div className="text-[11px] text-ink-400">
+                    por {formatNumber(cantidadDeReferencia(row.service_type, row.order_kind))}
+                    {precios[row.service_id].origen !== "costo" ? (
+                      <span
+                        className="ml-1 rounded bg-amber-500/15 px-1 py-0.5 text-amber-300"
+                        title={
+                          precios[row.service_id].origen === "piso"
+                            ? "El precio lo fija el mínimo por 1.000 de este tipo de servicio, no el costo. Por eso varios servicios de costo distinto valen lo mismo. Se cambia en Ajustes → Precios."
+                            : "El precio lo fija el ticket mínimo de la tienda. Se cambia en Ajustes → Precios."
+                        }
+                      >
+                        {precios[row.service_id].origen === "piso" ? "piso" : "mínimo"}
+                      </span>
+                    ) : null}
+                  </div>
+                </td>
+                <td className="whitespace-nowrap text-xs tabular-nums"
+                    title={`Costo del proveedor: ${formatClp(precios[row.service_id].costoClp)}`}>
+                  {precios[row.service_id].multiplo > 0 ? (
+                    <span
+                      className={
+                        precios[row.service_id].multiplo >= 4
+                          ? "text-lime-400"
+                          : precios[row.service_id].multiplo >= 2
+                            ? "text-ink-200"
+                            : "text-red-300"
+                      }
+                    >
+                      {precios[row.service_id].multiplo.toFixed(1)}×
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                  <div className="text-[11px] text-ink-400">
+                    {formatClp(precios[row.service_id].costoClp)}
+                  </div>
                 </td>
                 <td className="whitespace-nowrap text-[11px] text-ink-400">
                   {formatNumber(row.min_qty)} – {formatNumber(row.max_qty)}

@@ -78,7 +78,7 @@ function refreshStore(extra?: string) {
 const SETTING_KEYS = [
   "site_name", "site_domain", "site_url", "site_tagline", "site_description",
   "contact_email", "contact_whatsapp",
-  "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "min_rate_json",
+  "usd_clp", "margin_percent", "price_rounding", "min_price_clp",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
@@ -94,6 +94,17 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
     const raw = String(formData.get(key) ?? "").trim();
     values[key] = key === "seo_home_text" ? sanitizeHtml(raw) : raw;
   }
+
+  // Los precios mínimos por tipo llegan como un campo por tipo y se guardan
+  // como un solo JSON.
+  const minRates: Record<string, number> = {};
+  for (const [field, value] of formData.entries()) {
+    if (!field.startsWith("min_rate__")) continue;
+    const tipo = field.slice("min_rate__".length);
+    const n = Number(String(value).replace(/[^\d]/g, ""));
+    if (tipo && Number.isFinite(n) && n >= 0) minRates[tipo] = n;
+  }
+  if (Object.keys(minRates).length) values.min_rate_json = JSON.stringify(minRates);
   // Las casillas no envían nada cuando están apagadas.
   for (const flag of ["auto_send_to_provider", "flow_sandbox", "orders_enabled"]) {
     values[flag] = formData.get(flag) ? "1" : "0";

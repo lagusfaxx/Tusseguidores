@@ -108,10 +108,18 @@ precio = max(
 )
 ```
 
-El **piso por tipo de servicio** (editable en Ajustes como JSON) es lo que
-mantiene la escalera de packs siempre creciente: sin él, servicios que le cuestan
-centavos al proveedor harían que 100 y 5.000 unidades costaran lo mismo, el
-precio mínimo de la tienda.
+El **piso por tipo de servicio** (una tabla editable en Ajustes → Precios) es lo
+que mantiene la escalera de packs siempre creciente: sin él, servicios que le
+cuestan centavos al proveedor harían que 100 y 5.000 unidades costaran lo mismo,
+el precio mínimo de la tienda.
+
+Ese piso también explica algo que confunde al mirar el catálogo: cuando es más
+alto que el costo con margen, **servicios de costo muy distinto terminan con el
+mismo precio de venta**. Con los comentarios pasa siempre — el costo tendría que
+superar los US$14 por mil para que mandara el margen. Por eso el catálogo del
+panel marca cada precio con su origen (`piso`, `mínimo` o nada si lo fija el
+costo) y muestra la **ganancia** como múltiplo sobre el costo: ahí sí se ve la
+diferencia entre un servicio de 40× y uno de 325×.
 
 Cada producto puede además tener su propio margen o precios totalmente manuales.
 

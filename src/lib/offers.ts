@@ -96,6 +96,16 @@ export const LADDERS: Record<string, number[]> = {
   trafico: [1000, 5000, 10000, 25000],
 };
 
+/**
+ * Cantidad con la que tiene sentido comparar servicios de este tipo. Comparar
+ * comentarios de a 1.000 no dice nada: los packs van de 10 a 250.
+ */
+export function cantidadDeReferencia(serviceType: string, orderKind = "default"): number {
+  const key = orderKind === "custom_comments" ? "custom_comments" : serviceType;
+  const base = LADDERS[key] ?? LADDERS.seguidores;
+  return base[Math.min(2, base.length - 1)];
+}
+
 export function ladderFor(offer: Offer): number[] {
   const key = offer.order_kind === "custom_comments" ? "custom_comments" : offer.service_type;
   const base = LADDERS[key] ?? LADDERS.seguidores;

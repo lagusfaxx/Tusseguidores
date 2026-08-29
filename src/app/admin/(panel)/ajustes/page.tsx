@@ -1,5 +1,6 @@
 import { getSettings } from "@/lib/settings";
-import { DEFAULT_MIN_RATES } from "@/lib/pricing";
+import { DEFAULT_MIN_RATES, parseMinRates } from "@/lib/pricing";
+import { SERVICE_TYPE_OPTIONS } from "@/lib/labels";
 import { SettingsForm } from "@/components/settings-form";
 import { providerConfigured, provider } from "@/lib/provider";
 import { config as flowConfig } from "@/lib/flow";
@@ -23,6 +24,17 @@ export default async function AdminSettingsPage() {
 
   const flow = flowConfig();
 
+  // Un campo por tipo de servicio, con su etiqueta en español.
+  const actuales = parseMinRates(settings.min_rate_json ?? "");
+  const etiquetas = new Map(SERVICE_TYPE_OPTIONS.map((o) => [o.slug, o.label]));
+  const minRates = Object.keys(DEFAULT_MIN_RATES)
+    .map((slug) => ({
+      slug,
+      label: etiquetas.get(slug) ?? (slug === "otros" ? "Otros" : slug),
+      value: actuales[slug] ?? DEFAULT_MIN_RATES[slug],
+    }))
+    .sort((a, b) => b.value - a.value);
+
   return (
     <>
       <h1 className="text-2xl font-bold">Ajustes</h1>
@@ -33,7 +45,7 @@ export default async function AdminSettingsPage() {
       <div className="mt-6">
         <SettingsForm
           settings={settings}
-          defaultMinRates={JSON.stringify(DEFAULT_MIN_RATES, null, 2)}
+          minRates={minRates}
           providerBalance={balance}
           providerBalanceError={balanceError}
           flowSandbox={flow.sandbox}

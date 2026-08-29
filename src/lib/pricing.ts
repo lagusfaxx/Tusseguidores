@@ -94,6 +94,48 @@ export function autoPriceClp(
   return Math.max(ctx.minPriceClp, roundToEnding(Math.max(withMargin, rateFloor), ctx.rounding));
 }
 
+export type PriceBreakdown = {
+  priceClp: number;
+  /** Cuál de los dos términos fijó el precio. */
+  origen: "costo" | "piso" | "minimo";
+  /** Cuántas veces el costo del proveedor es el precio de venta. */
+  multiplo: number;
+  costoClp: number;
+};
+
+/**
+ * Precio con el detalle de por qué salió ese número.
+ *
+ * Sirve para el catálogo del panel: cuando el piso por tipo de servicio es más
+ * alto que el costo con margen, varios servicios de costos muy distintos
+ * terminan con el mismo precio, y sin esta explicación parece un error.
+ */
+export function priceBreakdown(
+  rateUsdPer1000: number,
+  quantity: number,
+  serviceType: string,
+  ctx: PricingContext,
+  marginOverride?: number | null,
+): PriceBreakdown {
+  const margin = marginOverride ?? ctx.marginPercent;
+  const costoClp = costUsd(rateUsdPer1000, quantity) * ctx.usdClp;
+  const conMargen = costoClp * (1 + margin / 100);
+  const piso = (quantity / 1000) * (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900);
+
+  const base = Math.max(conMargen, piso);
+  const priceClp = Math.max(ctx.minPriceClp, roundToEnding(base, ctx.rounding));
+
+  const origen: PriceBreakdown["origen"] =
+    priceClp > roundToEnding(base, ctx.rounding) ? "minimo" : piso > conMargen ? "piso" : "costo";
+
+  return {
+    priceClp,
+    origen,
+    multiplo: costoClp > 0 ? priceClp / costoClp : 0,
+    costoClp,
+  };
+}
+
 type PriceableProduct = Pick<Product, "price_mode" | "margin_override" | "service_type">;
 
 export function priceTier(
