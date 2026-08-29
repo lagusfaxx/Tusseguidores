@@ -80,6 +80,10 @@ export default async function PaymentReturnPage({
             <>
               <p className="mt-6 text-sm text-ink-400">Tu código de pedido</p>
               <p className="font-mono text-2xl font-extrabold text-brand-300">{order.code}</p>
+              <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-ink-400">
+                Anótalo o saca una foto: con este código sigues tu pedido cuando quieras.
+                Si lo pierdes, escríbenos desde el correo que usaste al comprar.
+              </p>
               <Link href={`/pedido/${order.code}`} className="btn btn-primary mt-8">
                 Ver mi pedido
               </Link>

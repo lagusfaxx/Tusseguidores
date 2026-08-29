@@ -18,7 +18,7 @@ export default function PrivacyPage() {
       <h2>Qué datos guardamos</h2>
       <p>Al comprar guardamos únicamente lo necesario para procesar y respaldar tu pedido:</p>
       <ul>
-        <li>Tu correo electrónico, para enviarte el comprobante y el código de seguimiento.</li>
+        <li>Tu correo electrónico, para identificar tu pedido y darte soporte. Flow lo usa además para enviarte el comprobante del pago.</li>
         <li>El enlace o usuario de destino que ingresaste.</li>
         <li>El detalle del pedido: producto, cantidad, monto y estado.</li>
         <li>La dirección IP desde la que se hizo el pedido, para prevención de fraude.</li>

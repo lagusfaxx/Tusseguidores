@@ -34,7 +34,7 @@ export default async function TrackingPage({
         <div className="mx-auto max-w-lg px-4 py-20">
           <h1 className="text-3xl font-extrabold tracking-tight">Seguir mi pedido</h1>
           <p className="mt-2 text-ink-200">
-            Escribe el código que te enviamos por correo al confirmar el pago. Se ve así:{" "}
+            Escribe el código que te mostramos al terminar la compra. Se ve así:{" "}
             <span className="font-mono text-brand-300">TS-7K2F9Q</span>.
           </p>
 

@@ -213,7 +213,7 @@ export function BuyBox(props: Props) {
             className="field"
             placeholder="tucorreo@ejemplo.cl"
           />
-          <p className="mt-1.5 text-xs text-ink-400">Ahí te enviamos el comprobante y el código de seguimiento.</p>
+          <p className="mt-1.5 text-xs text-ink-400">Flow te manda ahí el comprobante del pago. Tu código de seguimiento te lo mostramos apenas termines.</p>
         </div>
 
         <details className="text-sm">
