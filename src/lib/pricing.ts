@@ -10,6 +10,18 @@ import type { PricedTier, Product, Tier } from "./types";
  *     según el tipo de servicio (mil visualizaciones no valen lo mismo que
  *     mil seguidores). Es lo que mantiene la escalera de packs creciente
  *     cuando el costo del proveedor es de centavos.
+ *
+ * Los dos pisos se mueven con el margen. Como el costo del proveedor es de
+ * centavos en casi todo el catálogo, quien fija el precio de verdad suele ser
+ * el piso y no el margen: con los valores por defecto, el margen manda en uno
+ * de cada cinco packs. Con los pisos quietos, bajar el margen a la mitad no
+ * bajaba el precio de nada, que es justo lo contrario de lo que se espera de
+ * un control global.
+ *
+ * Así que los pisos se escriben "al margen de referencia" (margin_reference) y
+ * se escalan con el margen que esté vigente. Al dejar la referencia en el
+ * margen actual, los precios de hoy no se mueven ni un peso; a partir de ahí,
+ * mover el margen mueve toda la tienda.
  */
 
 export const DEFAULT_MIN_RATES: Record<string, number> = {
@@ -39,6 +51,8 @@ export type PricingContext = {
   rounding: number;
   minPriceClp: number;
   minRates: Record<string, number>;
+  /** Margen con el que están calibrados los pisos. Ver el comentario de arriba. */
+  marginReference: number;
 };
 
 export function parseMinRates(raw: string): Record<string, number> {
@@ -63,7 +77,26 @@ export function pricingContext(): PricingContext {
     rounding: getNumberSetting("price_rounding", 90),
     minPriceClp: getNumberSetting("min_price_clp", 1990),
     minRates: parseMinRates(getSetting("min_rate_json", "")),
+    marginReference: getNumberSetting("margin_reference", 180),
   };
+}
+
+/**
+ * Cuánto se encogen o estiran los pisos con el margen vigente.
+ *
+ * Con el margen en la referencia vale 1 y nada se mueve. Al bajar el margen a
+ * la mitad del recargo, los pisos bajan en la misma proporción.
+ */
+export function escalaDeMargen(ctx: PricingContext, margin: number): number {
+  const referencia = 1 + Math.max(0, ctx.marginReference) / 100;
+  if (referencia <= 0) return 1;
+  return (1 + Math.max(0, margin) / 100) / referencia;
+}
+
+/** Ticket mínimo de la tienda, ya escalado al margen vigente. */
+export function minPriceFor(ctx: PricingContext, margin?: number | null): number {
+  const efectivo = margin ?? ctx.marginPercent;
+  return roundToEnding(ctx.minPriceClp * escalaDeMargen(ctx, efectivo), ctx.rounding);
 }
 
 /** Costo real que nos cobra el proveedor, en USD. */
@@ -82,13 +115,18 @@ export function roundToEnding(value: number, ending: number): number {
   return base >= value ? base : base + step;
 }
 
-/** Piso por 1.000 de un tipo de servicio, ya escalado al nivel de calidad. */
+/**
+ * Piso por 1.000 de un tipo de servicio, ya escalado al nivel de calidad y al
+ * margen vigente.
+ */
 export function floorPer1000(
   serviceType: string,
   ctx: PricingContext,
   level?: string | null,
+  margin?: number | null,
 ): number {
-  return (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900) * levelFloorFactor(level);
+  const base = (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900) * levelFloorFactor(level);
+  return base * escalaDeMargen(ctx, margin ?? ctx.marginPercent);
 }
 
 export function autoPriceClp(
@@ -101,8 +139,8 @@ export function autoPriceClp(
 ): number {
   const margin = marginOverride ?? ctx.marginPercent;
   const withMargin = costUsd(rateUsdPer1000, quantity) * ctx.usdClp * (1 + margin / 100);
-  const rateFloor = (quantity / 1000) * floorPer1000(serviceType, ctx, level);
-  return Math.max(ctx.minPriceClp, roundToEnding(Math.max(withMargin, rateFloor), ctx.rounding));
+  const rateFloor = (quantity / 1000) * floorPer1000(serviceType, ctx, level, margin);
+  return Math.max(minPriceFor(ctx, margin), roundToEnding(Math.max(withMargin, rateFloor), ctx.rounding));
 }
 
 export type PriceBreakdown = {
@@ -135,10 +173,10 @@ export function priceBreakdown(
   const margin = marginOverride ?? ctx.marginPercent;
   const costoClp = costUsd(rateUsdPer1000, quantity) * ctx.usdClp;
   const conMargen = costoClp * (1 + margin / 100);
-  const piso = (quantity / 1000) * floorPer1000(serviceType, ctx, level);
+  const piso = (quantity / 1000) * floorPer1000(serviceType, ctx, level, margin);
 
   const base = Math.max(conMargen, piso);
-  const priceClp = Math.max(ctx.minPriceClp, roundToEnding(base, ctx.rounding));
+  const priceClp = Math.max(minPriceFor(ctx, margin), roundToEnding(base, ctx.rounding));
 
   const origen: PriceBreakdown["origen"] =
     priceClp > roundToEnding(base, ctx.rounding) ? "minimo" : piso > conMargen ? "piso" : "costo";

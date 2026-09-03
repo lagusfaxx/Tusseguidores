@@ -79,7 +79,7 @@ function refreshStore(extra?: string) {
 const SETTING_KEYS = [
   "site_name", "site_domain", "site_url", "site_tagline", "site_description",
   "contact_email", "contact_whatsapp",
-  "usd_clp", "margin_percent", "price_rounding", "min_price_clp",
+  "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "margin_reference",
   "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",

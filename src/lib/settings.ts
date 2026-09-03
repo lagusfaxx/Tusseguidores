@@ -19,6 +19,10 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   price_rounding: "90",     // redondea a terminación .., 90 -> $X.X90
   min_price_clp: "1990",
   min_rate_json: "",
+  // Margen con el que están calibrados los pisos de arriba. Los pisos se
+  // escalan con el margen vigente respecto de este valor, para que mover el
+  // margen global mueva de verdad todos los precios.
+  margin_reference: "180",
   // Mantiene el catálogo por niveles (económico / estándar / premium) al día
   // en cada sincronización con el proveedor.
   auto_levels: "1",

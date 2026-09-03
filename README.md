@@ -102,9 +102,12 @@ En el panel de **Flow** configura:
 El precio de venta se calcula así:
 
 ```
+escala  = (1 + margen%) / (1 + margen_de_referencia%)
+
 precio = max(
-  precio_mínimo,
-  redondeo( max( costo_usd × dólar × (1 + margen%),  cantidad/1000 × piso_por_tipo ) )
+  precio_mínimo × escala,
+  redondeo( max( costo_usd × dólar × (1 + margen%),
+                 cantidad/1000 × piso_por_tipo × factor_del_nivel × escala ) )
 )
 ```
 
@@ -112,6 +115,19 @@ El **piso por tipo de servicio** (una tabla editable en Ajustes → Precios) es 
 que mantiene la escalera de packs siempre creciente: sin él, servicios que le
 cuestan centavos al proveedor harían que 100 y 5.000 unidades costaran lo mismo,
 el precio mínimo de la tienda.
+
+**Los dos pisos se mueven con el margen.** Como el costo del proveedor es de
+centavos en casi todo el catálogo, el que fija el precio de verdad suele ser el
+piso: con los valores por defecto, el margen manda en uno de cada cinco packs, el
+piso en el 44% y el ticket mínimo en el 36%. Con los pisos quietos, bajar el
+margen del 180% al 30% no movía ni un peso en la mayoría de la tienda.
+
+Por eso los pisos se escriben **al margen de referencia** (`margin_reference`,
+también en Ajustes → Precios) y se escalan con el margen vigente. Deja la
+referencia en el margen que tengas hoy: los precios actuales no se mueven, y a
+partir de ahí bajar el margen a la mitad del recargo baja toda la tienda en la
+misma proporción. Medido sobre el catálogo real: 180% → 120% baja la tienda un
+21%, y 180% → 90% un 32%.
 
 Ese piso también explica algo que confunde al mirar el catálogo: cuando es más
 alto que el costo con margen, **servicios de costo muy distinto terminan con el

@@ -5,7 +5,7 @@ import { deleteProduct } from "@/app/admin/actions";
 import { getProductById, getPricedTiers, parseJson } from "@/lib/catalog";
 import { get } from "@/lib/db";
 import { PLATFORM_OPTIONS, SERVICE_TYPE_OPTIONS } from "@/lib/labels";
-import { pricingContext } from "@/lib/pricing";
+import { pricingContext , floorPer1000 } from "@/lib/pricing";
 import { rankCandidates, routingForProduct } from "@/lib/routing";
 import type { FaqItem } from "@/lib/types";
 
@@ -75,7 +75,7 @@ export default async function EditProductPage({
   const margin = product.margin_override ?? ctx.marginPercent;
   const autoRatePer1000 = Math.max(
     service.rate_usd_per_1000 * ctx.usdClp * (1 + margin / 100),
-    ctx.minRates[product.service_type] ?? ctx.minRates.otros ?? 2900,
+    floorPer1000(product.service_type, ctx, product.level, margin),
   );
 
   return (
