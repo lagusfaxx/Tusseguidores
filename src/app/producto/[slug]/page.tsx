@@ -5,15 +5,17 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox } from "@/components/buy-box";
+import { LevelCompare } from "@/components/level-compare";
 import { PlatformIcon, CheckIcon, BoltIcon, ShieldIcon } from "@/components/icons";
 import {
   getProductBySlug, getPricedTiers, getProductsByPlatform, parseJson,
 } from "@/lib/catalog";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
-import { formatClp, formatNumber, formatDuration, pricingContext } from "@/lib/pricing";
+import { formatClp, formatNumber, formatDuration, floorPer1000, pricingContext } from "@/lib/pricing";
 import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
+import { comparadorDeNiveles, levelLabel } from "@/lib/levels";
 import { getBoolSetting } from "@/lib/settings";
 import { transferenciaDisponible } from "@/lib/transfer";
 import type { FaqItem } from "@/lib/types";
@@ -47,7 +49,9 @@ export default async function ProductPage({ params }: Params) {
 
   // Precio efectivo por 1.000 unidades: lo que necesita el widget para
   // calcular cantidades libres con el mismo resultado que el servidor.
-  const minRate = ctx.minRates[product.service_type] ?? ctx.minRates.otros ?? 2900;
+  // El piso por 1.000 sube con el nivel: sin eso el económico y el premium
+  // chocarían contra el mismo mínimo y las cantidades libres se aplanarían.
+  const minRate = floorPer1000(product.service_type, ctx, product.level);
   const margin = product.margin_override ?? ctx.marginPercent;
   const ratePer1000Clp = Math.max(product.rate_usd_per_1000 * ctx.usdClp * (1 + margin / 100), minRate);
 
@@ -69,6 +73,9 @@ export default async function ProductPage({ params }: Params) {
   const maxQty = Math.min(product.max_qty, product.provider_max);
   const cheapest = tiers.length ? tiers.reduce((a, b) => (a.priceClp < b.priceClp ? a : b)) : null;
   const dearest = tiers.length ? tiers.reduce((a, b) => (a.priceClp > b.priceClp ? a : b)) : null;
+
+  // Los otros niveles del mismo servicio, con su precio a la misma cantidad.
+  const niveles = comparadorDeNiveles(product);
 
   const related = getProductsByPlatform(product.platform)
     .filter((p) => p.id !== product.id)
@@ -100,6 +107,22 @@ export default async function ProductPage({ params }: Params) {
               : refillDays > 0
                 ? `Este pack incluye ${refillDays} días de reposición sin costo.`
                 : "Si el pedido no se entrega, te devolvemos el dinero."}</p>`,
+          // Con niveles publicados, la comparación de precios es contenido
+          // propio de esta ficha y no se repite en ninguna otra: es la
+          // diferencia entre tres páginas distintas y tres páginas clonadas.
+          ...(niveles.length > 1
+            ? [
+                `<h2>Cuál nivel te conviene</h2>`,
+                `<p>Para ${formatNumber(niveles[0].quantity)} unidades, ` +
+                  niveles
+                    .map(
+                      (n) =>
+                        `el ${n.label.toLowerCase()} cuesta ${formatClp(n.priceClp)} y ${n.retencion}, ${n.entrega}, ${n.reposicion}`,
+                    )
+                    .join("; ") +
+                  `. Estás viendo el ${levelLabel(product.level).toLowerCase() || "único disponible"}.</p>`,
+              ]
+            : []),
         ].join("\n")
       : null;
 
@@ -148,6 +171,11 @@ export default async function ProductPage({ params }: Params) {
               <div className="flex items-center gap-2 text-sm font-semibold text-brand-300">
                 <PlatformIcon slug={product.platform} className="h-4 w-4" />
                 {platformLabel(product.platform)} · {serviceTypeLabel(product.service_type)}
+                {product.level ? (
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 text-[11px] font-semibold text-ink-200">
+                    {levelLabel(product.level)}
+                  </span>
+                ) : null}
               </div>
 
               <h1 className="mt-2 text-[26px] font-extrabold leading-tight tracking-tight sm:text-3xl lg:text-4xl">
@@ -239,6 +267,8 @@ export default async function ProductPage({ params }: Params) {
                   Leer la descripción completa
                 </label>
               </div>
+
+              <LevelCompare filas={niveles} />
 
               {/* Tabla de precios: buena para SEO y para comparar de un vistazo */}
               {tiers.length ? (

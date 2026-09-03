@@ -89,7 +89,10 @@ export function SettingsForm({
             hint="Desactívalo para pausar las ventas sin bajar el sitio." />
         </Section>
 
-        <Section title="Precios" hint="El precio de venta es el costo del proveedor convertido a pesos más el margen.">
+        <Section
+          title="Precios"
+          hint="El precio de venta es el costo del proveedor convertido a pesos más el margen. Mover el dólar o el margen reprecia toda la tienda de una vez: los tres niveles de cada producto, los packs y las cantidades libres."
+        >
           <Field label="Dólar (CLP por US$)" name="usd_clp" type="number" value={settings.usd_clp}
             hint="Súbelo un poco sobre el dólar observado para cubrir la variación." />
           <Field label="Margen global (%)" name="margin_percent" type="number" value={settings.margin_percent}
@@ -122,6 +125,12 @@ export function SettingsForm({
               ))}
             </div>
           </div>
+          <Check
+            label="Mantener el catálogo por niveles al día"
+            name="auto_levels"
+            checked={settings.auto_levels === "1"}
+            hint="Cada vez que se sincroniza el catálogo, la tienda vuelve a elegir el servicio económico, el estándar y el premium de cada producto. Si el proveedor da de baja uno, entra solo el mejor que quede."
+          />
         </Section>
 
         <Section title="Proveedor (honestsmm)">

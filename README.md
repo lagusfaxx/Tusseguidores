@@ -123,6 +123,47 @@ diferencia entre un servicio de 40× y uno de 325×.
 
 Cada producto puede además tener su propio margen o precios totalmente manuales.
 
+**Con el catálogo por niveles, mover el dólar y el margen global alcanza para
+repreciar toda la tienda.** El económico, el estándar y el premium de cada
+servicio salen de servicios distintos del proveedor, así que sus costos son
+distintos y sus precios se separan solos. Para que el piso por tipo no los
+aplaste contra el mismo número, se escala con el nivel: ×1 el económico, ×1,3 el
+estándar y ×1,75 el premium.
+
+### Catálogo automático por niveles
+
+**Panel → Productos → Generar catálogo por niveles.** De cada combinación red +
+servicio publica hasta tres productos:
+
+| Nivel | Qué servicio elige | Para quién |
+|---|---|---|
+| Económico | el más barato que todavía es defendible (retención ≥ 25/100) | subir el número gastando poco |
+| Estándar | el que más calidad da por dólar entre los dos extremos | la compra normal |
+| Premium | el de mejor retención y velocidad | cuentas que no pueden retroceder |
+
+Cada ficha explica **en qué se diferencia de las otras dos** con los datos del
+servicio que hay detrás —retención, tiempo de entrega, días de reposición y
+cuántas veces más o menos cuesta—, y lleva un comparador con los tres precios
+calculados a la misma cantidad: la primera en la que los precios se separan, así
+el ticket mínimo de la tienda no los hace parecer idénticos.
+
+Detalles que importan:
+
+- **Es idempotente.** Se puede correr las veces que quieras: lo que ya existe se
+  actualiza en vez de duplicarse.
+- **Se mantiene solo.** Con «Mantener el catálogo por niveles al día» activo
+  (Ajustes → Precios), cada sincronización con el proveedor —y cada pasada del
+  cron— vuelve a elegir los tres servicios. Si el proveedor da de baja el que
+  estaba detrás del premium, entra el mejor que quede.
+- **No pisa tu trabajo.** Solo toca los productos marcados como automáticos.
+  Desmarca «Mantenerlo al día automáticamente» en el editor y ese producto queda
+  congelado.
+- **Reemplaza, no borra.** El producto suelto que vendía lo mismo sin niveles se
+  despublica para no mostrar cuatro fichas del mismo servicio; vuelve a
+  publicarse desde el listado con un clic.
+- Si una combinación tiene un solo servicio utilizable, se publica uno solo: tres
+  fichas idénticas a distinto precio no son un catálogo.
+
 ### Agregar un producto
 
 **Panel → Productos → Agregar producto.** Eliges la red y qué quieres vender:
@@ -263,6 +304,12 @@ servicios hay. Como los números son distintos en cada red, las páginas son
 distintas de verdad —no plantillas con sinónimos cambiados— y se actualizan
 solas cuando cambias precios o publicas productos.
 
+Con los niveles publicados, cada página de red agrega además un bloque
+«Económico, estándar o premium» con los precios reales de los tres a la misma
+cantidad, y cada ficha explica cuál conviene. Es contenido que no existe en
+ninguna otra página del sitio y se actualiza solo al cambiar el margen o el
+dólar.
+
 Cada red además trae sus propias preguntas frecuentes, que es donde vive la
 búsqueda de cola larga: monetización en YouTube, el Para Ti en TikTok, cuentas
 privadas en Instagram. Van marcadas como `FAQPage` para Google.
@@ -331,6 +378,9 @@ src/
     quality.mjs                 retención, velocidad, región, subtipo y forma de pedido
     routing.ts                  elección del servicio al que se despacha
     offers.ts                   combinaciones vendibles para el creador de productos
+    level-defs.ts               definición de los niveles (económico/estándar/premium)
+    levels.ts                   elección de los tres servicios y sus diferencias
+    autolevels.ts               publicación automática del catálogo por niveles
     copy.mjs                    textos y SEO en español de cada producto
     flow.ts                     cliente de Flow
     orders.ts                   ciclo de vida de los pedidos

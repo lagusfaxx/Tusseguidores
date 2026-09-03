@@ -71,6 +71,13 @@ CREATE TABLE IF NOT EXISTS products (
   price_mode          TEXT    NOT NULL DEFAULT 'auto',   -- auto | manual
   margin_override     REAL,                              -- % que reemplaza al margen global
 
+  -- Nivel de calidad dentro de la misma combinación red + servicio:
+  -- 'economico', 'estandar' o 'premium'. Vacío = producto único, sin niveles.
+  level               TEXT    NOT NULL DEFAULT '',
+  -- 1 = lo publica y lo mantiene al día el generador automático de niveles.
+  -- Los textos que edites a mano se respetan igual (ver autolevels.ts).
+  auto_managed        INTEGER NOT NULL DEFAULT 0,
+
   -- Enrutado automático: el cliente elige el producto y la tienda decide a qué
   -- servicio del proveedor pedírselo (el más rápido y con menos caída dentro
   -- del presupuesto). provider_service_id queda como servicio de referencia:
@@ -100,6 +107,9 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_pub  ON products(published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_products_plat ON products(platform, published);
 CREATE INDEX IF NOT EXISTS idx_products_type ON products(platform, service_type, published);
+-- Los tres niveles de una misma combinación se buscan juntos, tanto para
+-- mantenerlos al día como para mostrar el comparador en la ficha.
+CREATE INDEX IF NOT EXISTS idx_products_level ON products(platform, service_type, level);
 
 -- Packs de cantidad que ve el cliente (100, 250, 500, 1000...).
 CREATE TABLE IF NOT EXISTS product_tiers (
