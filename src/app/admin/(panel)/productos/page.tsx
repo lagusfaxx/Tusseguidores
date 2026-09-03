@@ -3,6 +3,8 @@ import { all } from "@/lib/db";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
 import { formatClp, formatNumber, pricingContext, autoPriceClp } from "@/lib/pricing";
 import { togglePublished } from "@/app/admin/actions";
+import { GenerateLevelsButton } from "@/components/generate-levels";
+import { levelLabel } from "@/lib/levels";
 import type { Product } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -49,9 +51,10 @@ export default async function AdminProductsPage({
     <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold">Productos <span className="text-ink-400">({rows.length})</span></h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-start gap-2">
           <Link href="/admin/catalogo" className="btn btn-ghost text-sm">Catálogo del proveedor</Link>
-          <Link href="/admin/productos/nuevo" className="btn btn-primary text-sm">Agregar producto</Link>
+          <Link href="/admin/productos/nuevo" className="btn btn-ghost text-sm">Agregar producto</Link>
+          <GenerateLevelsButton />
         </div>
       </div>
 
@@ -76,7 +79,10 @@ export default async function AdminProductsPage({
           <tbody>
             {rows.map((row) => {
               const from = row.min_tier
-                ? autoPriceClp(row.rate_usd_per_1000, row.min_tier, row.service_type, ctx, row.margin_override)
+                ? autoPriceClp(
+                    row.rate_usd_per_1000, row.min_tier, row.service_type, ctx,
+                    row.margin_override, row.level,
+                  )
                 : null;
               return (
                 <tr key={row.id}>
@@ -89,6 +95,19 @@ export default async function AdminProductsPage({
                   <td>{platformLabel(row.platform)}</td>
                   <td className="text-xs text-ink-400">
                     {serviceTypeLabel(row.service_type)} · #{row.provider_service_id}
+                    {row.level ? (
+                      <span className="ml-1.5 rounded bg-white/8 px-1.5 py-0.5 text-ink-200">
+                        {levelLabel(row.level)}
+                      </span>
+                    ) : null}
+                    {row.auto_managed ? (
+                      <span
+                        className="ml-1 text-brand-300"
+                        title="Lo mantiene al día el generador automático de niveles"
+                      >
+                        auto
+                      </span>
+                    ) : null}
                     {row.provider_enabled === 0 ? (
                       <span className="ml-1.5 rounded bg-red-500/15 px-1.5 py-0.5 text-red-300">baja</span>
                     ) : null}

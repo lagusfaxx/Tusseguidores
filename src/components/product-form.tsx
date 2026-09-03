@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { saveProduct, type ActionState } from "@/app/admin/actions";
 import { ImagePicker } from "./image-picker";
 import { Feedback, SubmitButton } from "./admin-ui";
+import { LEVELS } from "@/lib/level-defs";
 import type { FaqItem, PricedTier, Product } from "@/lib/types";
 
 type ServiceInfo = {
@@ -179,6 +180,25 @@ export function ProductForm(props: Props) {
               placeholder="Más vendido" hint="Opcional. Se muestra sobre la foto." />
             <Field label="Orden" name="sort_order" type="number" defaultValue={product?.sort_order ?? 100}
               hint="Menor número, más arriba." />
+            <div>
+              <label className="field-label" htmlFor="level">Nivel de calidad</label>
+              <select id="level" name="level" defaultValue={product?.level ?? ""} className="field">
+                <option value="">Sin nivel (producto único)</option>
+                {LEVELS.map((level) => (
+                  <option key={level.id} value={level.id}>{level.label}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-ink-400">
+                Agrupa este producto con los otros niveles de la misma red y servicio. La ficha
+                muestra el comparador con los precios de los tres.
+              </p>
+            </div>
+            <Check
+              label="Mantenerlo al día automáticamente"
+              name="auto_managed"
+              defaultChecked={product?.auto_managed === 1}
+              hint="Con esto marcado, cada sincronización vuelve a elegir el servicio del proveedor y reescribe los textos del nivel. Desmárcalo si editaste algo a mano y no quieres que se pise."
+            />
           </Section>
 
           <Section title="Foto">

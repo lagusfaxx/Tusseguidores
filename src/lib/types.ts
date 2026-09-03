@@ -43,6 +43,10 @@ export type Product = {
   badge: string | null;
   price_mode: "auto" | "manual";
   margin_override: number | null;
+  /** Nivel de calidad dentro de la combinación: economico | estandar | premium. */
+  level: string;
+  /** 1 = lo mantiene al día el generador automático de niveles. */
+  auto_managed: number;
   auto_select: number;
   max_cost_ratio: number;
   min_qty: number;

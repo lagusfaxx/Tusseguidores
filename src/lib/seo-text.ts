@@ -1,5 +1,7 @@
-import { all } from "./db";
+import { all, get } from "./db";
 import { platformLabel, serviceTypeLabel } from "./labels";
+import { levelLabel } from "./level-defs";
+import { comparadorDeNiveles } from "./levels";
 import { formatClp, formatNumber, formatDuration, pricingContext, autoPriceClp } from "./pricing";
 
 /**
@@ -23,17 +25,19 @@ export type FilaPrecio = {
   desdeClp: number;
   minutos: number | null;
   refillDays: number;
+  /** Nivel de calidad del producto, si pertenece a una escalera de niveles. */
+  nivel: string;
 };
 
 /** Lo que la tienda vende hoy para una red, con precios reales. */
 export function filasDePrecio(platform: string): FilaPrecio[] {
   const ctx = pricingContext();
   const rows = all<{
-    slug: string; name: string; service_type: string; order_kind: string;
+    slug: string; name: string; service_type: string; order_kind: string; level: string;
     rate: number; margin_override: number | null; avg_minutes: number | null;
     refill_days: number; min_tier: number | null; manual_price: number | null;
   }>(
-    `SELECT p.slug, p.name, p.service_type, s.order_kind,
+    `SELECT p.slug, p.name, p.service_type, s.order_kind, p.level,
             s.rate_usd_per_1000 AS rate, p.margin_override, s.avg_minutes, p.refill_days,
             (SELECT MIN(t.quantity) FROM product_tiers t WHERE t.product_id = p.id) AS min_tier,
             (SELECT t.price_clp FROM product_tiers t
@@ -57,11 +61,67 @@ export function filasDePrecio(platform: string): FilaPrecio[] {
         slug: row.slug,
         nombre: row.name,
         desdeQty: qty,
-        desdeClp: row.manual_price ?? autoPriceClp(row.rate, qty, tipo, ctx, row.margin_override),
+        desdeClp:
+          row.manual_price ?? autoPriceClp(row.rate, qty, tipo, ctx, row.margin_override, row.level),
         minutos: row.avg_minutes,
         refillDays: row.refill_days,
+        nivel: row.level,
       };
     });
+}
+
+/**
+ * Explica los niveles con los precios de esta red.
+ *
+ * Los precios salen del comparador de la ficha, que calcula los tres niveles a
+ * la misma cantidad. Tomarlos del "desde" de cada producto daría lo mismo para
+ * todos —a cantidades chicas mandan el ticket mínimo de la tienda— y el texto
+ * diría que el premium cuesta lo mismo que el económico, que es justo lo
+ * contrario de lo que hay que explicar.
+ */
+function bloqueNiveles(platform: string, red: string): string[] {
+  const candidato = get<{ id: number; platform: string; service_type: string; order_kind: string }>(
+    `SELECT p.id, p.platform, p.service_type, s.order_kind
+       FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id
+      WHERE p.published = 1 AND s.provider_enabled = 1 AND p.platform = ? AND p.level != ''
+      GROUP BY p.platform, p.service_type, s.order_kind
+      -- El ejemplo tiene que ser el servicio insignia de la red, no el primero
+      -- que salga por orden alfabético.
+      ORDER BY CASE p.service_type
+                 WHEN 'seguidores' THEN 0 WHEN 'suscriptores' THEN 1
+                 WHEN 'miembros' THEN 2 WHEN 'likes' THEN 3
+                 WHEN 'vistas' THEN 4 ELSE 5 END,
+               COUNT(*) DESC, MIN(p.sort_order)
+      LIMIT 1`,
+    [platform],
+  );
+  if (!candidato) return [];
+
+  const niveles = comparadorDeNiveles(candidato);
+  if (niveles.length < 2) return [];
+
+  const barato = niveles[0];
+  const caro = niveles[niveles.length - 1];
+  const tipo = serviceTypeLabel(candidato.service_type).toLowerCase();
+
+  return [
+    `<h2>Económico, estándar o premium</h2>`,
+    `<p>Cada servicio de ${esc(red)} se vende en varios niveles y el precio sale del servicio que hay ` +
+      `detrás de cada uno, no de una lista inventada. Por ${formatNumber(barato.quantity)} ${esc(tipo)} ` +
+      `el ${esc(barato.label.toLowerCase())} cuesta ${formatClp(barato.priceClp)} y el ` +
+      `${esc(caro.label.toLowerCase())} ${formatClp(caro.priceClp)}. La diferencia es concreta: ` +
+      niveles
+        .map(
+          (n) =>
+            `el ${esc(n.label.toLowerCase())} ${esc(n.retencion)}, ${esc(n.entrega)} y ` +
+            (n.reposicion === "sin reposición" ? "no incluye reposición" : `incluye ${esc(n.reposicion)}`),
+        )
+        .join("; ") +
+      `.</p>`,
+    `<p>En la ficha de cada producto están todos los niveles comparados a la misma cantidad, con su ` +
+      `retención, su tiempo de entrega y su reposición, para que la decisión no dependa de adivinar.</p>`,
+  ];
 }
 
 function esc(value: string): string {
@@ -155,6 +215,7 @@ export function textoDeRed(platform: string): { html: string; faq: { q: string; 
     .map(
       (f) => `<tr>
 <td><a href="/producto/${esc(f.slug)}">${esc(f.nombre)}</a></td>
+<td>${f.nivel ? esc(levelLabel(f.nivel)) : "—"}</td>
 <td>${formatNumber(f.desdeQty)}</td>
 <td>${formatClp(f.desdeClp)}</td>
 <td>${f.minutos != null ? esc(formatDuration(f.minutos) ?? "—") : "Inicio inmediato"}</td>
@@ -173,8 +234,10 @@ export function textoDeRed(platform: string): { html: string; faq: { q: string; 
     `<h2>Precios de ${esc(red)} actualizados</h2>`,
     `<p>Estos son los precios de partida de cada servicio. En la ficha de cada uno eliges la cantidad exacta ` +
       `y el precio se ajusta solo.</p>`,
-    `<table><thead><tr><th>Servicio</th><th>Desde</th><th>Precio</th><th>Entrega</th><th>Reposición</th></tr></thead>` +
+    `<table><thead><tr><th>Servicio</th><th>Nivel</th><th>Desde</th><th>Precio</th><th>Entrega</th><th>Reposición</th></tr></thead>` +
       `<tbody>${filasTabla}</tbody></table>`,
+
+    ...bloqueNiveles(platform, red),
 
     `<h2>Cuánto demora la entrega</h2>`,
     rapidos.length
@@ -223,9 +286,9 @@ export function textoDePortada(): string | null {
   const ctx = pricingContext();
   const todos = all<{
     platform: string; slug: string; name: string; service_type: string; order_kind: string;
-    rate: number; margin_override: number | null; min_tier: number | null;
+    level: string; rate: number; margin_override: number | null; min_tier: number | null;
   }>(
-    `SELECT p.platform, p.slug, p.name, p.service_type, s.order_kind,
+    `SELECT p.platform, p.slug, p.name, p.service_type, s.order_kind, p.level,
             s.rate_usd_per_1000 AS rate, p.margin_override,
             (SELECT MIN(t.quantity) FROM product_tiers t WHERE t.product_id = p.id) AS min_tier
        FROM products p
@@ -243,6 +306,7 @@ export function textoDePortada(): string | null {
         r.order_kind === "custom_comments" ? "comentarios" : r.service_type,
         ctx,
         r.margin_override,
+        r.level,
       ),
     }));
   if (!precios.length) return null;

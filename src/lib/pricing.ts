@@ -1,4 +1,5 @@
 import { getNumberSetting, getSetting } from "./settings";
+import { levelFloorFactor } from "./level-defs";
 import type { PricedTier, Product, Tier } from "./types";
 
 /**
@@ -81,16 +82,26 @@ export function roundToEnding(value: number, ending: number): number {
   return base >= value ? base : base + step;
 }
 
+/** Piso por 1.000 de un tipo de servicio, ya escalado al nivel de calidad. */
+export function floorPer1000(
+  serviceType: string,
+  ctx: PricingContext,
+  level?: string | null,
+): number {
+  return (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900) * levelFloorFactor(level);
+}
+
 export function autoPriceClp(
   rateUsdPer1000: number,
   quantity: number,
   serviceType: string,
   ctx: PricingContext,
   marginOverride?: number | null,
+  level?: string | null,
 ): number {
   const margin = marginOverride ?? ctx.marginPercent;
   const withMargin = costUsd(rateUsdPer1000, quantity) * ctx.usdClp * (1 + margin / 100);
-  const rateFloor = (quantity / 1000) * (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900);
+  const rateFloor = (quantity / 1000) * floorPer1000(serviceType, ctx, level);
   return Math.max(ctx.minPriceClp, roundToEnding(Math.max(withMargin, rateFloor), ctx.rounding));
 }
 
@@ -119,11 +130,12 @@ export function priceBreakdown(
   serviceType: string,
   ctx: PricingContext,
   marginOverride?: number | null,
+  level?: string | null,
 ): PriceBreakdown {
   const margin = marginOverride ?? ctx.marginPercent;
   const costoClp = costUsd(rateUsdPer1000, quantity) * ctx.usdClp;
   const conMargen = costoClp * (1 + margin / 100);
-  const piso = (quantity / 1000) * (ctx.minRates[serviceType] ?? ctx.minRates.otros ?? 2900);
+  const piso = (quantity / 1000) * floorPer1000(serviceType, ctx, level);
 
   const base = Math.max(conMargen, piso);
   const priceClp = Math.max(ctx.minPriceClp, roundToEnding(base, ctx.rounding));
@@ -140,7 +152,10 @@ export function priceBreakdown(
   };
 }
 
-type PriceableProduct = Pick<Product, "price_mode" | "margin_override" | "service_type">;
+type PriceableProduct = Pick<Product, "price_mode" | "margin_override" | "service_type"> & {
+  /** Nivel de calidad, si el producto es parte de una escalera de niveles. */
+  level?: string | null;
+};
 
 export function priceTier(
   tier: Tier,
@@ -152,7 +167,10 @@ export function priceTier(
   const useManual = product.price_mode === "manual" && tier.price_clp != null;
   const priceClp = useManual
     ? (tier.price_clp as number)
-    : autoPriceClp(rateUsdPer1000, tier.quantity, product.service_type, ctx, product.margin_override);
+    : autoPriceClp(
+        rateUsdPer1000, tier.quantity, product.service_type, ctx,
+        product.margin_override, product.level,
+      );
   return {
     id: tier.id,
     quantity: tier.quantity,
@@ -170,7 +188,9 @@ export function priceCustomQuantity(
   rateUsdPer1000: number,
   ctx: PricingContext,
 ): number {
-  return autoPriceClp(rateUsdPer1000, quantity, product.service_type, ctx, product.margin_override);
+  return autoPriceClp(
+    rateUsdPer1000, quantity, product.service_type, ctx, product.margin_override, product.level,
+  );
 }
 
 const CLP = new Intl.NumberFormat("es-CL", {

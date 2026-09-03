@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser, hashPassword } from "@/lib/auth";
 import { all, db, get, run, rescoreServices } from "@/lib/db";
-import { setSettings, invalidateSettings } from "@/lib/settings";
+import { setSettings, invalidateSettings, getBoolSetting } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { testCredentials } from "@/lib/flow";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
@@ -17,6 +17,7 @@ import {
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
+import { publicarNiveles } from "@/lib/autolevels";
 import type { OrderStatus } from "@/lib/types";
 
 export type ActionState = { ok?: string; error?: string };
@@ -79,6 +80,7 @@ const SETTING_KEYS = [
   "site_name", "site_domain", "site_url", "site_tagline", "site_description",
   "contact_email", "contact_whatsapp",
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp",
+  "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
@@ -111,6 +113,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   // Las casillas no envían nada cuando están apagadas.
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
+    "auto_levels",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -207,6 +210,11 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
     image_url: String(formData.get("image_url") ?? "").trim() || null,
     badge: String(formData.get("badge") ?? "").trim() || null,
     price_mode: formData.get("price_mode") === "manual" ? "manual" : "auto",
+    // Al editar un producto a mano se sale del modo automático salvo que la
+    // casilla siga marcada: si no, el generador pisaría el texto en la
+    // siguiente sincronización.
+    auto_managed: formData.get("auto_managed") ? 1 : 0,
+    level: String(formData.get("level") ?? "").trim(),
     margin_override: formData.get("margin_override")
       ? Number(formData.get("margin_override")) || null
       : null,
@@ -239,6 +247,7 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
            seo_title=@seo_title, seo_description=@seo_description, seo_keywords=@seo_keywords,
            og_image=@og_image, noindex=@noindex, image_url=@image_url, badge=@badge,
            price_mode=@price_mode, margin_override=@margin_override,
+           level=@level, auto_managed=@auto_managed,
            auto_select=@auto_select, max_cost_ratio=@max_cost_ratio,
            min_qty=@min_qty, max_qty=@max_qty,
            link_label=@link_label, link_placeholder=@link_placeholder, link_help=@link_help,
@@ -254,14 +263,14 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
            (slug, name, platform, service_type, provider_service_id, short_description,
             description_html, bullets_json, faq_json, seo_title, seo_description, seo_keywords,
             og_image, noindex, image_url, badge, price_mode, margin_override,
-            auto_select, max_cost_ratio, min_qty, max_qty,
+            level, auto_managed, auto_select, max_cost_ratio, min_qty, max_qty,
             link_label, link_placeholder, link_help, delivery_label, quality_label,
             refill_days, guarantee_text, featured, published, sort_order)
          VALUES
            (@slug, @name, @platform, @service_type, @provider_service_id, @short_description,
             @description_html, @bullets_json, @faq_json, @seo_title, @seo_description, @seo_keywords,
             @og_image, @noindex, @image_url, @badge, @price_mode, @margin_override,
-            @auto_select, @max_cost_ratio, @min_qty, @max_qty,
+            @level, @auto_managed, @auto_select, @max_cost_ratio, @min_qty, @max_qty,
             @link_label, @link_placeholder, @link_help, @delivery_label, @quality_label,
             @refill_days, @guarantee_text, @featured, @published, @sort_order)`,
       ).run(values);
@@ -375,6 +384,35 @@ export async function createProductFromOffer(formData: FormData) {
     revalidatePath("/admin/productos");
     redirect(`/admin/productos/${productId}?creado=1`);
   });
+}
+
+/**
+ * Publica el catálogo completo por niveles: económico, estándar y premium de
+ * cada combinación red + servicio, con los textos que explican en qué se
+ * diferencian. Se puede repetir cuantas veces se quiera.
+ */
+export async function generarNiveles(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await guard();
+  const platform = String(formData.get("platform") ?? "").trim() || undefined;
+  const publicar = formData.get("borrador") ? false : true;
+  const reemplazar = formData.get("conservar") ? false : true;
+
+  const r = publicarNiveles({ publicar, platform, reemplazar });
+  refreshStore();
+  revalidatePath("/admin/productos");
+
+  if (!r.creados && !r.actualizados) {
+    return { error: "No se encontraron servicios publicables. Sincroniza el catálogo del proveedor." };
+  }
+  return {
+    ok:
+      `${r.combinaciones} combinaciones revisadas: ${r.creados} productos nuevos, ` +
+      `${r.actualizados} actualizados` +
+      (r.reemplazados ? `, ${r.reemplazados} productos antiguos ocultos por quedar duplicados` : "") +
+      (r.retirados ? `, ${r.retirados} despublicados porque su nivel ya no existe` : "") +
+      (r.sinNiveles ? `. ${r.sinNiveles} combinaciones tienen un solo servicio, así que no llevan niveles` : "") +
+      ".",
+  };
 }
 
 /**
@@ -613,11 +651,23 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
   )?.n ?? 0;
 
   invalidateSettings();
+
+  // Con los niveles automáticos activos, cada sincronización reacomoda el
+  // catálogo solo: si el proveedor dio de baja el servicio que estaba detrás
+  // del premium, el premium pasa a apuntar al mejor que quedó.
+  let niveles = "";
+  if (getBoolSetting("auto_levels", false)) {
+    const r = publicarNiveles({ publicar: true });
+    niveles = ` Niveles al día: ${r.creados} nuevos, ${r.actualizados} actualizados.`;
+  }
+
   refreshStore();
   revalidatePath("/admin/catalogo");
+  revalidatePath("/admin/productos");
 
   return {
     ok: `Catálogo sincronizado: ${seen.length} servicios activos, ${disabled} dados de baja.` +
+      niveles +
       (affected ? ` Atención: ${affected} producto(s) publicado(s) apuntan a servicios que el proveedor desactivó.` : ""),
   };
 }

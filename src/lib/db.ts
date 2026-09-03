@@ -60,6 +60,8 @@ function migrate(database: Database.Database) {
     ["products", "auto_select", "INTEGER NOT NULL DEFAULT 1"],
     ["products", "max_cost_ratio", "REAL NOT NULL DEFAULT 1.35"],
     ["orders", "reference_service_id", "INTEGER"],
+    ["products", "level", "TEXT NOT NULL DEFAULT ''"],
+    ["products", "auto_managed", "INTEGER NOT NULL DEFAULT 0"],
   ];
 
   const added: string[] = [];
