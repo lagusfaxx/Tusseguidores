@@ -11,7 +11,9 @@ import {
   getProductBySlug, getPricedTiers, getProductsByPlatform, parseJson,
 } from "@/lib/catalog";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
-import { formatClp, formatNumber, formatDuration, floorPer1000, pricingContext } from "@/lib/pricing";
+import {
+  formatClp, formatNumber, formatDuration, floorPer1000, minPriceFor, pricingContext,
+} from "@/lib/pricing";
 import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
@@ -51,8 +53,8 @@ export default async function ProductPage({ params }: Params) {
   // calcular cantidades libres con el mismo resultado que el servidor.
   // El piso por 1.000 sube con el nivel: sin eso el económico y el premium
   // chocarían contra el mismo mínimo y las cantidades libres se aplanarían.
-  const minRate = floorPer1000(product.service_type, ctx, product.level);
   const margin = product.margin_override ?? ctx.marginPercent;
+  const minRate = floorPer1000(product.service_type, ctx, product.level, margin);
   const ratePer1000Clp = Math.max(product.rate_usd_per_1000 * ctx.usdClp * (1 + margin / 100), minRate);
 
   // El pedido se le pide al mejor servicio disponible en el momento de
@@ -199,7 +201,7 @@ export default async function ProductPage({ params }: Params) {
                 deliveryLabel={deliveryLabel}
                 guaranteeText={guaranteeText}
                 ratePer1000Clp={ratePer1000Clp}
-                minPriceClp={ctx.minPriceClp}
+                minPriceClp={minPriceFor(ctx, margin)}
                 rounding={ctx.rounding}
                 orderKind={product.order_kind}
                 transferencia={transferenciaDisponible()}

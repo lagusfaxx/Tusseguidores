@@ -96,18 +96,21 @@ export function SettingsForm({
           <Field label="Dólar (CLP por US$)" name="usd_clp" type="number" value={settings.usd_clp}
             hint="Súbelo un poco sobre el dólar observado para cubrir la variación." />
           <Field label="Margen global (%)" name="margin_percent" type="number" value={settings.margin_percent}
-            hint="180 significa que el precio de venta es 2,8 veces el costo." />
+            hint="180 significa que el precio de venta es 2,8 veces el costo. Bájalo y baja toda la tienda: los pisos de más abajo se mueven contigo." />
           <Field label="Terminación de precio" name="price_rounding" type="number" value={settings.price_rounding}
             hint="90 redondea hacia arriba a terminaciones …90 ($4.390). 0 redondea a la decena." />
           <Field label="Precio mínimo (CLP)" name="min_price_clp" type="number" value={settings.min_price_clp}
             hint="Ningún pedido se cobra por debajo de este monto." />
+          <Field label="Margen de referencia de los pisos (%)" name="margin_reference" type="number"
+            value={settings.margin_reference}
+            hint="Los pisos de abajo están escritos para este margen y se escalan solos cuando cambias el margen global. Déjalo en el margen que tienes hoy: así los precios actuales no se mueven y, a partir de ahí, el margen manda sobre toda la tienda." />
           <div>
             <label className="field-label">Precio mínimo por cada 1.000 unidades</label>
             <p className="mb-3 text-xs leading-relaxed text-ink-400">
-              El piso de cada tipo de servicio. Cuando el costo del proveedor es de centavos,
-              este número es el que fija el precio, y por eso servicios de costo muy distinto
-              terminan valiendo lo mismo. Súbelo para ganar más; bájalo para dejar que mande el
-              margen sobre el costo.
+              El piso de cada tipo de servicio, escrito al margen de referencia. Cuando el costo del
+              proveedor es de centavos —que es casi todo el catálogo— este número es el que fija el
+              precio, y por eso servicios de costo muy distinto terminan valiendo lo mismo. Súbelo
+              para ganar más en ese tipo; bájalo para dejar que mande el costo.
             </p>
             <div className="grid gap-2 sm:grid-cols-2">
               {minRates.map((rate) => (
