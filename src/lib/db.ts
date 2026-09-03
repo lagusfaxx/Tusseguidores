@@ -72,6 +72,14 @@ function migrate(database: Database.Database) {
     }
   }
 
+  // Índices que dependen de columnas agregadas por esta misma función. No
+  // pueden vivir en schema.sql: ese archivo se ejecuta antes de migrar y sobre
+  // una base ya existente la columna todavía no está, así que el CREATE INDEX
+  // falla y se lleva puesto el arranque entero.
+  database.exec(
+    "CREATE INDEX IF NOT EXISTS idx_products_level ON products(platform, service_type, level)",
+  );
+
   // Las columnas nuevas quedan con su valor por defecto, que para los puntajes
   // de calidad sería mentira (todo 50/50, todo "default"). Las recalculamos a
   // partir del nombre del servicio, que es de donde salen igual.

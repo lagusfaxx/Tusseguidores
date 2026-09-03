@@ -107,9 +107,9 @@ CREATE TABLE IF NOT EXISTS products (
 CREATE INDEX IF NOT EXISTS idx_products_pub  ON products(published, sort_order);
 CREATE INDEX IF NOT EXISTS idx_products_plat ON products(platform, published);
 CREATE INDEX IF NOT EXISTS idx_products_type ON products(platform, service_type, published);
--- Los tres niveles de una misma combinación se buscan juntos, tanto para
--- mantenerlos al día como para mostrar el comparador en la ficha.
-CREATE INDEX IF NOT EXISTS idx_products_level ON products(platform, service_type, level);
+-- El índice por nivel (idx_products_level) se crea en db.ts, después de las
+-- migraciones: este archivo se ejecuta también sobre bases que ya existen, y
+-- ahí la tabla todavía no tiene la columna `level`. Ver migrate().
 
 -- Packs de cantidad que ve el cliente (100, 250, 500, 1000...).
 CREATE TABLE IF NOT EXISTS product_tiers (
