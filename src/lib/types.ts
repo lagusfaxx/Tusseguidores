@@ -107,6 +107,8 @@ export type Order = {
   payment_ref: string | null;
   payment_token: string | null;
   provider_order_id: number | null;
+  /** Fecha en que lo marcaste como despachado a mano, fuera del panel. */
+  manual_dispatch_at: string | null;
   provider_status: string | null;
   start_count: number | null;
   remains: number | null;

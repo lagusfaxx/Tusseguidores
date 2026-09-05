@@ -29,7 +29,8 @@ export default async function AdminOrdersPage({
   } else if (estado === "sin-enviar") {
     // Pagados que nunca salieron al proveedor: lo que hay que mirar primero.
     where.push(
-      "payment_status = 'paid' AND provider_order_id IS NULL AND status NOT IN ('canceled','refunded')",
+      `payment_status = 'paid' AND provider_order_id IS NULL AND manual_dispatch_at IS NULL
+       AND status NOT IN ('canceled','refunded')`,
     );
   } else if (estado && estado !== "todos") {
     where.push("status = ?");
@@ -118,7 +119,13 @@ export default async function AdminOrdersPage({
                 </td>
                 <td><StatusBadge status={order.status} /></td>
                 <td className="text-xs text-ink-400">
-                  {order.provider_order_id ? `#${order.provider_order_id}` : order.provider_error ? "Error" : "—"}
+                  {order.provider_order_id
+                    ? `#${order.provider_order_id}`
+                    : order.manual_dispatch_at
+                      ? "A mano"
+                      : order.provider_error
+                        ? "Error"
+                        : "—"}
                 </td>
                 <td className="whitespace-nowrap text-xs text-ink-400">{formatDateCl(order.created_at)}</td>
               </tr>

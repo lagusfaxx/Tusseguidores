@@ -10,8 +10,15 @@ import type { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminOrderDetail({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdminOrderDetail({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const { id } = await params;
+  const { error } = await searchParams;
   const order = getOrderById(Number(id));
   if (!order) notFound();
 
@@ -29,6 +36,14 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
           [order.reference_service_id],
         )
       : null;
+  // Plata cobrada que no se está entregando: ni salió al proveedor ni lo
+  // despachaste tú.
+  const pendienteDeEnvio =
+    order.payment_status === "paid" &&
+    !order.provider_order_id &&
+    !order.manual_dispatch_at &&
+    !["canceled", "refunded"].includes(order.status);
+
   const costClp = order.cost_usd * ctx.usdClp;
   const profit = order.amount_clp - costClp;
 
@@ -40,6 +55,20 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
         <h1 className="font-mono text-2xl font-bold">{order.code}</h1>
         <StatusBadge status={order.status} />
       </div>
+
+      {error ? (
+        <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+          {error}
+        </p>
+      ) : null}
+
+      {pendienteDeEnvio ? (
+        <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
+          Pagado y todavía sin enviar al proveedor. Mándalo con «Enviar al proveedor», o si ya lo
+          despachaste por fuera, regístralo con «Marcar como enviado a mano» para que deje de contar
+          como pendiente.
+        </p>
+      ) : null}
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
@@ -133,6 +162,16 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
                 <dd className={`font-bold ${profit >= 0 ? "text-lime-400" : "text-red-300"}`}>{formatClp(profit)}</dd>
               </div>
               <div className="flex justify-between"><dt className="text-ink-400">Pago</dt><dd>{order.payment_status} · {order.payment_ref ?? "—"}</dd></div>
+              <div className="flex justify-between">
+                <dt className="text-ink-400">Envío</dt>
+                <dd>
+                  {order.provider_order_id
+                    ? `Proveedor #${order.provider_order_id}`
+                    : order.manual_dispatch_at
+                      ? `A mano · ${formatDateCl(order.manual_dispatch_at)}`
+                      : "Sin enviar"}
+                </dd>
+              </div>
             </dl>
           </section>
 
@@ -169,14 +208,39 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
               </form>
             ) : null}
 
-            {order.payment_status === "paid" && !order.provider_order_id ? (
-              <form action={orderAction}>
-                <input type="hidden" name="order_id" value={order.id} />
-                <input type="hidden" name="action" value="send" />
-                <button type="submit" className="btn btn-primary w-full text-sm">
-                  Enviar al proveedor
-                </button>
-              </form>
+            {order.payment_status === "paid" && !order.provider_order_id && !order.manual_dispatch_at ? (
+              <>
+                <form action={orderAction}>
+                  <input type="hidden" name="order_id" value={order.id} />
+                  <input type="hidden" name="action" value="send" />
+                  <button type="submit" className="btn btn-primary w-full text-sm">
+                    Enviar al proveedor
+                  </button>
+                </form>
+
+                {/* Para los pedidos que le pasaste al proveedor por fuera: sin
+                    esto quedaban para siempre en "pagados sin enviar". */}
+                <form action={orderAction} className="space-y-2">
+                  <input type="hidden" name="order_id" value={order.id} />
+                  <input type="hidden" name="action" value="sent_manual" />
+                  <input
+                    name="admin_note"
+                    className="field text-xs"
+                    placeholder="Referencia del envío manual (opcional)"
+                  />
+                  <button type="submit" className="btn btn-ghost w-full text-sm">
+                    Marcar como enviado a mano
+                  </button>
+                </form>
+              </>
+            ) : null}
+
+            {order.manual_dispatch_at && !order.provider_order_id ? (
+              <p className="rounded-lg border border-white/10 bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-200">
+                Lo marcaste como enviado a mano el {formatDateCl(order.manual_dispatch_at)}. Ya no se
+                cuenta como pendiente y el reintento automático lo deja tranquilo; el estado final lo
+                pones tú abajo.
+              </p>
             ) : null}
 
             {order.provider_order_id ? (
@@ -198,6 +262,11 @@ export default async function AdminOrderDetail({ params }: { params: Promise<{ i
               <input type="hidden" name="order_id" value={order.id} />
               <input type="hidden" name="action" value="status" />
               <label className="field-label">Cambiar estado a mano</label>
+              <p className="text-[11px] leading-relaxed text-ink-400">
+                Poner «Pagado», «En proceso», «Entrega parcial» o «Completado» también da el pago por
+                recibido. Con «Pagado» el pedido sale al proveedor al aplicar; con los otros tres, si
+                nunca salió del panel, queda registrado como enviado a mano.
+              </p>
               <select name="status" defaultValue={order.status} className="field">
                 {(Object.keys(ORDER_STATUS_LABEL) as OrderStatus[]).map((status) => (
                   <option key={status} value={status}>{ORDER_STATUS_LABEL[status]}</option>

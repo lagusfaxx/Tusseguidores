@@ -12,7 +12,8 @@ import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
 } from "@/lib/quality.mjs";
 import {
-  sendToProvider, setStatus, syncOpenOrders, logEvent, markPaid, retryUndispatched,
+  sendToProvider, setStatus, setStatusManual, markDispatchedManually, syncOpenOrders, logEvent,
+  markPaid, retryUndispatched,
 } from "@/lib/orders";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
@@ -484,22 +485,32 @@ export async function createFromService(formData: FormData) {
 
 // ------------------------------------------------------------------ pedidos
 export async function orderAction(formData: FormData) {
-  await withErrorRedirect("/admin/pedidos", async () => {
+  const id = Number(formData.get("order_id"));
+  // Volvemos a la ficha del pedido, que es donde están los botones: si el envío
+  // falla, el motivo tiene que verse ahí y no en la lista.
+  await withErrorRedirect(`/admin/pedidos/${id}`, async () => {
     await guard();
-    const id = Number(formData.get("order_id"));
     const action = String(formData.get("action"));
 
     if (action === "send") {
-      await sendToProvider(id);
+      const result = await sendToProvider(id);
+      // Antes el error se perdía en silencio y el pedido seguía "pendiente de
+      // envío" sin que nada lo explicara.
+      if (!result.ok) throw new Error(result.error);
     } else if (action === "mark_paid") {
       const referencia = String(formData.get("admin_note") ?? "").trim();
       await markPaid(id, referencia || "manual");
+    } else if (action === "sent_manual") {
+      markDispatchedManually(id, String(formData.get("admin_note") ?? "").trim() || undefined);
     } else if (action === "note") {
       const note = String(formData.get("admin_note") ?? "").trim();
       run("UPDATE orders SET admin_note = ?, updated_at = datetime('now') WHERE id = ?", [note, id]);
     } else if (action === "status") {
       const status = String(formData.get("status")) as OrderStatus;
-      setStatus(id, status, `Estado cambiado a mano desde el panel: ${status}.`);
+      // Cambiar el estado a mano también pone el pago al día y, si el pedido
+      // queda pagado y sin despachar, lo manda al proveedor en el acto.
+      const sent = await setStatusManual(id, status);
+      if (sent && !sent.ok) throw new Error(sent.error);
     } else if (action === "refill") {
       const order = get<{ provider_order_id: number | null }>(
         "SELECT provider_order_id FROM orders WHERE id = ?", [id],

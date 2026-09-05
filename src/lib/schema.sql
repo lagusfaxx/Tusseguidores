@@ -150,6 +150,7 @@ CREATE TABLE IF NOT EXISTS orders (
   payment_token       TEXT,
 
   provider_order_id   INTEGER,
+  manual_dispatch_at  TEXT,                               -- lo despachaste tú fuera del panel
   provider_status     TEXT,
   start_count         INTEGER,
   remains             INTEGER,
