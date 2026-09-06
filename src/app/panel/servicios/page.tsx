@@ -38,11 +38,27 @@ function Barra({ valor, titulo }: { valor: number; titulo: string }) {
   );
 }
 
-/** Una fila de servicio, compacta: el precio y el botón siempre a la derecha. */
+/**
+ * Una fila de servicio.
+ *
+ * En escritorio es una tabla: nombre, calidad, rango, precio y botón en
+ * columnas alineadas. En teléfono se dobla en dos alturas —el nombre completo
+ * arriba, el precio y el botón abajo— porque recortar el nombre a "Instagram
+ * Follo…" deja al cliente eligiendo entre doce servicios idénticos.
+ */
 function Fila({ s, mostrarRed = false }: { s: ServicioPanel; mostrarRed?: boolean }) {
+  const reposicion =
+    s.refill_days >= 9999
+      ? "reposición ∞"
+      : s.refill_days > 0
+        ? `reposición ${s.refill_days} d`
+        : s.refill === 1
+          ? "con reposición"
+          : null;
+
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/6 px-4 py-3 last:border-0 hover:bg-white/3">
-      <div className="min-w-0 flex-1">
+    <div className="border-b border-white/6 px-4 py-3 last:border-0 hover:bg-white/3 sm:flex sm:items-center sm:gap-4">
+      <div className="min-w-0 sm:flex-1">
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-ink-400">
           <span className="font-mono">#{s.service_id}</span>
           {mostrarRed ? (
@@ -50,14 +66,8 @@ function Fila({ s, mostrarRed = false }: { s: ServicioPanel; mostrarRed?: boolea
               {platformLabel(s.platform)} · {serviceTypeLabel(s.service_type)}
             </span>
           ) : null}
-          {s.refill_days > 0 || s.refill === 1 ? (
-            <span className="rounded bg-lime-500/15 px-1.5 py-0.5 text-lime-300">
-              {s.refill_days >= 9999
-                ? "reposición ∞"
-                : s.refill_days > 0
-                  ? `reposición ${s.refill_days} d`
-                  : "con reposición"}
-            </span>
+          {reposicion ? (
+            <span className="rounded bg-lime-500/15 px-1.5 py-0.5 text-lime-300">{reposicion}</span>
           ) : null}
           {s.order_kind === "custom_comments" ? (
             <span className="rounded bg-brand-500/20 px-1.5 py-0.5 text-brand-300">
@@ -65,29 +75,48 @@ function Fila({ s, mostrarRed = false }: { s: ServicioPanel; mostrarRed?: boolea
             </span>
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-sm font-medium" title={s.clean_name || s.name}>
+
+        {/* Dos líneas en teléfono, una recortada en escritorio: en la tabla el
+            recorte mantiene las columnas alineadas y el nombre completo está en
+            el título emergente y en la ficha del pedido. */}
+        <p className="mt-1 line-clamp-2 text-sm font-medium sm:truncate" title={s.clean_name || s.name}>
           {s.clean_name || s.name}
+        </p>
+
+        {/* En teléfono los datos van aquí, en texto, en vez de en columnas. */}
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-400 sm:hidden">
+          <span>{etiquetaRetencion(s.drop_score)}</span>
+          <span className="text-ink-600">·</span>
+          <span>{etiquetaVelocidad(s.speed_score)}</span>
+          <span className="text-ink-600">·</span>
+          <span>{formatNumber(s.min_qty)} – {formatNumber(s.max_qty)} u.</span>
+          {formatDuration(s.avg_minutes) ? (
+            <>
+              <span className="text-ink-600">·</span>
+              <span>≈ {formatDuration(s.avg_minutes)}</span>
+            </>
+          ) : null}
         </p>
       </div>
 
-      <div className="flex shrink-0 items-center gap-4">
-        <div className="hidden w-40 flex-col gap-1 sm:flex">
+      <div className="mt-2.5 flex items-center justify-between gap-4 sm:mt-0 sm:justify-end">
+        <div className="hidden w-36 shrink-0 flex-col gap-1 sm:flex">
           <Barra valor={s.drop_score} titulo={etiquetaRetencion(s.drop_score)} />
           <Barra valor={s.speed_score} titulo={etiquetaVelocidad(s.speed_score)} />
         </div>
-        <div className="hidden w-32 text-[11px] leading-tight text-ink-400 lg:block">
+        <div className="hidden w-32 shrink-0 text-[11px] leading-tight text-ink-400 lg:block">
           {formatNumber(s.min_qty)} – {formatNumber(s.max_qty)} u.
           {formatDuration(s.avg_minutes) ? (
             <span className="block">≈ {formatDuration(s.avg_minutes)}</span>
           ) : null}
         </div>
-        <div className="w-24 text-right">
+        <div className="shrink-0 sm:w-24 sm:text-right">
           <p className="text-[10px] uppercase tracking-wide text-ink-400">por 1.000</p>
           <p className="font-bold tracking-tight">{formatClp(s.ratePer1000Clp)}</p>
         </div>
         <Link
           href={`/panel/nuevo?servicio=${s.service_id}`}
-          className="shrink-0 rounded-lg border border-white/12 bg-white/6 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:border-brand-400/60 hover:bg-brand-500/20"
+          className="shrink-0 rounded-lg border border-white/12 bg-white/6 px-4 py-2 text-sm font-semibold text-white transition-colors hover:border-brand-400/60 hover:bg-brand-500/20 sm:px-3 sm:py-1.5"
         >
           Pedir
         </Link>
@@ -98,12 +127,12 @@ function Fila({ s, mostrarRed = false }: { s: ServicioPanel; mostrarRed?: boolea
 
 function Buscador({ q, red }: { q?: string; red?: string }) {
   return (
-    <form className="flex flex-wrap gap-2">
+    <form className="flex flex-wrap items-center gap-2">
       {red ? <input type="hidden" name="red" value={red} /> : null}
       <input
         name="q"
         defaultValue={q ?? ""}
-        className="field max-w-sm"
+        className="field min-w-0 flex-1 sm:max-w-sm sm:flex-none"
         placeholder="Buscar por nombre o ID de servicio"
       />
       <button type="submit" className="btn btn-ghost text-sm">Buscar</button>
@@ -135,7 +164,7 @@ export default async function PanelServiciosPage({
           Precio por cada 1.000 unidades. En el pedido se cobra la cantidad exacta.
         </p>
       </div>
-      <span className="rounded-lg border border-white/12 bg-white/6 px-3 py-1.5 text-sm">
+      <span className="hidden rounded-lg border border-white/12 bg-white/6 px-3 py-1.5 text-sm sm:inline-block">
         Saldo: <strong className="text-lime-400">{formatClp(user.balance_clp)}</strong>
       </span>
     </div>
@@ -266,14 +295,18 @@ export default async function PanelServiciosPage({
               className="card group overflow-hidden [&_summary::-webkit-details-marker]:hidden"
             >
               <summary className="flex cursor-pointer items-center gap-3 px-4 py-3.5 hover:bg-white/3">
-                <span className="font-semibold">{serviceTypeLabel(grupo.serviceType)}</span>
-                <span className="rounded-full bg-white/8 px-2 py-0.5 text-[11px] text-ink-200">
-                  {formatNumber(grupo.total)}
-                </span>
-                <span className="ml-auto text-xs text-ink-400">
-                  desde {formatClp(Math.min(...grupo.servicios.map((s) => s.ratePer1000Clp)))} /1.000
-                </span>
-                <span className="text-ink-400 transition-transform group-open:rotate-180">▾</span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">{serviceTypeLabel(grupo.serviceType)}</span>
+                    <span className="rounded-full bg-white/8 px-2 py-0.5 text-[11px] text-ink-200">
+                      {formatNumber(grupo.total)}
+                    </span>
+                  </div>
+                  <span className="mt-0.5 block text-xs text-ink-400">
+                    desde {formatClp(Math.min(...grupo.servicios.map((s) => s.ratePer1000Clp)))} por 1.000
+                  </span>
+                </div>
+                <span className="shrink-0 text-ink-400 transition-transform group-open:rotate-180">▾</span>
               </summary>
 
               <div className="border-t border-white/8">

@@ -159,7 +159,7 @@ export function PanelOrderForm({
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-ink-400">
-        El pedido sale al proveedor al instante. Revisa el enlace antes de enviarlo: una vez
+        El pedido entra a entrega al instante. Revisa el enlace antes de enviarlo: una vez
         despachado no se puede cambiar el destino.
       </p>
     </form>

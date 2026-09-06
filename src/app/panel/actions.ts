@@ -8,7 +8,7 @@ import { crearRecarga, avisarTransferencia, guardarTokenFlow, recargaPorId } fro
 import { crearTicket, agregarMensaje, ticketDelCliente } from "@/lib/tickets";
 import { createPayment, checkoutUrl, flowConfigured } from "@/lib/flow";
 import { transferenciaDisponible } from "@/lib/transfer";
-import { avisarAdmin } from "@/lib/notify";
+import { avisarAdmin, notificarBienvenidaPanel } from "@/lib/notify";
 import { absoluteUrl } from "@/lib/seo";
 import { getBoolSetting, getSetting } from "@/lib/settings";
 import { formatClp } from "@/lib/pricing";
@@ -57,6 +57,9 @@ export async function accionRegistrar(_prev: PanelState, formData: FormData): Pr
   });
   if (!result.ok) return { error: result.error };
 
+  // La bienvenida al cliente y el aviso al dueño, en ese orden: lo primero que
+  // hace una cuenta nueva es buscar el correo para ver si quedó bien creada.
+  await notificarBienvenidaPanel(result.user);
   await avisarAdmin(
     "Cuenta nueva en el panel mayorista",
     `<p>Se registró <strong>${result.user.email}</strong>${result.user.name ? ` (${result.user.name})` : ""}.</p>`,

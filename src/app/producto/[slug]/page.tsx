@@ -311,8 +311,8 @@ export default async function ProductPage({ params }: Params) {
                   <div>
                     <h2 className="font-bold">¿Compras seguido o revendes?</h2>
                     <p className="mt-1 max-w-lg text-sm leading-relaxed text-ink-400">
-                      En el panel mayorista pides el mismo servicio al costo del proveedor más un
-                      margen chico, cargando saldo por adelantado.
+                      En el panel mayorista pides el mismo servicio a precio de mayorista, cargando
+                      saldo por adelantado.
                     </p>
                   </div>
                   <Link href="/panel" className="btn btn-ghost shrink-0 text-sm">

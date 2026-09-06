@@ -28,26 +28,32 @@ export default async function PanelHome() {
         <div>
           <h1 className="text-2xl font-bold">Hola{user.name ? `, ${user.name}` : ""}</h1>
           <p className="mt-1 text-sm text-ink-400">
-            Precio mayorista: costo del proveedor + {ctx.marginPercent}%
+            Precio mayorista, muy por debajo del de la tienda
             {user.discount_percent > 0 ? `, con tu descuento del ${user.discount_percent}%` : ""}.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link href="/panel/servicios" className="btn btn-primary text-sm">Hacer un pedido</Link>
-          <Link href="/panel/saldo" className="btn btn-ghost text-sm">Recargar saldo</Link>
+        <div className="flex w-full gap-2 sm:w-auto">
+          <Link href="/panel/servicios" className="btn btn-primary flex-1 text-sm sm:flex-none">
+            Hacer un pedido
+          </Link>
+          <Link href="/panel/saldo" className="btn btn-ghost flex-1 text-sm sm:flex-none">
+            Recargar
+          </Link>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/* Dos columnas ya en teléfono: cuatro tarjetas apiladas eran una
+          pantalla entera de números antes de llegar a los pedidos. */}
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           ["Saldo disponible", formatClp(user.balance_clp), "text-lime-400"],
           ["Pedidos", formatNumber(stats.pedidos), ""],
           ["En curso", formatNumber(stats.enCurso), ""],
           ["Gastado", formatClp(stats.gastado), ""],
         ].map(([etiqueta, valor, tono]) => (
-          <div key={etiqueta} className="card p-4">
-            <p className="text-xs uppercase tracking-wider text-ink-400">{etiqueta}</p>
-            <p className={`mt-1 text-xl font-extrabold tracking-tight ${tono}`}>{valor}</p>
+          <div key={etiqueta} className="card p-3.5 sm:p-4">
+            <p className="text-[11px] uppercase tracking-wider text-ink-400 sm:text-xs">{etiqueta}</p>
+            <p className={`mt-1 text-lg font-extrabold tracking-tight sm:text-xl ${tono}`}>{valor}</p>
           </div>
         ))}
       </div>
@@ -75,8 +81,8 @@ export default async function PanelHome() {
         </div>
       ) : null}
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
-        <section>
+      <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr] [&>*]:min-w-0">
+        <section className="min-w-0">
           <div className="flex items-end justify-between gap-4">
             <h2 className="font-bold">Últimos pedidos</h2>
             <Link href="/panel/pedidos" className="text-sm text-brand-300 hover:text-white">Ver todos →</Link>
@@ -86,7 +92,7 @@ export default async function PanelHome() {
               <Link
                 key={order.id}
                 href={`/panel/pedidos/${order.id}`}
-                className="flex items-center gap-3 p-3.5 transition-colors hover:bg-white/4"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1.5 p-3.5 transition-colors hover:bg-white/4"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{order.product_name}</p>
@@ -113,7 +119,7 @@ export default async function PanelHome() {
           </div>
         </section>
 
-        <section>
+        <section className="min-w-0">
           <div className="flex items-end justify-between gap-4">
             <h2 className="font-bold">Movimientos</h2>
             <Link href="/panel/saldo" className="text-sm text-brand-300 hover:text-white">Ver saldo →</Link>

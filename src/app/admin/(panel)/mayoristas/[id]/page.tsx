@@ -57,7 +57,7 @@ export default async function AdminMayoristaDetalle({
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start [&>*]:min-w-0">
         <div className="space-y-6">
           <section className="card p-6">
             <div className="flex flex-wrap items-end justify-between gap-4">

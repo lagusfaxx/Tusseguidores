@@ -30,7 +30,7 @@ export default async function PanelTicketsPage({
         el botón de reposición: así llega con todos los datos.
       </p>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-start [&>*]:min-w-0">
         <div className="card p-6">
           <h2 className="font-bold">Nuevo ticket</h2>
           <PanelForm action={accionCrearTicket} submitLabel="Abrir ticket" pendiente="Abriendo…" className="mt-4">
@@ -65,7 +65,7 @@ export default async function PanelTicketsPage({
               <Link
                 key={t.id}
                 href={`/panel/tickets/${t.code}`}
-                className="flex items-center gap-3 p-4 transition-colors hover:bg-white/4"
+                className="flex flex-wrap items-center gap-x-3 gap-y-2 p-4 transition-colors hover:bg-white/4"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">{t.subject}</p>

@@ -4,6 +4,7 @@ import { emailConfig, emailConfigured, sendEmail, type SendEmailResult } from ".
 import { getBoolSetting } from "./settings";
 import {
   correoAdminPedidoNuevo,
+  correoBienvenidaPanel,
   correoAdminPedidoPagado,
   correoAdminPedidoTrabado,
   correoAdminTransferencia,
@@ -174,6 +175,37 @@ export async function avisarAdmin(subject: string, html: string, text: string): 
   if (!config.adminAlerts || !emailConfigured() || !config.admin) return;
   try {
     await sendEmail({ to: config.admin, subject, html, text });
+  } catch (error) {
+    console.error("[email]", error);
+  }
+}
+
+/**
+ * Bienvenida a un cliente que acaba de crear su cuenta mayorista.
+ *
+ * No pasa por `email_log` porque no hay pedido al que colgarlo: nace de un
+ * registro, que ocurre una sola vez por cuenta.
+ */
+export async function notificarBienvenidaPanel(user: {
+  email: string;
+  name?: string | null;
+}): Promise<void> {
+  if (!emailConfigured()) return;
+  const { resellerContext } = await import("./pricing");
+  const ctx = resellerContext();
+  const contenido = correoBienvenidaPanel({
+    email: user.email,
+    name: user.name,
+    minTopupClp: ctx.minTopupClp,
+    marginPercent: ctx.marginPercent,
+  });
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: contenido.subject,
+      html: contenido.html,
+      text: contenido.text,
+    });
   } catch (error) {
     console.error("[email]", error);
   }
