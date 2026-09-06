@@ -63,7 +63,7 @@ export default async function AdminTicketDetalle({
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start [&>*]:min-w-0">
         <div>
           <div className="space-y-3">
             {mensajes.map((m) => (

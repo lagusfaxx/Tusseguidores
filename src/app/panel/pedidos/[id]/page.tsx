@@ -36,8 +36,8 @@ export default async function PanelPedidoDetalle({
     ["completed", "partial", "processing"].includes(order.status) &&
     (!ticketAbierto || ticketAbierto.status === "cerrado");
 
-  // "En cola" es el estado real de un pedido pagado que todavía no salió al
-  // proveedor: decirlo así evita el ticket de "no pasa nada con mi pedido".
+  // "En cola" es el estado real de un pedido pagado que todavía no entró a
+  // entrega: decirlo así evita el ticket de "no pasa nada con mi pedido".
   const enCola = !order.provider_order_id && !order.manual_dispatch_at && order.status === "paid";
 
   return (
@@ -67,21 +67,21 @@ export default async function PanelPedidoDetalle({
       ) : null}
       {enCola ? (
         <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
-          El pedido está en cola: el proveedor no lo aceptó todavía y se reintenta solo cada pocos
-          minutos. Si no sale, te devolvemos el saldo completo.
+          El pedido está en cola: todavía no entró a entrega y se reintenta solo cada pocos
+          minutos. Si no alcanza a salir, te devolvemos el saldo completo.
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start [&>*]:min-w-0">
         <section className="card p-5 sm:p-6">
           <h2 className="font-bold">{order.product_name}</h2>
           <dl className="mt-4 space-y-3 text-sm">
             {[
-              ["Servicio del proveedor", `#${order.provider_service_id}`],
+              ["Servicio", `#${order.provider_service_id}`],
               ["Cantidad", formatNumber(order.quantity)],
               ["Cobrado de tu saldo", formatClp(order.amount_clp)],
               ["Creado", formatDateCl(order.created_at)],
-              ["Estado del proveedor", order.provider_status ?? "—"],
+              ["Estado de la entrega", order.provider_status ?? "—"],
               [
                 "Avance",
                 order.remains != null
@@ -126,8 +126,8 @@ export default async function PanelPedidoDetalle({
               <input type="hidden" name="order_id" value={order.id} />
               <h2 className="font-bold">Pedir reposición</h2>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-400">
-                Este servicio incluye reposición. Cuéntanos qué pasó y lo gestionamos con el
-                proveedor; te respondemos en el ticket.
+                Este servicio incluye reposición. Cuéntanos qué pasó y lo reponemos; te
+                respondemos en el ticket.
               </p>
               <textarea
                 name="detalle"

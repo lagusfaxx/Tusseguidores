@@ -154,7 +154,7 @@ export async function crearPedidoDePanel(input: CrearPedidoInput): Promise<Crear
     despachado: envio.ok,
     aviso: envio.ok
       ? undefined
-      : "El pedido quedó en cola: el proveedor no lo aceptó en este momento y se reintenta solo. Si no sale, te devolvemos el saldo.",
+      : "El pedido quedó en cola: no pudo entrar a entrega en este momento y se reintenta solo. Si no sale, te devolvemos el saldo.",
   };
 }
 

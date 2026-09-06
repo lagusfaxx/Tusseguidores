@@ -53,7 +53,7 @@ export default async function PanelNuevoPedido({
 
       <h1 className="mt-4 text-2xl font-bold">Nuevo pedido</h1>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.85fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.85fr] lg:items-start [&>*]:min-w-0">
         <PanelOrderForm
           serviceId={service.service_id}
           serviceName={service.clean_name || service.name}
@@ -86,7 +86,7 @@ export default async function PanelNuevoPedido({
                   : service.refill_days > 0
                     ? `${service.refill_days} días`
                     : service.refill === 1
-                      ? "Sí, según el proveedor"
+                      ? "Sí, incluida"
                       : "Sin reposición",
               ],
             ].map(([etiqueta, valor]) => (
@@ -106,7 +106,7 @@ export default async function PanelNuevoPedido({
           {service.refill_days > 0 || service.refill === 1 ? (
             <p className="mt-4 text-xs leading-relaxed text-ink-400">
               Si bajan dentro del plazo, pides la reposición desde la ficha del pedido y la
-              gestionamos con el proveedor.
+              reponemos sin costo.
             </p>
           ) : null}
         </aside>

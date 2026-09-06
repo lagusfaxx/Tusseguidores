@@ -203,7 +203,7 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
       titulo: parcial ? "Entregamos parte de tu pedido" : "Tu pedido está entregado",
       intro: parcial
         ? `Alcanzamos a entregar ${escape(entregado)} de ${escape(formatNumber(order.quantity))}. ` +
-          "El proveedor no pudo completar el resto; escríbenos y lo resolvemos."
+          "No pudimos completar el resto; escríbenos y lo resolvemos."
         : "Ya está todo entregado. Si algo no cuadra, respóndenos este correo dentro de las próximas horas y lo revisamos.",
       filas: detalle(order),
       cta: { texto: "Ver el detalle", url },
@@ -217,6 +217,58 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
       `Destino: ${order.link}`,
       "",
       `Detalle: ${url}`,
+    ]),
+  };
+}
+
+/**
+ * Bienvenida al panel mayorista.
+ *
+ * Es el único correo que recibe quien recién se registra, así que dice las tres
+ * cosas que necesita saber para empezar: cómo son los precios, cómo se paga y
+ * dónde entrar.
+ */
+export function correoBienvenidaPanel(input: {
+  email: string;
+  name?: string | null;
+  minTopupClp: number;
+  marginPercent: number;
+}): EmailContent {
+  const url = absoluteUrl("/panel");
+  const tienda = getSetting("site_name", "TusSeguidores");
+  const nombre = input.name?.trim();
+
+  return {
+    subject: `Tu cuenta mayorista en ${tienda} está lista`,
+    html: layout({
+      titulo: nombre ? `Bienvenido, ${nombre}` : "Bienvenido al panel mayorista",
+      intro:
+        "Tu cuenta ya está activa. Compras el mismo catálogo a precio de mayorista —muy por " +
+        "debajo del de la tienda y sin su precio mínimo— y pagas con saldo cargado por adelantado.",
+      filas: [
+        ["Tu cuenta", input.email],
+        ["Recarga mínima", formatClp(input.minTopupClp)],
+        ["Formas de pago", "Webpay o transferencia"],
+      ],
+      aviso:
+        "Cómo funciona: cargas saldo, eliges el servicio, pegas el enlace y la cantidad. Cada " +
+        "pedido se descuenta del saldo al instante y entra a entrega solo.",
+      cta: { texto: "Entrar al panel", url },
+      cierre:
+        "Si un pedido sale mal, abres un ticket desde el panel y lo revisamos. En los servicios " +
+        "con reposición, la pides desde la ficha del pedido.",
+    }),
+    text: texto([
+      nombre ? `Bienvenido, ${nombre}.` : "Bienvenido al panel mayorista.",
+      "",
+      `Tu cuenta ${input.email} ya está activa.`,
+      "Precio mayorista, muy por debajo del de la tienda.",
+      `Recarga mínima: ${formatClp(input.minTopupClp)} por Webpay o transferencia.`,
+      "",
+      "Cargas saldo, eliges el servicio, pegas el enlace y la cantidad. Cada pedido se descuenta",
+      "del saldo al instante y entra a entrega solo.",
+      "",
+      `Entra en: ${url}`,
     ]),
   };
 }

@@ -37,24 +37,28 @@ export default async function PanelPedidosPage({
           <Link
             key={order.id}
             href={`/panel/pedidos/${order.id}`}
-            className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-white/4"
+            className="block p-4 transition-colors hover:bg-white/4 sm:flex sm:items-center sm:gap-4"
           >
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">{order.product_name}</p>
+            <div className="min-w-0 sm:flex-1">
+              <p className="line-clamp-2 text-sm font-semibold sm:truncate">{order.product_name}</p>
               <p className="truncate text-xs text-ink-400">
                 <span className="font-mono">{order.code}</span> · {formatNumber(order.quantity)} u. ·{" "}
                 {order.link}
               </p>
             </div>
-            <span className="text-xs text-ink-400">{formatDateCl(order.created_at)}</span>
-            <span className="text-sm font-semibold">{formatClp(order.amount_clp)}</span>
-            <span
-              className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                ORDER_STATUS_TONE[order.status as OrderStatus]
-              }`}
-            >
-              {ORDER_STATUS_LABEL[order.status as OrderStatus]}
-            </span>
+            <div className="mt-2 flex items-center gap-3 sm:mt-0 sm:shrink-0">
+              <span className="hidden text-xs text-ink-400 lg:inline">
+                {formatDateCl(order.created_at)}
+              </span>
+              <span className="text-sm font-semibold">{formatClp(order.amount_clp)}</span>
+              <span
+                className={`ml-auto rounded-full border px-2 py-0.5 text-[11px] font-semibold sm:ml-0 ${
+                  ORDER_STATUS_TONE[order.status as OrderStatus]
+                }`}
+              >
+                {ORDER_STATUS_LABEL[order.status as OrderStatus]}
+              </span>
+            </div>
           </Link>
         ))}
         {pedidos.length === 0 ? (

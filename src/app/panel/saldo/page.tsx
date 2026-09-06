@@ -9,6 +9,7 @@ import { formatDateCl } from "@/lib/utils";
 import { PanelForm, PanelSubmit } from "@/components/panel-ui";
 import { accionRecargar, accionAvisarTransferencia } from "../actions";
 import { Copiar } from "@/components/copiar";
+import { CampoMonto } from "@/components/panel-monto";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,12 @@ export default async function PanelSaldoPage({
   const datos = datosTransferencia();
   const montos = [ctx.minTopupClp, ctx.minTopupClp * 3, ctx.minTopupClp * 5, ctx.minTopupClp * 10];
 
+  // Formas de pago realmente disponibles según lo que esté configurado.
+  const formas = [
+    flowConfigured() ? { valor: "flow", etiqueta: "Webpay / tarjeta (al instante)" } : null,
+    transferenciaDisponible() ? { valor: "transferencia", etiqueta: "Transferencia bancaria" } : null,
+  ].filter((f): f is { valor: string; etiqueta: string } => f !== null);
+
   return (
     <>
       <h1 className="text-2xl font-bold">Saldo</h1>
@@ -46,7 +53,7 @@ export default async function PanelSaldoPage({
         </p>
       ) : null}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-start">
+      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-start [&>*]:min-w-0">
         <div className="space-y-6">
           <div className="card p-6">
             <p className="text-xs uppercase tracking-wider text-ink-400">Saldo disponible</p>
@@ -57,41 +64,46 @@ export default async function PanelSaldoPage({
 
           <div className="card p-6">
             <h2 className="font-bold">Recargar</h2>
+            {formas.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
+                No hay ninguna forma de pago configurada todavía. Escríbenos y cargamos tu saldo a
+                mano.
+              </p>
+            ) : (
             <PanelForm
               action={accionRecargar}
               submitLabel="Continuar"
               pendiente="Abriendo el pago…"
               className="mt-4"
             >
-              <label className="field-label" htmlFor="monto">Monto (CLP)</label>
-              <input
-                id="monto"
-                name="monto"
-                inputMode="numeric"
-                required
-                defaultValue={ctx.minTopupClp}
-                className="field"
-              />
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {montos.map((m) => (
-                  <span key={m} className="rounded-md bg-white/6 px-2 py-1 text-[11px] text-ink-200">
-                    {formatClp(m)}
-                  </span>
-                ))}
-              </div>
+              <CampoMonto minimo={ctx.minTopupClp} atajos={montos} />
 
               <label className="field-label mt-4" htmlFor="metodo">Forma de pago</label>
-              <select id="metodo" name="metodo" className="field" defaultValue={flowConfigured() ? "flow" : "transferencia"}>
-                {flowConfigured() ? <option value="flow">Webpay / tarjeta (al instante)</option> : null}
-                {transferenciaDisponible() ? (
-                  <option value="transferencia">Transferencia bancaria</option>
-                ) : null}
-              </select>
+              {/* Con una sola forma disponible el desplegable sobra: se muestra
+                  cuál es y se manda en un campo oculto. Un select con una sola
+                  opción —o peor, con ninguna— se ve como un error. */}
+              {formas.length > 1 ? (
+                <select id="metodo" name="metodo" className="field" defaultValue={formas[0].valor}>
+                  {formas.map((f) => (
+                    <option key={f.valor} value={f.valor}>{f.etiqueta}</option>
+                  ))}
+                </select>
+              ) : (
+                <>
+                  <input type="hidden" name="metodo" value={formas[0].valor} />
+                  <p className="field bg-white/3">{formas[0].etiqueta}</p>
+                </>
+              )}
               <p className="mt-1 text-xs text-ink-400">
-                Con Webpay el saldo se acredita solo apenas se confirma el pago. Por transferencia lo
-                acreditamos al revisar la cuenta.
+                {flowConfigured()
+                  ? "Con Webpay el saldo se acredita solo apenas se confirma el pago. "
+                  : ""}
+                {transferenciaDisponible()
+                  ? "Por transferencia lo acreditamos al revisar la cuenta."
+                  : ""}
               </p>
             </PanelForm>
+            )}
           </div>
 
           {pendiente && pendiente.method === "transferencia" && pendiente.status === "pending" ? (
@@ -148,7 +160,7 @@ export default async function PanelSaldoPage({
               <h2 className="font-bold">Recargas</h2>
               <div className="card mt-3 divide-y divide-white/6">
                 {recargas.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 p-3.5 text-sm">
+                  <div key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3.5 text-sm">
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs text-ink-400">{r.code}</p>
                       <p className="text-xs text-ink-400">
@@ -177,7 +189,7 @@ export default async function PanelSaldoPage({
             <h2 className="font-bold">Movimientos</h2>
             <div className="card mt-3 divide-y divide-white/6">
               {historial.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 p-3.5">
+                <div key={m.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-3.5">
                   <div className="min-w-0 flex-1">
                     <p className="text-sm">{ETIQUETA_MOVIMIENTO[m.kind] ?? m.kind}</p>
                     <p className="truncate text-xs text-ink-400">
