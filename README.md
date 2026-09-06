@@ -75,6 +75,7 @@ Todo se configura en `/admin/ajustes`; no hace falta volver a desplegar.
 | **Proveedor** | La API key de honestsmm (la sacas de tu página de cuenta). |
 | **Pagos** | API key y secret key de Flow. Arriba de la sección dice en qué entorno se está cobrando de verdad. |
 | **Correos (Resend)** | API key de Resend y el remitente. Sin esto la tienda no manda ningún correo. |
+| **Panel mayorista** | Margen de reventa, recarga mínima y cobro mínimo por pedido. |
 | **SEO** | Título, descripción y verificación de Google Search Console. |
 
 En el panel de **Flow** configura:
@@ -310,6 +311,64 @@ Tres cosas que conviene saber:
 Para no dejar la clave en la base de datos, `RESEND_API_KEY` como variable de
 entorno manda sobre el panel, igual que las de Flow y el proveedor.
 
+### Panel mayorista (reventa con saldo)
+
+Además de la tienda, el sitio tiene un **panel SMM de reventa** en `/panel`.
+Es la otra mitad del negocio: quien compra seguido no paga el precio de la
+tienda, sino el costo del proveedor más un margen chico, y a cambio carga saldo
+por adelantado.
+
+**Cómo funciona para el cliente**
+
+1. Crea su cuenta en `/panel/crear-cuenta` (gratis, sin aprobación).
+2. Recarga saldo desde el mínimo configurado, por **Webpay** (se acredita solo)
+   o por **transferencia** (la confirmas tú).
+3. En **Servicios** ve el catálogo completo del proveedor con el precio por
+   cada 1.000 unidades, el rango, la retención, la velocidad y la reposición de
+   cada servicio, y filtra por red, tipo o reposición.
+4. Elige uno, pega el enlace y la cantidad. El precio se calcula mientras
+   escribe y el botón queda bloqueado si la cantidad está fuera de rango o el
+   saldo no alcanza.
+5. Al enviar, **el saldo se descuenta y el pedido sale al proveedor**, con el
+   mismo despacho, reintento y seguimiento de estados que los de la tienda.
+6. Sigue cada pedido en `/panel/pedidos`, pide la **reposición** cuando el
+   servicio la incluye, y abre **tickets** de soporte que se responden desde el
+   panel de administración.
+
+**Cómo funciona para ti**
+
+| Dónde | Qué haces |
+|---|---|
+| **Mayoristas** | Ves cada cuenta, su saldo, su libro de movimientos, sus pedidos; le pones un descuento propio, le ajustas el saldo a mano (con motivo) o la suspendes. |
+| **Recargas** | Confirmas o rechazas las transferencias. Las de Webpay ya están acreditadas cuando las ves. |
+| **Tickets** | Respondes, cierras y, en las solicitudes de reposición, se la pides al proveedor con un botón. |
+| **Pedidos** | Los del panel se ven igual que los de la tienda, con un botón extra para devolver el saldo si no se pudieron entregar. |
+
+Se configura en **Ajustes → Panel mayorista**: margen, recarga mínima, cobro
+mínimo por pedido y un interruptor para apagarlo entero.
+
+#### El saldo no se puede descuadrar
+
+Es lo más delicado del panel, así que está construido para que no dependa de
+que el código se porte bien:
+
+- **Un solo módulo toca el saldo** (`wallet.ts`). Nadie más escribe
+  `balance_clp`.
+- **Cada peso deja una línea en el libro** (`wallet_entries`) con el saldo que
+  quedó, y la línea y el saldo se escriben en la misma transacción de SQLite.
+- **El saldo se lee dentro de la transacción**, así que dos pedidos a la vez no
+  pueden gastar la misma plata: el segundo ve el saldo ya descontado. Un saldo
+  negativo es imposible.
+- **Un pedido cobra una vez y se reembolsa una vez**, y **una recarga acredita
+  una vez**, lo garantiza un índice único de la base —no el código—, así que ni
+  un doble clic, ni dos pestañas, ni un reintento de Flow pueden duplicar nada.
+- La ficha del cliente en el panel compara el libro con el saldo y avisa en
+  rojo si alguna vez no cuadran.
+
+Si un pedido del panel no se puede entregar, el dinero no se pierde: queda
+pagado y sin despachar (el cron lo reintenta solo) y, si no hay forma, el botón
+de **devolver el saldo** lo acredita de vuelta con su línea en el libro.
+
 ### Pedido, de principio a fin
 
 1. El cliente elige un pack (o una cantidad libre) y deja su enlace y correo.
@@ -424,9 +483,11 @@ src/
     producto/[slug]/            ficha de producto
     pedido/[code]/              seguimiento
     pago/retorno/               vuelta desde Flow
-    admin/(panel)/              panel (protegido)
+    admin/(panel)/              panel de administración (protegido)
+    panel/                      panel mayorista de reventa (clientes con saldo)
     api/flow/confirmar/         webhook de Flow
     api/cron/sincronizar/       actualización de estados
+    api/flow/recarga/           webhook de las recargas de saldo
   lib/
     schema.sql                  esquema de la base de datos
     pricing.ts                  motor de precios
@@ -443,6 +504,12 @@ src/
     email-templates.ts          los correos que ve el cliente
     notify.ts                   qué correo sale en cada momento del pedido
     orders.ts                   ciclo de vida de los pedidos
+    wallet.ts                   saldo de los mayoristas (libro + transacciones)
+    reseller-auth.ts            sesiones del panel de reventa
+    reseller-catalog.ts         catálogo y precios mayoristas
+    reseller-orders.ts          pedidos pagados con saldo
+    topups.ts                   recargas por Webpay y transferencia
+    tickets.ts                  soporte y solicitudes de reposición
     taxonomy.mjs                clasificación de servicios
 scripts/
   parse-catalog.mjs             listas del proveedor -> catalog.json

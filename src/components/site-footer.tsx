@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getPlatformsWithProducts } from "@/lib/catalog";
-import { getSettings } from "@/lib/settings";
+import { getSettings, getBoolSetting } from "@/lib/settings";
 import { platformLabel, sortPlatforms } from "@/lib/labels";
 
 export function SiteFooter() {
@@ -39,6 +39,9 @@ export function SiteFooter() {
           <h3 className="text-sm font-semibold text-white">Ayuda</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
             <li><Link href="/seguimiento" className="hover:text-white">Seguir mi pedido</Link></li>
+            {getBoolSetting("reseller_enabled", true) ? (
+              <li><Link href="/panel" className="hover:text-white">Panel mayorista</Link></li>
+            ) : null}
             <li><Link href="/preguntas-frecuentes" className="hover:text-white">Preguntas frecuentes</Link></li>
             <li><Link href="/terminos" className="hover:text-white">Términos y condiciones</Link></li>
             <li><Link href="/privacidad" className="hover:text-white">Política de privacidad</Link></li>

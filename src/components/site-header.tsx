@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getPlatformsWithProducts } from "@/lib/catalog";
-import { getSettings } from "@/lib/settings";
+import { getSettings, getBoolSetting } from "@/lib/settings";
 import { platformLabel, sortPlatforms } from "@/lib/labels";
 import { PlatformIcon } from "./icons";
 
@@ -34,6 +34,15 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 lg:ml-0">
+          {getBoolSetting("reseller_enabled", true) ? (
+            <Link
+              href="/panel"
+              className="hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white lg:block"
+              title="Precios de reventa con saldo"
+            >
+              Mayorista
+            </Link>
+          ) : null}
           <Link
             href="/seguimiento"
             className="hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white sm:block"

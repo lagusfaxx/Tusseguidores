@@ -8,6 +8,8 @@ import { formatDateCl } from "@/lib/utils";
 import { getSettings, getNumberSetting } from "@/lib/settings";
 import { flowConfigured } from "@/lib/flow";
 import { emailConfigured } from "@/lib/email";
+import { contarRecargasPorConfirmar } from "@/lib/topups";
+import { contarTicketsAbiertos } from "@/lib/tickets";
 import { providerConfigured, cachedBalance, refreshBalance } from "@/lib/provider";
 import type { Order } from "@/lib/types";
 
@@ -36,7 +38,19 @@ export default async function AdminDashboard() {
 
   const lowBalance = getNumberSetting("low_balance_usd", 10);
 
+  const recargasPendientes = contarRecargasPorConfirmar();
+  const ticketsAbiertos = contarTicketsAbiertos();
+
   const alerts = [
+    recargasPendientes > 0 && {
+      text: `${recargasPendientes} recarga(s) de saldo por confirmar en el panel mayorista.`,
+      href: "/admin/recargas",
+      urgente: true,
+    },
+    ticketsAbiertos > 0 && {
+      text: `${ticketsAbiertos} ticket(s) de mayoristas esperando respuesta.`,
+      href: "/admin/tickets",
+    },
     stats.transferenciasAvisadas > 0 && {
       text: `${stats.transferenciasAvisadas} cliente(s) avisaron que transfirieron y esperan tu confirmación.`,
       href: "/admin/pedidos?estado=transferencias",

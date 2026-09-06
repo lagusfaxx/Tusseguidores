@@ -278,6 +278,36 @@ export function SettingsForm({
           </p>
         </Section>
 
+        <Section
+          title="Panel mayorista"
+          hint="La sección de reventa: el cliente carga saldo y manda pedidos al costo del proveedor más un margen chico, sin los pisos de precio de la tienda."
+        >
+          <Check label="Panel mayorista activo" name="reseller_enabled"
+            checked={settings.reseller_enabled === "1"}
+            hint="Apagado, /panel deja de estar disponible y el enlace desaparece de la tienda." />
+          <Field label="Margen mayorista (%)" name="reseller_margin_percent" type="number"
+            value={settings.reseller_margin_percent}
+            hint="Sobre el costo del proveedor. 30 significa que un servicio que te cuesta $1.000 el mil se vende a $1.300 el mil. Nada que ver con el margen de la tienda: aquí no hay pisos ni ticket mínimo." />
+          <Field label="Recarga mínima (CLP)" name="reseller_min_topup_clp" type="number"
+            value={settings.reseller_min_topup_clp}
+            hint="Lo que menos puede cargar un cliente de una vez." />
+          <Field label="Cobro mínimo por pedido (CLP)" name="reseller_min_order_clp" type="number"
+            value={settings.reseller_min_order_clp}
+            hint="Piso por pedido, para que 10 unidades de algo de centavos no salgan $1." />
+          <div>
+            <label className="field-label" htmlFor="reseller_welcome">Mensaje de bienvenida</label>
+            <textarea id="reseller_welcome" name="reseller_welcome" rows={2}
+              defaultValue={settings.reseller_welcome} className="field"
+              placeholder="Ej: Cuentas verificadas en el día hábil." />
+            <p className="mt-1 text-xs text-ink-400">Se muestra al crear la cuenta.</p>
+          </div>
+          <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
+            El saldo se descuenta en el momento del pedido y queda registrado en el libro de
+            movimientos de cada cliente. Las recargas por Webpay se acreditan solas; las
+            transferencias las confirmas tú en <strong className="text-white">Recargas</strong>.
+          </p>
+        </Section>
+
         <Section title="SEO de la portada">
           <Field label="Título" name="seo_home_title" value={settings.seo_home_title} />
           <div>

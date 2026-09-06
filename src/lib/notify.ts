@@ -76,6 +76,16 @@ const ETIQUETA: Record<EmailKind, string> = {
   admin_trabado: "aviso interno de pedido sin enviar",
 };
 
+/**
+ * Los pedidos del panel mayorista no llevan correos de tienda.
+ *
+ * El mayorista manda decenas de pedidos al día y ve el estado de todos en su
+ * panel: mandarle un correo por cada uno sería castigarlo por comprar.
+ */
+function esDelPanel(order: Order): boolean {
+  return order.reseller_user_id != null;
+}
+
 /** Envía y deja constancia. Nunca lanza. */
 async function enviar(
   order: Order,
@@ -110,14 +120,17 @@ async function enviarAlAdmin(order: Order, kind: EmailKind, contenido: EmailCont
 /** Pedido por transferencia recién creado: le mandamos los datos de la cuenta. */
 export async function notificarTransferenciaPendiente(order: Order): Promise<void> {
   if (order.payment_provider !== "transferencia") return;
+  if (esDelPanel(order)) return;
   await enviar(order, "transferencia_pendiente", order.email, correoTransferenciaPendiente(order));
 }
 
 export async function notificarPagoConfirmado(order: Order): Promise<void> {
+  if (esDelPanel(order)) return;
   await enviar(order, "pago_confirmado", order.email, correoPagoConfirmado(order));
 }
 
 export async function notificarPedidoCompletado(order: Order, parcial = false): Promise<void> {
+  if (esDelPanel(order)) return;
   await enviar(order, "pedido_completado", order.email, correoPedidoCompletado(order, parcial));
 }
 
@@ -146,4 +159,22 @@ export async function notificarTransferenciaAvisada(order: Order): Promise<void>
 /** Un pedido pagado que no pudo salir al proveedor. */
 export async function notificarPedidoTrabado(order: Order, motivo: string): Promise<void> {
   await enviarAlAdmin(order, "admin_trabado", correoAdminPedidoTrabado(order, motivo));
+}
+
+/**
+ * Aviso interno suelto, sin pedido enganchado (panel mayorista: cuentas
+ * nuevas, recargas por confirmar, tickets).
+ *
+ * No pasa por `email_log` porque no hay un pedido al que colgarlo y porque
+ * cada uno nace de una acción concreta de una persona: no hay reintentos que
+ * puedan duplicarlo.
+ */
+export async function avisarAdmin(subject: string, html: string, text: string): Promise<void> {
+  const config = emailConfig();
+  if (!config.adminAlerts || !emailConfigured() || !config.admin) return;
+  try {
+    await sendEmail({ to: config.admin, subject, html, text });
+  } catch (error) {
+    console.error("[email]", error);
+  }
 }

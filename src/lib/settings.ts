@@ -61,6 +61,15 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // Aviso de cada pedido que entra, aunque todavía no esté pagado.
   email_admin_new_orders: "1",
 
+  // Panel SMM de reventa (clientes mayoristas con saldo)
+  reseller_enabled: "1",
+  // Margen sobre el costo del proveedor. Muy por debajo del de la tienda: el
+  // mayorista compra volumen y paga por adelantado.
+  reseller_margin_percent: "30",
+  reseller_min_topup_clp: "10000",
+  reseller_min_order_clp: "200",
+  reseller_welcome: "",
+
   // Flow.cl
   flow_api_key: "",
   flow_secret_key: "",

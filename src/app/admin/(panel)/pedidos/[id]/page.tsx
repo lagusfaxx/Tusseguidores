@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/order-status";
 import { getOrderById, getOrderEvents, ORDER_STATUS_LABEL } from "@/lib/orders";
-import { orderAction } from "@/app/admin/actions";
+import { orderAction, reembolsarPedido } from "@/app/admin/actions";
 import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { get } from "@/lib/db";
+import { yaReembolsado } from "@/lib/reseller-orders";
 import type { OrderStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -274,6 +275,33 @@ export default async function AdminOrderDetail({
               </select>
               <button type="submit" className="btn btn-ghost w-full text-sm">Aplicar</button>
             </form>
+
+            {order.reseller_user_id ? (
+              <div className="rounded-lg border border-white/10 bg-white/4 p-3">
+                <p className="text-xs text-ink-400">Pedido del panel mayorista</p>
+                <Link
+                  href={`/admin/mayoristas/${order.reseller_user_id}`}
+                  className="mt-1 block text-sm text-brand-300 hover:text-white"
+                >
+                  Ver la cuenta del cliente →
+                </Link>
+                {yaReembolsado(order.id) ? (
+                  <p className="mt-2 text-xs text-ink-400">Ya se le devolvió el saldo.</p>
+                ) : (
+                  <form action={reembolsarPedido} className="mt-3 space-y-2">
+                    <input type="hidden" name="order_id" value={order.id} />
+                    <input
+                      name="motivo"
+                      className="field text-xs"
+                      placeholder="Motivo (queda en su historial)"
+                    />
+                    <button type="submit" className="btn btn-ghost w-full text-sm">
+                      Devolver {formatClp(order.amount_clp)} a su saldo
+                    </button>
+                  </form>
+                )}
+              </div>
+            ) : null}
 
             <form action={orderAction} className="space-y-2">
               <input type="hidden" name="order_id" value={order.id} />
