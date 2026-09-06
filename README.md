@@ -323,9 +323,12 @@ por adelantado.
 1. Crea su cuenta en `/panel/crear-cuenta` (gratis, sin aprobación).
 2. Recarga saldo desde el mínimo configurado, por **Webpay** (se acredita solo)
    o por **transferencia** (la confirmas tú).
-3. En **Servicios** ve el catálogo completo del proveedor con el precio por
-   cada 1.000 unidades, el rango, la retención, la velocidad y la reposición de
-   cada servicio, y filtra por red, tipo o reposición.
+3. En **Servicios** entra por red y dentro de cada una encuentra sus categorías
+   plegadas, con cuántos servicios tiene y desde qué precio. Al abrir una ve los
+   doce mejores —con precio por 1.000, rango, retención, velocidad, reposición y
+   plazo— y, si quiere todos, pasa a la página de esa categoría, paginada. El
+   buscador se salta los dos pasos y busca en todo el catálogo por nombre o ID.
+   Casi dos mil servicios en una sola lista no se recorren: se abandonan.
 4. Elige uno, pega el enlace y la cantidad. El precio se calcula mientras
    escribe y el botón queda bloqueado si la cantidad está fuera de rango o el
    saldo no alcanza.

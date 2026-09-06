@@ -44,8 +44,11 @@ export default async function PanelNuevoPedido({
 
   return (
     <>
-      <Link href="/panel/servicios" className="text-sm text-ink-400 hover:text-white">
-        ← Volver al catálogo
+      <Link
+        href={`/panel/servicios?red=${service.platform}`}
+        className="text-sm text-ink-400 hover:text-white"
+      >
+        ← Volver a {platformLabel(service.platform)}
       </Link>
 
       <h1 className="mt-4 text-2xl font-bold">Nuevo pedido</h1>
