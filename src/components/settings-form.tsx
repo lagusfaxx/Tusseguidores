@@ -267,7 +267,11 @@ export function SettingsForm({
             value={settings.email_admin}
             hint="Transferencias por confirmar y pedidos pagados que no pudieron salir. Vacío = el correo de contacto." />
           <Check label="Recibir los avisos internos" name="email_admin_alerts"
-            checked={settings.email_admin_alerts === "1"} />
+            checked={settings.email_admin_alerts === "1"}
+            hint="Venta pagada, transferencia por confirmar y pedidos que no pudieron salir al proveedor." />
+          <Check label="Avisarme también de cada pedido nuevo" name="email_admin_new_orders"
+            checked={settings.email_admin_new_orders === "1"}
+            hint="Apenas entra el pedido, aunque todavía no esté pagado. Apágalo si te molestan los carritos abandonados." />
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
             Cada correo sale una sola vez por pedido, aunque el cron pase muchas veces o Flow repita
             la confirmación. Lo que se envió queda en el historial del pedido.

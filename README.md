@@ -285,8 +285,14 @@ La tienda avisa por correo en los cuatro momentos que importan, con
 | Pedido por transferencia recién creado | Cliente | Los datos de tu cuenta, el monto exacto y el código que tiene que poner como mensaje. |
 | Pago confirmado (Flow o transferencia) | Cliente | Que el pedido va en camino, con el enlace de seguimiento. |
 | Entrega terminada o parcial | Cliente | Qué se entregó y qué hacer si algo no cuadra. |
+| **Entra un pedido**, aunque no esté pagado | Tienda | Qué compraron, por cuánto, con qué forma de pago y quién. |
+| **Se confirma el pago** | Tienda | La venta, con el enlace a la ficha del pedido. |
 | El cliente avisa que transfirió | Tienda | Que hay una transferencia por revisar, con el comprobante. |
 | Un pedido pagado no pudo salir al proveedor | Tienda | El motivo (normalmente falta de saldo) y el enlace a la ficha. |
+
+Los dos avisos internos de arriba tienen su propia casilla: «Recibir los avisos
+internos» manda sobre todos, y «Avisarme también de cada pedido nuevo» apaga
+solo el primero, que es el único que llega aunque el cliente nunca pague.
 
 Tres cosas que conviene saber:
 

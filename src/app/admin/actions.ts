@@ -85,7 +85,7 @@ const SETTING_KEYS = [
   "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
   "email_enabled", "resend_api_key", "email_from", "email_reply_to", "email_admin",
-  "email_admin_alerts",
+  "email_admin_alerts", "email_admin_new_orders",
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
@@ -117,7 +117,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   // Las casillas no envían nada cuando están apagadas.
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
-    "auto_levels", "email_enabled", "email_admin_alerts",
+    "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }

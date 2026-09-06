@@ -58,6 +58,8 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // A dónde llegan los avisos internos. Vacío = el correo de contacto.
   email_admin: "",
   email_admin_alerts: "1",
+  // Aviso de cada pedido que entra, aunque todavía no esté pagado.
+  email_admin_new_orders: "1",
 
   // Flow.cl
   flow_api_key: "",

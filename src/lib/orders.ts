@@ -8,6 +8,7 @@ import { orderCode } from "./utils";
 import { pickService } from "./routing";
 import {
   notificarPagoConfirmado, notificarPedidoCompletado, notificarPedidoTrabado,
+  notificarVentaPagada,
 } from "./notify";
 import type { Order, OrderStatus } from "./types";
 
@@ -304,6 +305,7 @@ export async function markPaid(orderId: number, paymentRef: string): Promise<voi
 
   const pagado = getOrderById(orderId)!;
   await notificarPagoConfirmado(pagado);
+  await notificarVentaPagada(pagado);
 
   if (getBoolSetting("auto_send_to_provider", true)) {
     await sendToProvider(orderId);

@@ -227,6 +227,63 @@ function fichaAdmin(order: Order): string {
   return absoluteUrl(`/admin/pedidos/${order.id}`);
 }
 
+/** Entró un pedido nuevo, todavía sin pagar. */
+export function correoAdminPedidoNuevo(order: Order): EmailContent {
+  const url = fichaAdmin(order);
+  const metodo = order.payment_provider === "transferencia" ? "transferencia" : "Webpay (Flow)";
+  return {
+    subject: `Pedido nuevo · ${order.code} · ${formatClp(order.amount_clp)}`,
+    html: layout({
+      titulo: "Entró un pedido nuevo",
+      intro:
+        `Todavía sin pagar: el cliente eligió <strong>${escape(metodo)}</strong>. ` +
+        (order.payment_provider === "transferencia"
+          ? "Te avisamos de nuevo cuando diga que transfirió."
+          : "Si paga, sale solo al proveedor y te llega el aviso."),
+      filas: [...detalle(order), ["Cliente", order.email], ["Teléfono", order.phone ?? "—"]],
+      cta: { texto: "Abrir el pedido en el panel", url },
+    }),
+    text: texto([
+      `Pedido nuevo: ${order.code} por ${formatClp(order.amount_clp)} (${metodo}, sin pagar).`,
+      "",
+      `Servicio: ${order.product_name}`,
+      `Cantidad: ${formatNumber(order.quantity)}`,
+      `Destino: ${order.link}`,
+      `Cliente: ${order.email}`,
+      order.phone && `Teléfono: ${order.phone}`,
+      "",
+      url,
+    ]),
+  };
+}
+
+/** Se confirmó el pago: es la venta de verdad. */
+export function correoAdminPedidoPagado(order: Order): EmailContent {
+  const url = fichaAdmin(order);
+  return {
+    subject: `Venta pagada · ${order.code} · ${formatClp(order.amount_clp)}`,
+    html: layout({
+      titulo: "Se confirmó un pago",
+      intro:
+        order.payment_provider === "transferencia"
+          ? "Confirmaste la transferencia: el pedido sale al proveedor."
+          : "El cobro pasó por Flow y el pedido sale solo al proveedor.",
+      filas: [...detalle(order), ["Forma de pago", order.payment_provider], ["Cliente", order.email]],
+      cta: { texto: "Ver el pedido", url },
+    }),
+    text: texto([
+      `Venta pagada: ${order.code} por ${formatClp(order.amount_clp)}.`,
+      "",
+      `Servicio: ${order.product_name}`,
+      `Cantidad: ${formatNumber(order.quantity)}`,
+      `Destino: ${order.link}`,
+      `Cliente: ${order.email}`,
+      "",
+      url,
+    ]),
+  };
+}
+
 /** El cliente dice que ya transfirió: hay que revisar la cuenta. */
 export function correoAdminTransferencia(order: Order): EmailContent {
   const url = fichaAdmin(order);

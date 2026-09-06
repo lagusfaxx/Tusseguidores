@@ -330,7 +330,7 @@ export default async function ProductPage({ params }: Params) {
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
                 {related.map((item, i) => (
-                  <div key={item.id} className={i >= 2 ? "hidden sm:block" : ""}>
+                  <div key={item.id} className={"h-full " + (i >= 2 ? "hidden sm:block" : "")}>
                     <ProductCard product={item} />
                   </div>
                 ))}

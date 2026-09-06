@@ -1,7 +1,10 @@
 import "server-only";
 import { get, run } from "./db";
 import { emailConfig, emailConfigured, sendEmail, type SendEmailResult } from "./email";
+import { getBoolSetting } from "./settings";
 import {
+  correoAdminPedidoNuevo,
+  correoAdminPedidoPagado,
   correoAdminPedidoTrabado,
   correoAdminTransferencia,
   correoPagoConfirmado,
@@ -30,6 +33,8 @@ export type EmailKind =
   | "transferencia_pendiente"
   | "pago_confirmado"
   | "pedido_completado"
+  | "admin_pedido_nuevo"
+  | "admin_pedido_pagado"
   | "admin_transferencia"
   | "admin_trabado";
 
@@ -65,6 +70,8 @@ const ETIQUETA: Record<EmailKind, string> = {
   transferencia_pendiente: "datos para transferir",
   pago_confirmado: "pago confirmado",
   pedido_completado: "pedido entregado",
+  admin_pedido_nuevo: "aviso interno de pedido nuevo",
+  admin_pedido_pagado: "aviso interno de venta pagada",
   admin_transferencia: "aviso interno de transferencia",
   admin_trabado: "aviso interno de pedido sin enviar",
 };
@@ -112,6 +119,23 @@ export async function notificarPagoConfirmado(order: Order): Promise<void> {
 
 export async function notificarPedidoCompletado(order: Order, parcial = false): Promise<void> {
   await enviar(order, "pedido_completado", order.email, correoPedidoCompletado(order, parcial));
+}
+
+/**
+ * Entró un pedido, todavía sin pagar.
+ *
+ * Va aparte del resto de los avisos internos porque es el único que llega
+ * aunque el cliente no pague nunca: quien no quiera ese ruido lo apaga en
+ * Ajustes y sigue recibiendo los de la plata.
+ */
+export async function notificarPedidoNuevo(order: Order): Promise<void> {
+  if (!getBoolSetting("email_admin_new_orders", true)) return;
+  await enviarAlAdmin(order, "admin_pedido_nuevo", correoAdminPedidoNuevo(order));
+}
+
+/** Se confirmó el pago de un pedido. */
+export async function notificarVentaPagada(order: Order): Promise<void> {
+  await enviarAlAdmin(order, "admin_pedido_pagado", correoAdminPedidoPagado(order));
 }
 
 /** El cliente avisó que transfirió: hay que revisar la cuenta. */
