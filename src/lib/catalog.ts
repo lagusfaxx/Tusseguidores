@@ -1,4 +1,6 @@
 import { all, get } from "./db";
+import { levelOrder } from "./level-defs";
+import { serviceTypeOrder } from "./labels";
 import { pricingContext, priceTier } from "./pricing";
 import type { PricedTier, Product, ProviderService, Tier } from "./types";
 
@@ -117,4 +119,43 @@ export function parseJson<T>(raw: string | null | undefined, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Ordena los productos de una misma categoría como se leen: primero la
+ * escalera de niveles (económico → estándar → premium) y, dentro de cada
+ * nivel, del pack más barato al más caro.
+ *
+ * `sort_order` sirve para ordenar categorías entre sí, pero dentro de una
+ * dejaba la lista al azar: dos productos con el mismo número quedaban en el
+ * orden en que SQLite los devolviera.
+ */
+export function sortProductsForStore(products: ProductWithService[]): ProductWithService[] {
+  const desde = new Map(products.map((p) => [p.id, cheapestTier(p)?.priceClp ?? Number.MAX_SAFE_INTEGER]));
+  return [...products].sort((a, b) => {
+    const nivel = levelOrder(a.level) - levelOrder(b.level);
+    if (nivel !== 0) return nivel;
+    const precio = desde.get(a.id)! - desde.get(b.id)!;
+    if (precio !== 0) return precio;
+    return a.name.localeCompare(b.name, "es");
+  });
+}
+
+export type ServiceTypeGroup = { serviceType: string; items: ProductWithService[] };
+
+/**
+ * Agrupa los productos por tipo de servicio para pintar una sección por
+ * categoría, con las categorías en el orden de la tienda y los productos
+ * ordenados dentro de cada una.
+ */
+export function groupByServiceType(products: ProductWithService[]): ServiceTypeGroup[] {
+  const groups = new Map<string, ProductWithService[]>();
+  for (const product of products) {
+    const list = groups.get(product.service_type) ?? [];
+    list.push(product);
+    groups.set(product.service_type, list);
+  }
+  return [...groups.entries()]
+    .map(([serviceType, items]) => ({ serviceType, items: sortProductsForStore(items) }))
+    .sort((a, b) => serviceTypeOrder(a.serviceType) - serviceTypeOrder(b.serviceType));
 }

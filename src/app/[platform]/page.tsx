@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { PlatformIcon } from "@/components/icons";
-import { getPlatformsWithProducts, getProductsByPlatform } from "@/lib/catalog";
+import { getPlatformsWithProducts, getProductsByPlatform, groupByServiceType } from "@/lib/catalog";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
 import { breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { textoDeRed } from "@/lib/seo-text";
@@ -29,6 +29,9 @@ const INTRO: Record<string, string> = {
   threads: "Seguidores para tu perfil de Threads.",
   linkedin: "Seguidores para tu perfil o página de empresa en LinkedIn.",
 };
+
+/** Tarjetas que se ven de entrada en cada categoría; el resto va plegado. */
+const VISIBLES_POR_CATEGORIA = 8;
 
 function known(platform: string): boolean {
   return getPlatformsWithProducts().some((p) => p.platform === platform);
@@ -63,12 +66,9 @@ export default async function PlatformPage({ params }: Params) {
   const faqSeo = manual ? [] : generado?.faq ?? [];
 
   // Agrupamos por tipo de servicio para que la página no sea una lista plana.
-  const groups = new Map<string, typeof products>();
-  for (const product of products) {
-    const list = groups.get(product.service_type) ?? [];
-    list.push(product);
-    groups.set(product.service_type, list);
-  }
+  // El orden lo pone la tienda (seguidores primero, no lo que devuelva la base)
+  // y dentro de cada categoría los productos van por nivel y precio.
+  const grupos = groupByServiceType(products);
 
   return (
     <>
@@ -95,18 +95,62 @@ export default async function PlatformPage({ params }: Params) {
             </div>
           </div>
 
-          {[...groups.entries()].map(([type, items]) => (
-            <section key={type} className="mt-9 lg:mt-12">
-              <h2 className="text-lg font-bold sm:text-xl">
-                {serviceTypeLabel(type)} para {label}
-              </h2>
-              <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-                {items.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {grupos.length > 1 ? (
+            <nav aria-label="Categorías" className="mt-6 flex flex-wrap gap-2">
+              {grupos.map(({ serviceType, items }) => (
+                <a
+                  key={serviceType}
+                  href={`#${serviceType}`}
+                  className="rounded-full border border-white/12 bg-white/5 px-3.5 py-1.5 text-sm text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white"
+                >
+                  {serviceTypeLabel(serviceType)}
+                  <span className="ml-1.5 text-xs text-ink-400">{items.length}</span>
+                </a>
+              ))}
+            </nav>
+          ) : null}
+
+          {grupos.map(({ serviceType, items }) => {
+            // Una categoría con veinte tarjetas seguidas es media pantalla de
+            // scroll antes de llegar a la siguiente: mostramos las primeras y
+            // el resto queda detrás de un botón (sin JavaScript, así Google
+            // sigue viendo todos los productos en el HTML).
+            const visibles = items.slice(0, VISIBLES_POR_CATEGORIA);
+            const resto = items.slice(VISIBLES_POR_CATEGORIA);
+            return (
+              <section key={serviceType} id={serviceType} className="mt-9 scroll-mt-24 lg:mt-12">
+                <div className="flex items-end justify-between gap-4">
+                  <h2 className="text-lg font-bold sm:text-xl">
+                    {serviceTypeLabel(serviceType)} para {label}
+                  </h2>
+                  {items.length > 1 ? (
+                    <span className="shrink-0 text-xs text-ink-400">{items.length} opciones</span>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                  {visibles.map((product) => (
+                    <ProductCard key={product.id} product={product} />
+                  ))}
+                </div>
+                {resto.length ? (
+                  <>
+                    <input type="checkbox" id={`mas-${serviceType}`} className="peer sr-only" />
+                    <div className="mt-3 hidden gap-3 peer-checked:grid sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                      {resto.map((product) => (
+                        <ProductCard key={product.id} product={product} />
+                      ))}
+                    </div>
+                    <label
+                      htmlFor={`mas-${serviceType}`}
+                      className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-white/12 bg-white/4 px-4 py-2.5 text-sm font-semibold text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white peer-checked:hidden"
+                    >
+                      Ver las otras {resto.length} opciones de {serviceTypeLabel(serviceType).toLowerCase()}
+                    </label>
+                  </>
+                ) : null}
+              </section>
+            );
+          })}
 
           {cuerpoSeo ? (
             <section className="mt-12 border-t border-white/8 pt-10 lg:mt-16 lg:pt-12">

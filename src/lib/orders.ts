@@ -173,6 +173,108 @@ export function setStatus(orderId: number, status: OrderStatus, message?: string
   if (message) logEvent(orderId, status, message);
 }
 
+/**
+ * Estados que solo pueden existir si el pedido está pagado.
+ *
+ * Cambiar el estado a mano y dejar el pago en "pendiente" dejaba el pedido en
+ * un limbo: no aparecía el botón de enviar, `sendToProvider` lo rechazaba por
+ * no estar pagado y el reintento automático tampoco lo tomaba. Es decir, se
+ * quedaba pendiente de envío para siempre.
+ */
+const ESTADOS_PAGADOS: OrderStatus[] = ["paid", "processing", "completed", "partial"];
+
+/** Marca el pago a mano sin tocar el estado ni despachar nada. */
+function marcarPagadoSinEnviar(orderId: number, motivo: string) {
+  run(
+    `UPDATE orders
+        SET payment_status = 'paid',
+            payment_ref = COALESCE(payment_ref, 'manual'),
+            paid_at = COALESCE(paid_at, datetime('now')),
+            updated_at = datetime('now')
+      WHERE id = ?`,
+    [orderId],
+  );
+  logEvent(orderId, "paid", motivo);
+}
+
+/**
+ * Cambio de estado hecho a mano desde el panel.
+ *
+ * Además de guardar el estado, sincroniza el pago (un pedido "En proceso" no
+ * puede estar impago) y, si queda pagado y sin despachar, lo manda al
+ * proveedor en el mismo gesto. Devuelve el resultado del envío cuando lo hubo,
+ * para poder mostrar el error en pantalla en vez de tragárselo.
+ */
+export async function setStatusManual(
+  orderId: number,
+  status: OrderStatus,
+): Promise<SendResult | null> {
+  const order = getOrderById(orderId);
+  if (!order) return { ok: false, error: "Pedido no encontrado." };
+
+  if (ESTADOS_PAGADOS.includes(status) && order.payment_status !== "paid") {
+    marcarPagadoSinEnviar(
+      orderId,
+      `Pago dado por recibido a mano al cambiar el estado a "${ORDER_STATUS_LABEL[status]}".`,
+    );
+  }
+  setStatus(orderId, status, `Estado cambiado a mano desde el panel: ${ORDER_STATUS_LABEL[status]}.`);
+
+  // Poner "En proceso", "Entrega parcial" o "Completado" en un pedido que
+  // nunca salió del panel solo puede significar que lo despachaste tú: se
+  // registra como envío manual para que deje de figurar como pendiente.
+  if (
+    ["processing", "completed", "partial"].includes(status) &&
+    !order.provider_order_id &&
+    !order.manual_dispatch_at
+  ) {
+    markDispatchedManually(orderId);
+    return null;
+  }
+
+  // "Pagado" es justamente el estado de "pagado y todavía sin enviar": si no
+  // salió nunca, lo intentamos ahora.
+  const fresh = getOrderById(orderId)!;
+  if (
+    status === "paid" &&
+    !fresh.provider_order_id &&
+    !fresh.manual_dispatch_at &&
+    getBoolSetting("auto_send_to_provider", true)
+  ) {
+    return await sendToProvider(orderId);
+  }
+  return null;
+}
+
+/**
+ * Deja constancia de que el pedido lo despachaste tú, fuera del panel.
+ *
+ * Sirve para los pedidos que se le pasan al proveedor a mano (o que se
+ * entregan por otra vía): sin esto quedaban para siempre en "pagados sin
+ * enviar" y el cron seguía intentando mandarlos.
+ */
+export function markDispatchedManually(orderId: number, referencia?: string): void {
+  const order = getOrderById(orderId);
+  if (!order) return;
+  if (order.payment_status !== "paid") {
+    marcarPagadoSinEnviar(orderId, "Pago dado por recibido a mano al registrar el envío manual.");
+  }
+  run(
+    `UPDATE orders
+        SET manual_dispatch_at = COALESCE(manual_dispatch_at, datetime('now')),
+            provider_error = NULL,
+            status = CASE WHEN status IN ('pending', 'paid') THEN 'processing' ELSE status END,
+            updated_at = datetime('now')
+      WHERE id = ?`,
+    [orderId],
+  );
+  logEvent(
+    orderId,
+    "sent",
+    `Enviado a mano, fuera del panel${referencia ? ` (${referencia})` : ""}. Ya no cuenta como pendiente de envío.`,
+  );
+}
+
 /** Marca el pedido como pagado y, si corresponde, lo envía al proveedor. */
 export async function markPaid(orderId: number, paymentRef: string): Promise<void> {
   const order = getOrderById(orderId);
@@ -246,7 +348,16 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
   const order = getOrderById(orderId);
   if (!order) return { ok: false, error: "Pedido no encontrado." };
   if (order.provider_order_id) return { ok: true, providerOrderId: order.provider_order_id };
-  if (order.payment_status !== "paid") return { ok: false, error: "El pedido aún no está pagado." };
+  if (order.manual_dispatch_at) {
+    return { ok: false, error: "Este pedido figura como enviado a mano: no se vuelve a mandar al proveedor." };
+  }
+  if (order.payment_status !== "paid") {
+    return {
+      ok: false,
+      error:
+        "El pedido aún no está pagado. Confirma el pago (o cambia el estado a “Pagado”) y vuelve a intentarlo.",
+    };
+  }
   if (!providerConfigured()) {
     const message = "Falta configurar la API key del proveedor.";
     run("UPDATE orders SET provider_error = ?, updated_at = datetime('now') WHERE id = ?", [message, orderId]);
@@ -308,6 +419,7 @@ export function undispatchedOrders(limit = 100): Order[] {
     `SELECT * FROM orders
       WHERE payment_status = 'paid'
         AND provider_order_id IS NULL
+        AND manual_dispatch_at IS NULL
         AND status NOT IN ('canceled', 'refunded')
       ORDER BY paid_at ASC LIMIT ?`,
     [limit],
@@ -433,16 +545,19 @@ export function orderStats() {
     sinEnviar: get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM orders
         WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND manual_dispatch_at IS NULL
           AND status NOT IN ('canceled', 'refunded')`,
     )?.n ?? 0,
     sinEnviarClp: get<{ v: number }>(
       `SELECT COALESCE(SUM(amount_clp), 0) AS v FROM orders
         WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND manual_dispatch_at IS NULL
           AND status NOT IN ('canceled', 'refunded')`,
     )?.v ?? 0,
     sinSaldo: get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM orders
         WHERE payment_status = 'paid' AND provider_order_id IS NULL
+          AND manual_dispatch_at IS NULL
           AND provider_error IS NOT NULL
           AND (provider_error LIKE '%funds%' OR provider_error LIKE '%balance%'
                OR provider_error LIKE '%saldo%' OR provider_error LIKE '%insufficient%')`,

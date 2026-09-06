@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
-import { getPublishedProducts } from "@/lib/catalog";
+import { getPublishedProducts, groupByServiceType } from "@/lib/catalog";
 import { platformLabel, sortPlatforms } from "@/lib/labels";
 import { buildMetadata } from "@/lib/seo";
 
@@ -55,7 +55,11 @@ export default function CatalogPage() {
                 </Link>
               </div>
               {(() => {
-                const items = products.filter((product) => product.platform === p.platform);
+                // Mismo orden que la página de la red: las categorías salen
+                // agrupadas y en el orden de la tienda, no como venga la base.
+                const items = groupByServiceType(
+                  products.filter((product) => product.platform === p.platform),
+                ).flatMap((grupo) => grupo.items);
                 return (
                   <>
                     <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
