@@ -77,7 +77,7 @@ export default async function PanelTicketDetalle({ params }: { params: Promise<{
         </form>
       ) : (
         <p className="mt-6 rounded-lg border border-white/10 bg-white/4 px-4 py-3 text-sm text-ink-400">
-          Este ticket está cerrado. Si el problema sigue, abre uno nuevo.
+          Ticket cerrado. Si el problema sigue, abre uno nuevo.
         </p>
       )}
     </div>

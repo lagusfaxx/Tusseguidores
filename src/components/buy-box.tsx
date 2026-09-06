@@ -249,7 +249,7 @@ export function BuyBox(props: Props) {
           />
           <p className="mt-1.5 text-xs text-ink-400">
             {props.transferencia
-              ? "Lo usamos para identificar tu pedido. Tu código de seguimiento te lo mostramos apenas termines."
+              ? "Para identificar tu pedido."
               : "Flow te manda ahí el comprobante del pago. Tu código de seguimiento te lo mostramos apenas termines."}
           </p>
         </div>
@@ -293,12 +293,12 @@ export function BuyBox(props: Props) {
       <ul className="mt-4 space-y-1.5 text-xs text-ink-400">
         <li className="flex items-center gap-1.5">
           <LockIcon className="h-3.5 w-3.5 text-lime-400" />
-          Webpay procesa el pago al instante y tu pedido sale solo
+          Webpay cobra al instante y el pedido sale solo
         </li>
         {props.transferencia ? (
           <li className="flex items-center gap-1.5">
             <CheckIcon className="h-3.5 w-3.5 text-lime-400" />
-            Por transferencia te damos los datos y confirmamos en cuanto llegue
+            Por transferencia te damos los datos
           </li>
         ) : null}
         <li className="flex items-center gap-1.5"><CheckIcon className="h-3.5 w-3.5 text-lime-400" /> Nunca pedimos tu contraseña</li>

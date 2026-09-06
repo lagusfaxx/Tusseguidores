@@ -27,10 +27,11 @@ export default async function PanelHome() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Hola{user.name ? `, ${user.name}` : ""}</h1>
-          <p className="mt-1 text-sm text-ink-400">
-            Precio mayorista, muy por debajo del de la tienda
-            {user.discount_percent > 0 ? `, con tu descuento del ${user.discount_percent}%` : ""}.
-          </p>
+          {user.discount_percent > 0 ? (
+            <p className="mt-1 text-sm text-ink-400">
+              Tienes un {user.discount_percent}% de descuento sobre el precio mayorista.
+            </p>
+          ) : null}
         </div>
         <div className="flex w-full gap-2 sm:w-auto">
           <Link href="/panel/servicios" className="btn btn-primary flex-1 text-sm sm:flex-none">
@@ -60,9 +61,8 @@ export default async function PanelHome() {
 
       {user.balance_clp <= 0 ? (
         <p className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-          Todavía no tienes saldo. Recarga desde {formatClp(ctx.minTopupClp)} y empieza a mandar
-          pedidos: se descuentan solos de tu saldo.{" "}
-          <Link href="/panel/saldo" className="font-semibold underline">Recargar ahora</Link>
+          No tienes saldo. Recarga desde {formatClp(ctx.minTopupClp)} para empezar a pedir.{" "}
+          <Link href="/panel/saldo" className="font-semibold underline">Recargar</Link>
         </p>
       ) : null}
 
@@ -112,8 +112,8 @@ export default async function PanelHome() {
             ))}
             {ultimos.length === 0 ? (
               <p className="p-6 text-center text-sm text-ink-400">
-                Todavía no has hecho pedidos.{" "}
-                <Link href="/panel/servicios" className="text-brand-300">Mira el catálogo</Link>
+                Sin pedidos.{" "}
+                <Link href="/panel/servicios" className="text-brand-300">Ver el catálogo</Link>
               </p>
             ) : null}
           </div>
@@ -142,7 +142,7 @@ export default async function PanelHome() {
               </div>
             ))}
             {ultimosMovimientos.length === 0 ? (
-              <p className="p-6 text-center text-sm text-ink-400">Sin movimientos todavía.</p>
+              <p className="p-6 text-center text-sm text-ink-400">Sin movimientos.</p>
             ) : null}
           </div>
         </section>

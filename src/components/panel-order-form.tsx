@@ -90,8 +90,7 @@ export function PanelOrderForm({
             placeholder={"Muy bueno\nMe encantó\n..."}
           />
           <p className="mt-1 text-xs text-ink-400">
-            {lineas} comentario{lineas === 1 ? "" : "s"} · el servicio acepta entre{" "}
-            {minQty.toLocaleString("es-CL")} y {maxQty.toLocaleString("es-CL")}.
+            {lineas} de {minQty.toLocaleString("es-CL")} a {maxQty.toLocaleString("es-CL")}
           </p>
           {/* El servidor cuenta las líneas; este campo va solo para que el
               formulario tenga siempre una cantidad válida. */}
@@ -110,7 +109,7 @@ export function PanelOrderForm({
             onChange={(e) => setCantidad(e.target.value)}
           />
           <p className="mt-1 text-xs text-ink-400">
-            Entre {minQty.toLocaleString("es-CL")} y {maxQty.toLocaleString("es-CL")} unidades.
+            De {minQty.toLocaleString("es-CL")} a {maxQty.toLocaleString("es-CL")}
           </p>
         </>
       )}
@@ -118,7 +117,7 @@ export function PanelOrderForm({
       <div className="mt-5 rounded-xl border border-white/10 bg-white/4 p-4">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <p className="text-xs text-ink-400">Se descuenta de tu saldo</p>
+            <p className="text-xs text-ink-400">Total</p>
             <p className="text-2xl font-extrabold tracking-tight">{clp(precio)}</p>
           </div>
           <div className="text-right text-xs text-ink-400">
@@ -128,14 +127,11 @@ export function PanelOrderForm({
         </div>
         {fueraDeRango ? (
           <p className="mt-3 text-xs text-amber-300">
-            La cantidad tiene que estar entre {minQty.toLocaleString("es-CL")} y{" "}
-            {maxQty.toLocaleString("es-CL")}.
+            Fuera de rango: de {minQty.toLocaleString("es-CL")} a {maxQty.toLocaleString("es-CL")}.
           </p>
         ) : null}
         {sinSaldo && unidades > 0 ? (
-          <p className="mt-3 text-xs text-amber-300">
-            Te falta saldo para este pedido. Recarga y vuelve a intentarlo.
-          </p>
+          <p className="mt-3 text-xs text-amber-300">Te falta saldo.</p>
         ) : null}
       </div>
 
@@ -158,9 +154,8 @@ export function PanelOrderForm({
         <PanelFeedback state={state} />
       </div>
 
-      <p className="mt-3 text-xs leading-relaxed text-ink-400">
-        El pedido entra a entrega al instante. Revisa el enlace antes de enviarlo: una vez
-        despachado no se puede cambiar el destino.
+      <p className="mt-3 text-xs text-ink-400">
+        Revisa el enlace: una vez despachado no se puede cambiar.
       </p>
     </form>
   );

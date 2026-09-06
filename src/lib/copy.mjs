@@ -262,7 +262,7 @@ export function buildCopy({ platform, type, orderKind = "default" }) {
     `<h2>Qué incluye</h2>`,
     `<ul>${bullets.map((b) => `<li>${b}</li>`).join("")}</ul>`,
     `<h2>Antes de comprar</h2>`,
-    `<p>Revisa que tu cuenta esté pública y que el enlace que entregas sea el correcto: una vez enviado el pedido al sistema de entrega no se puede cambiar el destino. Si tienes dudas, escríbenos antes de pagar y te ayudamos.</p>`,
+    `<p>La cuenta tiene que estar pública y el enlace bien escrito: una vez enviado el pedido no se puede cambiar el destino.</p>`,
   ].join("\n");
 
   const seoTitle = custom

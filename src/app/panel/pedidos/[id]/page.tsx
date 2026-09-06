@@ -57,7 +57,7 @@ export default async function PanelPedidoDetalle({
 
       {nuevo ? (
         <p className="mt-4 rounded-lg border border-lime-500/30 bg-lime-500/10 px-4 py-2.5 text-sm text-lime-200">
-          Pedido creado y descontado de tu saldo.
+          Pedido creado.
         </p>
       ) : null}
       {error ? (
@@ -67,8 +67,8 @@ export default async function PanelPedidoDetalle({
       ) : null}
       {enCola ? (
         <p className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-100">
-          El pedido está en cola: todavía no entró a entrega y se reintenta solo cada pocos
-          minutos. Si no alcanza a salir, te devolvemos el saldo completo.
+          En cola: todavía no entra a entrega. Se reintenta solo; si no sale, te devolvemos el
+          saldo.
         </p>
       ) : null}
 
@@ -115,7 +115,7 @@ export default async function PanelPedidoDetalle({
 
           {yaReembolsado(order.id) ? (
             <p className="mt-4 rounded-lg border border-white/10 bg-white/4 px-3 py-2 text-xs text-ink-200">
-              Este pedido fue reembolsado a tu saldo.
+              Reembolsado a tu saldo.
             </p>
           ) : null}
         </section>
@@ -125,9 +125,8 @@ export default async function PanelPedidoDetalle({
             <form action={accionPedirReposicion} className="card p-5">
               <input type="hidden" name="order_id" value={order.id} />
               <h2 className="font-bold">Pedir reposición</h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink-400">
-                Este servicio incluye reposición. Cuéntanos qué pasó y lo reponemos; te
-                respondemos en el ticket.
+              <p className="mt-1.5 text-sm text-ink-400">
+                Cuéntanos qué pasó y te respondemos en el ticket.
               </p>
               <textarea
                 name="detalle"
@@ -145,7 +144,7 @@ export default async function PanelPedidoDetalle({
             <div className="card p-5">
               <h2 className="font-bold">Reposición solicitada</h2>
               <p className="mt-1.5 text-sm text-ink-400">
-                Sigue la respuesta en el ticket{" "}
+                Ticket{" "}
                 <Link href={`/panel/tickets/${ticketAbierto.code}`} className="text-brand-300 hover:text-white">
                   {ticketAbierto.code}
                 </Link>
@@ -156,9 +155,7 @@ export default async function PanelPedidoDetalle({
 
           <div className="card p-5">
             <h2 className="font-bold">¿Algo no cuadra?</h2>
-            <p className="mt-1.5 text-sm leading-relaxed text-ink-400">
-              Abre un ticket con el pedido enganchado y lo revisamos.
-            </p>
+            <p className="mt-1.5 text-sm text-ink-400">Abre un ticket y lo revisamos.</p>
             <Link
               href={`/panel/tickets?pedido=${order.id}`}
               className="btn btn-ghost mt-4 w-full text-sm"

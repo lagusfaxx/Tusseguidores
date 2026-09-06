@@ -17,7 +17,7 @@ export default async function PanelRegistroPage() {
     <div className="mx-auto max-w-md py-6">
       <h1 className="text-2xl font-extrabold tracking-tight">Crear cuenta mayorista</h1>
       <p className="mt-2 text-sm text-ink-200">
-        Es gratis. Solo pagas cuando cargas saldo, desde {formatClp(ctx.minTopupClp)}.
+        Gratis. Recargas desde {formatClp(ctx.minTopupClp)}.
       </p>
       {bienvenida ? (
         <p className="mt-4 rounded-lg border border-white/10 bg-white/4 px-4 py-3 text-sm text-ink-200">
@@ -28,7 +28,7 @@ export default async function PanelRegistroPage() {
       <div className="card mt-6 p-6">
         <PanelForm action={accionRegistrar} submitLabel="Crear mi cuenta" pendiente="Creando…">
           <label className="field-label" htmlFor="name">Nombre</label>
-          <input id="name" name="name" required className="field" placeholder="Cómo te llamamos" />
+          <input id="name" name="name" required className="field" />
 
           <label className="field-label mt-4" htmlFor="email">Correo</label>
           <input id="email" name="email" type="email" required autoComplete="username" className="field" />

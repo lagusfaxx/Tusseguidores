@@ -38,18 +38,15 @@ export default async function PanelSaldoPage({
   return (
     <>
       <h1 className="text-2xl font-bold">Saldo</h1>
-      <p className="mt-1 text-sm text-ink-400">
-        Tu saldo se descuenta con cada pedido. Recarga mínima: {formatClp(ctx.minTopupClp)}.
-      </p>
 
       {pagada ? (
         <p className="mt-4 rounded-lg border border-lime-500/30 bg-lime-500/10 px-4 py-2.5 text-sm text-lime-200">
-          Recarga acreditada. Ya puedes mandar pedidos.
+          Recarga acreditada.
         </p>
       ) : null}
       {aviso ? (
         <p className="mt-4 rounded-lg border border-lime-500/30 bg-lime-500/10 px-4 py-2.5 text-sm text-lime-200">
-          Gracias, avisamos al equipo. Revisamos la transferencia y acreditamos el saldo.
+          Aviso recibido. Revisamos la transferencia y acreditamos el saldo.
         </p>
       ) : null}
 
@@ -66,8 +63,7 @@ export default async function PanelSaldoPage({
             <h2 className="font-bold">Recargar</h2>
             {formas.length === 0 ? (
               <p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-100">
-                No hay ninguna forma de pago configurada todavía. Escríbenos y cargamos tu saldo a
-                mano.
+                No hay formas de pago disponibles. Escríbenos y cargamos tu saldo.
               </p>
             ) : (
             <PanelForm
@@ -94,14 +90,11 @@ export default async function PanelSaldoPage({
                   <p className="field bg-white/3">{formas[0].etiqueta}</p>
                 </>
               )}
-              <p className="mt-1 text-xs text-ink-400">
-                {flowConfigured()
-                  ? "Con Webpay el saldo se acredita solo apenas se confirma el pago. "
-                  : ""}
-                {transferenciaDisponible()
-                  ? "Por transferencia lo acreditamos al revisar la cuenta."
-                  : ""}
-              </p>
+              {transferenciaDisponible() ? (
+                <p className="mt-1 text-xs text-ink-400">
+                  Por transferencia el saldo se acredita cuando confirmamos el pago.
+                </p>
+              ) : null}
             </PanelForm>
             )}
           </div>
@@ -110,8 +103,7 @@ export default async function PanelSaldoPage({
             <div className="card p-6">
               <h2 className="font-bold">Transfiere {formatClp(pendiente.amount_clp)}</h2>
               <p className="mt-1.5 text-sm text-ink-400">
-                Pon <strong className="font-mono text-white">{pendiente.code}</strong> como mensaje
-                para que podamos identificarla.
+                Mensaje: <strong className="font-mono text-white">{pendiente.code}</strong>
               </p>
               <dl className="mt-4 space-y-2 text-sm">
                 {[
@@ -141,7 +133,7 @@ export default async function PanelSaldoPage({
               <form action={accionAvisarTransferencia} className="mt-5">
                 <input type="hidden" name="topup_id" value={pendiente.id} />
                 <label className="field-label" htmlFor="referencia">
-                  Número de comprobante (opcional)
+                  N.º de comprobante (opcional)
                 </label>
                 <input id="referencia" name="referencia" className="field" />
                 <div className="mt-3">
@@ -210,7 +202,7 @@ export default async function PanelSaldoPage({
                 </div>
               ))}
               {historial.length === 0 ? (
-                <p className="p-8 text-center text-sm text-ink-400">Sin movimientos todavía.</p>
+                <p className="p-8 text-center text-sm text-ink-400">Sin movimientos.</p>
               ) : null}
             </div>
           </section>

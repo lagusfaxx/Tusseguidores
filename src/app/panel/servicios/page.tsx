@@ -158,12 +158,7 @@ export default async function PanelServiciosPage({
 
   const cabecera = (
     <div className="flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-2xl font-bold">Servicios</h1>
-        <p className="mt-1 text-sm text-ink-400">
-          Precio por cada 1.000 unidades. En el pedido se cobra la cantidad exacta.
-        </p>
-      </div>
+      <h1 className="text-2xl font-bold">Servicios</h1>
       <span className="hidden rounded-lg border border-white/12 bg-white/6 px-3 py-1.5 text-sm sm:inline-block">
         Saldo: <strong className="text-lime-400">{formatClp(user.balance_clp)}</strong>
       </span>
@@ -185,7 +180,7 @@ export default async function PanelServiciosPage({
         <p className="mt-4 text-sm text-ink-400">
           {formatNumber(total)} resultado{total === 1 ? "" : "s"} para «{q}»
           {red ? ` en ${platformLabel(red)}` : ""}
-          {total > MAX_BUSQUEDA ? ` · mostrando los ${MAX_BUSQUEDA} mejores` : ""}
+          {total > MAX_BUSQUEDA ? ` · se muestran ${MAX_BUSQUEDA}` : ""}
         </p>
 
         <div className="card mt-3 overflow-hidden">
@@ -193,9 +188,7 @@ export default async function PanelServiciosPage({
             <Fila key={s.service_id} s={s} mostrarRed />
           ))}
           {resultados.length === 0 ? (
-            <p className="p-10 text-center text-sm text-ink-400">
-              No encontramos servicios con ese texto.
-            </p>
+            <p className="p-10 text-center text-sm text-ink-400">Sin resultados.</p>
           ) : null}
         </div>
       </>
@@ -318,8 +311,7 @@ export default async function PanelServiciosPage({
                     href={`/panel/servicios?red=${red}&cat=${grupo.serviceType}`}
                     className="flex items-center justify-center gap-1.5 border-t border-white/6 px-4 py-3 text-sm font-semibold text-brand-300 hover:bg-white/4 hover:text-white"
                   >
-                    Ver los {formatNumber(grupo.total)} de{" "}
-                    {serviceTypeLabel(grupo.serviceType).toLowerCase()} →
+                    Ver los {formatNumber(grupo.total)} →
                   </Link>
                 ) : null}
               </div>
@@ -343,8 +335,7 @@ export default async function PanelServiciosPage({
       </div>
 
       <p className="mt-5 text-sm text-ink-400">
-        {formatNumber(totalServicios)} servicios en {redes.length} redes. Elige una para ver sus
-        categorías.
+        {formatNumber(totalServicios)} servicios en {redes.length} redes
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -310,9 +310,8 @@ export default async function ProductPage({ params }: Params) {
                 <aside className="card mt-8 flex flex-wrap items-center justify-between gap-4 p-5">
                   <div>
                     <h2 className="font-bold">¿Compras seguido o revendes?</h2>
-                    <p className="mt-1 max-w-lg text-sm leading-relaxed text-ink-400">
-                      En el panel mayorista pides el mismo servicio a precio de mayorista, cargando
-                      saldo por adelantado.
+                    <p className="mt-1 max-w-lg text-sm text-ink-400">
+                      El mismo servicio a precio de mayorista, pagando con saldo.
                     </p>
                   </div>
                   <Link href="/panel" className="btn btn-ghost shrink-0 text-sm">

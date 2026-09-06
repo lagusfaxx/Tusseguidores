@@ -68,7 +68,7 @@ export default async function PanelNuevoPedido({
 
         <aside className="card p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">
-            Qué estás comprando
+            Detalle
           </h2>
           <dl className="mt-4 space-y-3 text-sm">
             {[
@@ -105,8 +105,7 @@ export default async function PanelNuevoPedido({
 
           {service.refill_days > 0 || service.refill === 1 ? (
             <p className="mt-4 text-xs leading-relaxed text-ink-400">
-              Si bajan dentro del plazo, pides la reposición desde la ficha del pedido y la
-              reponemos sin costo.
+              Si bajan dentro del plazo, pides la reposición desde el pedido.
             </p>
           ) : null}
         </aside>

@@ -27,27 +27,27 @@ export function generateMetadata(): Metadata {
 const HOME_FAQ = [
   {
     q: "¿Me pueden cerrar la cuenta?",
-    a: "No hemos tenido casos. Nunca entramos a tu cuenta ni te pedimos la clave: la entrega se hace desde afuera, como si esas personas te hubieran encontrado solas. Lo que sí te recomendamos es no pedir 10.000 seguidores para una cuenta que tiene 200: se nota.",
+    a: "No hemos tenido casos. Nunca entramos a tu cuenta ni te pedimos la clave. Eso sí: no pidas 10.000 seguidores para una cuenta que tiene 200, se nota.",
   },
   {
     q: "¿Cuánto se demora?",
-    a: "La mayoría parte antes de 10 minutos. Cada producto dice su tiempo estimado arriba del botón de pago, y ese tiempo sale del servicio que efectivamente vamos a usar, no de un promedio inventado.",
+    a: "La mayoría parte antes de 10 minutos. Cada producto dice su tiempo estimado arriba del botón de pago.",
   },
   {
     q: "¿Con qué puedo pagar?",
-    a: "Webpay (crédito y débito), transferencia y Mercado Pago. Todo pasa por Flow, así que los datos de tu tarjeta no llegan nunca a nosotros.",
+    a: "Webpay, transferencia y Mercado Pago, todo por Flow. Los datos de tu tarjeta no pasan por nosotros.",
   },
   {
     q: "¿Los seguidores se caen?",
-    a: "Algunos sí, en todas las plataformas pasa. Por eso los packs marcados con reposición los reponemos gratis dentro del plazo que indican. Si tu pedido no llega, te devolvemos la plata completa.",
+    a: "Algunos sí, pasa en todas las plataformas. Los packs con reposición los reponemos gratis dentro del plazo que indican. Si tu pedido no llega, te devolvemos la plata.",
   },
   {
     q: "¿Necesito tener la cuenta pública?",
-    a: "Sí, durante toda la entrega. Si la pones privada a mitad de camino el pedido queda incompleto y no alcanzamos a arreglarlo.",
+    a: "Sí, durante toda la entrega. Si la pones privada a mitad de camino el pedido queda incompleto.",
   },
   {
     q: "Me equivoqué en el enlace",
-    a: "Escríbenos altiro con tu código de pedido. Si todavía no sale a entrega lo corregimos; si ya salió, no hay vuelta atrás.",
+    a: "Escríbenos altiro con tu código. Si todavía no sale a entrega lo corregimos; si ya salió, no hay vuelta atrás.",
   },
 ];
 
@@ -91,8 +91,8 @@ export default function HomePage() {
                 </h1>
 
                 <p className="mt-5 text-lg leading-relaxed text-ink-200">
-                  Eliges cuántos quieres, pagas con Webpay o transferencia y empiezan a llegar
-                  en minutos. No te pedimos la clave: con tu usuario basta.
+                  Eliges cuántos quieres, pagas y empiezan a llegar en minutos. Sin contraseñas:
+                  con tu usuario basta.
                 </p>
 
                 <div className="mt-7 flex flex-wrap items-center gap-3">
@@ -158,17 +158,14 @@ export default function HomePage() {
         <div className="border-b border-white/8 bg-ink-900/50">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-5 px-4 py-6 lg:grid-cols-4">
             {[
-              [<LockIcon key="i" className="h-4 w-4" />, "Sin contraseñas", "Solo tu usuario o el enlace."],
-              [<BoltIcon key="i" className="h-4 w-4" />, "Entrega en minutos", "Sale solo apenas se paga."],
-              [<ShieldIcon key="i" className="h-4 w-4" />, "Reposición gratis", "En los packs que la indican."],
-              [<CheckIcon key="i" className="h-4 w-4" />, "Pago seguro", "Webpay, transferencia y Mercado Pago."],
-            ].map(([icono, titulo, texto]) => (
-              <div key={String(titulo)} className="flex gap-2.5">
-                <span className="mt-0.5 shrink-0 text-brand-300">{icono}</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold leading-tight text-white">{titulo}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-ink-400">{texto}</p>
-                </div>
+              [<LockIcon key="i" className="h-4 w-4" />, "Sin contraseñas"],
+              [<BoltIcon key="i" className="h-4 w-4" />, "Entrega en minutos"],
+              [<ShieldIcon key="i" className="h-4 w-4" />, "Reposición gratis"],
+              [<CheckIcon key="i" className="h-4 w-4" />, "Webpay y transferencia"],
+            ].map(([icono, titulo]) => (
+              <div key={String(titulo)} className="flex items-center gap-2.5">
+                <span className="shrink-0 text-brand-300">{icono}</span>
+                <p className="text-sm font-medium text-ink-200">{titulo}</p>
               </div>
             ))}
           </div>
@@ -177,13 +174,7 @@ export default function HomePage() {
         {/* -------------------------------------------------------- Catálogo */}
         <section id="catalogo" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:py-16">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo que más se vende</h2>
-              <p className="mt-2 max-w-xl text-sm text-ink-400">
-                Los packs que más salen, con su precio final y el tiempo de entrega real del
-                servicio que vamos a usar.
-              </p>
-            </div>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo que más se vende</h2>
             <Link
               href="/catalogo"
               className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3.5 py-2 text-sm font-semibold text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white sm:inline-flex"
@@ -221,10 +212,10 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Cómo se compra</h2>
             <ol className="mt-7 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {[
-                ["Eliges el pack", "La red, el servicio y cuántos quieres. Los precios ya están con IVA."],
-                ["Pegas tu usuario", "O el enlace de la publicación, según el servicio. Y tu correo."],
-                ["Pagas", "Webpay, transferencia o Mercado Pago. El pedido sale solo apenas se confirma."],
-                ["Sigues el avance", "Te llega un código tipo TS-7K2F9Q para ver cómo va cuando quieras."],
+                ["Eliges el pack", "La red, el servicio y la cantidad."],
+                ["Pegas tu usuario", "O el enlace de la publicación, y tu correo."],
+                ["Pagas", "Webpay, transferencia o Mercado Pago."],
+                ["Sigues el avance", "Con tu código de pedido, cuando quieras."],
               ].map(([title, text], i) => (
                 <li key={title} className="card h-full p-4 sm:p-5">
                   <span className="inline-grid h-7 w-7 place-items-center rounded-lg bg-brand-500/20 font-mono text-xs font-bold text-brand-300">
@@ -242,10 +233,10 @@ export default function HomePage() {
                 <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo que no hacemos</h2>
                 <div className="mt-6 grid grid-cols-2 gap-3">
                   {[
-                    ["No te pedimos la clave.", "Ni ahora ni después. Si alguna vez te la piden para esto, no es un buen lugar para comprar."],
-                    ["No prometemos que nadie se caiga.", "Se cae gente en todas las plataformas. Lo que sí hacemos es reponerla gratis en los packs que lo indican."],
-                    ["No vendemos interacción real.", "Esto sube números y da empuje inicial. Los comentarios de verdad los tiene que ganar tu contenido."],
-                    ["No trabajamos con cuentas privadas.", "Tiene que estar pública mientras dure la entrega, si no el sistema no llega."],
+                    ["No te pedimos la clave.", "Ni ahora ni después."],
+                    ["No prometemos que nadie se caiga.", "Pasa en todas las plataformas. Por eso reponemos gratis en los packs que lo indican."],
+                    ["No vendemos interacción real.", "Esto sube números. Los comentarios los gana tu contenido."],
+                    ["No trabajamos con cuentas privadas.", "Tiene que estar pública mientras dure la entrega."],
                   ].map(([titulo, texto]) => (
                     <div key={titulo} className="rounded-xl border border-white/8 bg-white/3 p-3.5 sm:p-4">
                       <p className="text-[13px] font-semibold leading-snug text-white sm:text-sm">{titulo}</p>
@@ -257,10 +248,7 @@ export default function HomePage() {
 
               <div className="card flex flex-col justify-center p-6">
                 <h3 className="text-lg font-bold">¿Dudas antes de pagar?</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-400">
-                  Contestamos el mismo día. Si no sabes qué pack te conviene, cuéntanos tu cuenta y
-                  te decimos.
-                </p>
+                <p className="mt-2 text-sm text-ink-400">Contestamos el mismo día.</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   {whatsapp ? (
                     <a

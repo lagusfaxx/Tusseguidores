@@ -331,22 +331,19 @@ export function textoDePortada(): string | null {
       `Tenemos ${precios.length} servicios repartidos en ${filas.length} redes —${esc(listaRedes)}— ` +
       `desde ${formatClp(barato.clp)}. Pagas con Webpay, transferencia o Mercado Pago a través de Flow, ` +
       `y la entrega empieza sola apenas se confirma el pago.</p>`,
-    `<p>No pedimos contraseñas ni acceso a tus cuentas: con tu usuario o el enlace público basta. ` +
-      `Eso significa que puedes seguir usando tu cuenta con normalidad mientras se entrega el pedido.</p>`,
+    `<p>No pedimos contraseñas ni acceso a tus cuentas: con tu usuario o el enlace público basta.</p>`,
 
     `<h2>Qué puedes comprar</h2>`,
     `<ul>${enlaces}</ul>`,
 
     `<h2>Cuánto cuesta</h2>`,
-    `<p>Los precios están en pesos chilenos e incluyen impuestos. El pack más barato de la tienda cuesta ` +
+    `<p>Precios en pesos chilenos, con impuestos incluidos. El pack más barato cuesta ` +
       `${formatClp(barato.clp)} por ${formatNumber(barato.min_tier as number)} unidades de ` +
-      `${esc(barato.name.toLowerCase())}. En cada ficha eliges la cantidad exacta y ves el precio antes de pagar; ` +
-      `no hay costos ocultos ni suscripciones.</p>`,
+      `${esc(barato.name.toLowerCase())}. En cada ficha eliges la cantidad exacta y ves el precio antes de pagar.</p>`,
 
     `<h2>Es seguro para mi cuenta</h2>`,
-    `<p>La entrega se hace desde fuera de tu cuenta, sin instalar nada y sin iniciar sesión. ` +
-      `Lo único que te pedimos es que el perfil o la publicación estén públicos mientras dura el pedido. ` +
-      `Los packs marcados con reposición reponen sin costo lo que se caiga dentro del plazo indicado, ` +
-      `y si un pedido no se entrega devolvemos el 100% del dinero.</p>`,
+    `<p>La entrega se hace desde fuera de tu cuenta, sin instalar nada. Solo pedimos que el perfil o ` +
+      `la publicación estén públicos mientras dura el pedido. Los packs con reposición reponen sin ` +
+      `costo dentro del plazo, y si un pedido no se entrega devolvemos el 100%.</p>`,
   ].join("\n");
 }
