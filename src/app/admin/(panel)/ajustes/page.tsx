@@ -4,6 +4,7 @@ import { SERVICE_TYPE_OPTIONS } from "@/lib/labels";
 import { SettingsForm } from "@/components/settings-form";
 import { providerConfigured, provider } from "@/lib/provider";
 import { config as flowConfig } from "@/lib/flow";
+import { emailConfig } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,7 @@ export default async function AdminSettingsPage() {
   }
 
   const flow = flowConfig();
+  const email = emailConfig();
 
   // Un campo por tipo de servicio, con su etiqueta en español.
   const actuales = parseMinRates(settings.min_rate_json ?? "");
@@ -51,6 +53,7 @@ export default async function AdminSettingsPage() {
           flowSandbox={flow.sandbox}
           flowForcedByEnv={flow.forcedByEnv}
           providerKeyFromEnv={Boolean((process.env.PROVIDER_API_KEY ?? "").trim())}
+          resendKeyFromEnv={email.keyFromEnv}
         />
       </div>
     </>

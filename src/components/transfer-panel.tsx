@@ -4,6 +4,7 @@ import { formatClp } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { run } from "@/lib/db";
 import { getOrderByCode, logEvent } from "@/lib/orders";
+import { notificarTransferenciaAvisada } from "@/lib/notify";
 import type { DatosTransferencia } from "@/lib/transfer";
 import type { Order } from "@/lib/types";
 import { Copiar } from "./copiar";
@@ -29,6 +30,9 @@ async function avisarTransferencia(formData: FormData) {
     "info",
     `El cliente avisó que transfirió${referencia ? ` (comprobante ${referencia})` : ""}.`,
   );
+  const avisado = getOrderByCode(code);
+  if (avisado) await notificarTransferenciaAvisada(avisado);
+
   revalidatePath(`/pedido/${order.code}`);
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin");

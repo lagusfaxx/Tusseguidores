@@ -167,6 +167,20 @@ CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_token   ON orders(payment_token);
 CREATE INDEX IF NOT EXISTS idx_orders_email   ON orders(email);
 
+-- Correos que se mandaron por cada pedido. Además del registro, es lo que
+-- evita que el cliente reciba el mismo aviso en cada pasada del cron: antes de
+-- enviar se mira si ya salió (ver notify.ts).
+CREATE TABLE IF NOT EXISTS email_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  kind        TEXT    NOT NULL,   -- pago_confirmado, pedido_completado...
+  recipient   TEXT    NOT NULL,
+  provider_id TEXT,               -- id que devuelve Resend
+  error       TEXT,               -- NULL = salió bien
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_log ON email_log(order_id, kind);
+
 CREATE TABLE IF NOT EXISTS order_events (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

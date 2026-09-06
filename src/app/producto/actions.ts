@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createOrder, logEvent, setStatus } from "@/lib/orders";
+import { notificarTransferenciaPendiente } from "@/lib/notify";
 import { createPayment, checkoutUrl, flowConfigured, FlowError } from "@/lib/flow";
 import { absoluteUrl } from "@/lib/seo";
 import { getSettings, getBoolSetting } from "@/lib/settings";
@@ -64,6 +65,9 @@ export async function startCheckout(
   if (metodo === "transferencia") {
     // No se cobra nada acá: el pedido espera a que el dueño vea la plata.
     logEvent(order.id, "info", "Esperando la transferencia del cliente.");
+    // Los datos de la cuenta también por correo: el cliente los necesita
+    // cuando abra el banco, que casi nunca es en esta misma pestaña.
+    await notificarTransferenciaPendiente(order);
     redirect(`/pedido/${order.code}?estado=transferencia`);
   }
 

@@ -23,6 +23,7 @@ services:
       - FLOW_API_KEY=${FLOW_API_KEY:-}
       - FLOW_SECRET_KEY=${FLOW_SECRET_KEY:-}
       - FLOW_SANDBOX=${FLOW_SANDBOX:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
       - CRON_SECRET=${CRON_SECRET:-}
     ports:
       - "3000:3000"

@@ -7,6 +7,7 @@ import { all, db, get, run, rescoreServices } from "@/lib/db";
 import { setSettings, invalidateSettings, getBoolSetting } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { testCredentials } from "@/lib/flow";
+import { testEmail } from "@/lib/email";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
@@ -83,6 +84,8 @@ const SETTING_KEYS = [
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "margin_reference",
   "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
+  "email_enabled", "resend_api_key", "email_from", "email_reply_to", "email_admin",
+  "email_admin_alerts",
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
@@ -114,7 +117,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   // Las casillas no envían nada cuando están apagadas.
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
-    "auto_levels",
+    "auto_levels", "email_enabled", "email_admin_alerts",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -142,6 +145,13 @@ export async function testFlow(_prev: ActionState): Promise<ActionState> {
   const result = await testCredentials();
   if (result.ok) return { ok: result.message };
   return { error: result.detail ? `${result.message} (Flow dijo: "${result.detail}")` : result.message };
+}
+
+/** Manda un correo de prueba con Resend para ver si la configuración sirve. */
+export async function testResend(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const result = await testEmail();
+  return result.ok ? { ok: result.message } : { error: result.message };
 }
 
 // ----------------------------------------------------------------- productos

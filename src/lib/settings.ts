@@ -47,6 +47,18 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   transfer_email: "",
   transfer_instructions: "",
 
+  // Correos transaccionales (Resend)
+  email_enabled: "1",
+  resend_api_key: "",
+  // Remitente. Puede ser solo la dirección ("pedidos@tusseguidores.cl") o el
+  // formato completo ("TusSeguidores <pedidos@tusseguidores.cl>"). El dominio
+  // tiene que estar verificado en Resend.
+  email_from: "",
+  email_reply_to: "",
+  // A dónde llegan los avisos internos. Vacío = el correo de contacto.
+  email_admin: "",
+  email_admin_alerts: "1",
+
   // Flow.cl
   flow_api_key: "",
   flow_secret_key: "",

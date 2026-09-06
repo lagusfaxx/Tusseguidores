@@ -1,7 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { saveSettings, changePassword, testFlow, type ActionState } from "@/app/admin/actions";
+import {
+  saveSettings, changePassword, testFlow, testResend, type ActionState,
+} from "@/app/admin/actions";
 import { Feedback, SubmitButton } from "./admin-ui";
 
 type Props = {
@@ -13,6 +15,7 @@ type Props = {
   flowSandbox: boolean;
   flowForcedByEnv: { apiKey: boolean; secretKey: boolean; sandbox: boolean };
   providerKeyFromEnv: boolean;
+  resendKeyFromEnv: boolean;
 };
 
 /** Marca los campos que una variable de entorno está pisando. */
@@ -64,11 +67,12 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
 
 export function SettingsForm({
   settings, minRates, providerBalance, providerBalanceError,
-  flowSandbox, flowForcedByEnv, providerKeyFromEnv,
+  flowSandbox, flowForcedByEnv, providerKeyFromEnv, resendKeyFromEnv,
 }: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
   const [passwordState, passwordAction] = useActionState<ActionState, FormData>(changePassword, {});
   const [flowState, flowAction] = useActionState<ActionState>(testFlow, {});
+  const [emailState, emailAction] = useActionState<ActionState>(testResend, {});
   // El entorno real, no el que dice la casilla: una variable de entorno puede
   // estar pisándola.
   const sandbox = flowSandbox;
@@ -242,6 +246,34 @@ export function SettingsForm({
           </p>
         </Section>
 
+        <Section
+          title="Correos (Resend)"
+          hint="Los avisos automáticos del pedido: los datos para transferir, la confirmación del pago y el aviso de entrega. Sin esto la tienda no manda ningún correo."
+        >
+          <Check label="Enviar correos" name="email_enabled" checked={settings.email_enabled === "1"}
+            hint="Apágalo para dejar de mandar todo de una vez, sin borrar la configuración." />
+          <div>
+            <Field label="API key de Resend" name="resend_api_key" type="password"
+              value={settings.resend_api_key}
+              hint="La creas en resend.com → API Keys. Con permiso de envío basta." />
+            {resendKeyFromEnv ? <EnvNotice name="RESEND_API_KEY" /> : null}
+          </div>
+          <Field label="Remitente" name="email_from" value={settings.email_from}
+            placeholder="pedidos@tusseguidores.cl"
+            hint="El dominio tiene que estar verificado en Resend (SPF y DKIM). Puedes escribir solo la dirección o el formato completo: TusSeguidores <pedidos@tusseguidores.cl>." />
+          <Field label="Responder a" name="email_reply_to" type="email" value={settings.email_reply_to}
+            hint="A dónde llegan las respuestas de los clientes. Vacío = el correo de contacto de la tienda." />
+          <Field label="Correo para los avisos internos" name="email_admin" type="email"
+            value={settings.email_admin}
+            hint="Transferencias por confirmar y pedidos pagados que no pudieron salir. Vacío = el correo de contacto." />
+          <Check label="Recibir los avisos internos" name="email_admin_alerts"
+            checked={settings.email_admin_alerts === "1"} />
+          <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
+            Cada correo sale una sola vez por pedido, aunque el cron pase muchas veces o Flow repita
+            la confirmación. Lo que se envió queda en el historial del pedido.
+          </p>
+        </Section>
+
         <Section title="SEO de la portada">
           <Field label="Título" name="seo_home_title" value={settings.seo_home_title} />
           <div>
@@ -287,6 +319,18 @@ export function SettingsForm({
         <div className="mt-5 flex flex-wrap items-center gap-4">
           <SubmitButton className="btn btn-ghost text-sm">Probar ahora</SubmitButton>
           <Feedback state={flowState} />
+        </div>
+      </form>
+
+      <form action={emailAction} className="card mt-6 p-6">
+        <h2 className="font-bold">Probar el envío de correos</h2>
+        <p className="mt-1 text-sm text-ink-400">
+          Manda un correo de prueba al destinatario de los avisos internos. Guarda primero: el botón
+          usa lo que está guardado, no lo que tienes escrito en pantalla.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <SubmitButton className="btn btn-ghost text-sm">Enviar prueba</SubmitButton>
+          <Feedback state={emailState} />
         </div>
       </form>
 

@@ -7,6 +7,7 @@ import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { getSettings, getNumberSetting } from "@/lib/settings";
 import { flowConfigured } from "@/lib/flow";
+import { emailConfigured } from "@/lib/email";
 import { providerConfigured, cachedBalance, refreshBalance } from "@/lib/provider";
 import type { Order } from "@/lib/types";
 
@@ -63,6 +64,10 @@ export default async function AdminDashboard() {
     },
     !flowConfigured() && {
       text: "Flow no está configurado: los clientes no pueden pagar en línea.",
+      href: "/admin/ajustes",
+    },
+    !emailConfigured() && {
+      text: "Resend no está configurado: nadie recibe la confirmación de su pedido por correo.",
       href: "/admin/ajustes",
     },
     settings.orders_enabled !== "1" && {

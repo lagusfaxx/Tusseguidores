@@ -74,6 +74,7 @@ Todo se configura en `/admin/ajustes`; no hace falta volver a desplegar.
 | **Precios** | Valor del dólar, margen global y precios mínimos. |
 | **Proveedor** | La API key de honestsmm (la sacas de tu página de cuenta). |
 | **Pagos** | API key y secret key de Flow. Arriba de la sección dice en qué entorno se está cobrando de verdad. |
+| **Correos (Resend)** | API key de Resend y el remitente. Sin esto la tienda no manda ningún correo. |
 | **SEO** | Título, descripción y verificación de Google Search Console. |
 
 En el panel de **Flow** configura:
@@ -258,8 +259,10 @@ los datos de tu cuenta con su código de pedido como mensaje, y ahí se detiene.
 El pedido **no sale al proveedor hasta que tú lo confirmes** en el panel.
 
 1. El cliente elige transferencia y ve tus datos bancarios y el monto exacto.
+   Los mismos datos le llegan por correo, que es donde los va a buscar cuando
+   abra el banco.
 2. Cuando transfiere puede apretar «Ya transferí» y dejar el número de
-   comprobante. Eso no confirma nada: solo te avisa.
+   comprobante. Eso no confirma nada: solo te avisa, en el panel y por correo.
 3. En el resumen aparece una alerta y el pedido queda en el filtro
    **Transferencias por confirmar**.
 4. Revisas tu cuenta y aprietas «Confirmar transferencia y enviar». Recién ahí
@@ -271,6 +274,35 @@ que ya están pagados.
 Se activa en **Ajustes → Transferencia bancaria**, y el botón solo aparece si
 están el banco, el número de cuenta y el titular: un botón que lleva a una
 pantalla sin datos pierde la venta.
+
+### Correos automáticos (Resend)
+
+La tienda avisa por correo en los cuatro momentos que importan, con
+[Resend](https://resend.com). Se configura en **Ajustes → Correos**:
+
+| Cuándo | A quién | Qué dice |
+|---|---|---|
+| Pedido por transferencia recién creado | Cliente | Los datos de tu cuenta, el monto exacto y el código que tiene que poner como mensaje. |
+| Pago confirmado (Flow o transferencia) | Cliente | Que el pedido va en camino, con el enlace de seguimiento. |
+| Entrega terminada o parcial | Cliente | Qué se entregó y qué hacer si algo no cuadra. |
+| El cliente avisa que transfirió | Tienda | Que hay una transferencia por revisar, con el comprobante. |
+| Un pedido pagado no pudo salir al proveedor | Tienda | El motivo (normalmente falta de saldo) y el enlace a la ficha. |
+
+Tres cosas que conviene saber:
+
+- **Cada correo sale una sola vez por pedido.** Flow reintenta la confirmación
+  y el cron pasa cada diez minutos: el registro de `email_log` es lo que evita
+  que el cliente reciba el mismo aviso veinte veces. Un envío que falló sí se
+  puede reintentar; uno que salió, no se repite.
+- **Un correo caído nunca tumba una venta.** Si Resend responde con un error,
+  el pedido sigue su curso y el motivo queda escrito en el historial del pedido
+  («no se pudo enviar el correo…»), donde se lee sin entrar al servidor.
+- **El dominio del remitente tiene que estar verificado en Resend** (SPF y
+  DKIM). Mientras no lo esté, Resend rechaza los envíos con un mensaje claro:
+  el botón «Enviar prueba» de Ajustes te lo muestra tal cual.
+
+Para no dejar la clave en la base de datos, `RESEND_API_KEY` como variable de
+entorno manda sobre el panel, igual que las de Flow y el proveedor.
 
 ### Pedido, de principio a fin
 
@@ -284,7 +316,9 @@ pantalla sin datos pierde la venta.
    idempotente porque Flow reintenta.
 5. Con el pago confirmado se vuelve a elegir el mejor servicio (pudo cambiar
    entre la compra y el pago) y el pedido se envía solo al proveedor.
-6. El cron consulta el avance y el cliente lo sigue en `/pedido/<código>`.
+6. Sale el correo de «pago confirmado» y el cron consulta el avance, que el
+   cliente también sigue en `/pedido/<código>`. Al terminar la entrega se manda
+   el último correo.
 
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
 y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rota.
@@ -399,6 +433,9 @@ src/
     autolevels.ts               publicación automática del catálogo por niveles
     copy.mjs                    textos y SEO en español de cada producto
     flow.ts                     cliente de Flow
+    email.ts                    cliente de Resend
+    email-templates.ts          los correos que ve el cliente
+    notify.ts                   qué correo sale en cada momento del pedido
     orders.ts                   ciclo de vida de los pedidos
     taxonomy.mjs                clasificación de servicios
 scripts/
@@ -414,6 +451,6 @@ scripts/
 - Las contraseñas del panel se guardan con `scrypt` y sal aleatoria.
 - El HTML que escribes en el panel se filtra al guardar: solo pasan etiquetas de
   texto, y los enlaces salen con `rel="nofollow noopener"`.
-- Las variables de entorno `PROVIDER_API_KEY`, `FLOW_API_KEY`, `FLOW_SECRET_KEY`
-  y `CRON_SECRET` tienen prioridad sobre lo guardado en el panel: úsalas si
-  prefieres no dejar las claves en la base de datos.
+- Las variables de entorno `PROVIDER_API_KEY`, `FLOW_API_KEY`, `FLOW_SECRET_KEY`,
+  `RESEND_API_KEY` y `CRON_SECRET` tienen prioridad sobre lo guardado en el
+  panel: úsalas si prefieres no dejar las claves en la base de datos.
