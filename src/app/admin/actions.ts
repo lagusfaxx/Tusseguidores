@@ -7,6 +7,7 @@ import { all, db, get, run, rescoreServices } from "@/lib/db";
 import { setSettings, invalidateSettings, getBoolSetting } from "@/lib/settings";
 import { provider, providerConfigured, ProviderError } from "@/lib/provider";
 import { testCredentials } from "@/lib/flow";
+import { testEmail } from "@/lib/email";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
@@ -19,6 +20,11 @@ import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
 import { publicarNiveles } from "@/lib/autolevels";
+import { movimiento } from "@/lib/wallet";
+import { acreditar, rechazar } from "@/lib/topups";
+import { reembolsar } from "@/lib/reseller-orders";
+import { agregarMensaje, cerrarTicket, reabrirTicket } from "@/lib/tickets";
+import { formatClp } from "@/lib/pricing";
 import type { OrderStatus } from "@/lib/types";
 
 export type ActionState = { ok?: string; error?: string };
@@ -83,6 +89,10 @@ const SETTING_KEYS = [
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "margin_reference",
   "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
+  "email_enabled", "resend_api_key", "email_from", "email_reply_to", "email_admin",
+  "email_admin_alerts", "email_admin_new_orders",
+  "reseller_enabled", "reseller_margin_percent", "reseller_min_topup_clp",
+  "reseller_min_order_clp", "reseller_welcome",
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
@@ -114,7 +124,8 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   // Las casillas no envían nada cuando están apagadas.
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
-    "auto_levels",
+    "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
+    "reseller_enabled",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -142,6 +153,13 @@ export async function testFlow(_prev: ActionState): Promise<ActionState> {
   const result = await testCredentials();
   if (result.ok) return { ok: result.message };
   return { error: result.detail ? `${result.message} (Flow dijo: "${result.detail}")` : result.message };
+}
+
+/** Manda un correo de prueba con Resend para ver si la configuración sirve. */
+export async function testResend(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const result = await testEmail();
+  return result.ok ? { ok: result.message } : { error: result.message };
 }
 
 // ----------------------------------------------------------------- productos
@@ -563,6 +581,124 @@ export async function syncOrders() {
   await syncOpenOrders(200);
   revalidatePath("/admin/pedidos");
   revalidatePath("/admin");
+}
+
+// ------------------------------------------------------------ panel mayorista
+
+/** Ajusta el saldo de un cliente a mano, con su motivo. */
+export async function ajustarSaldo(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await guard();
+  const userId = Number(formData.get("user_id"));
+  const monto = Number(String(formData.get("monto") ?? "").replace(/[^\d-]/g, ""));
+  const nota = String(formData.get("nota") ?? "").trim();
+  if (!Number.isFinite(monto) || monto === 0) return { error: "Escribe un monto distinto de cero." };
+  if (!nota) return { error: "Escribe el motivo del ajuste: queda en el historial del cliente." };
+
+  const result = movimiento({ userId, kind: "ajuste", amountClp: monto, note: nota });
+  if (!result.ok) return { error: result.error };
+  revalidatePath(`/admin/mayoristas/${userId}`);
+  revalidatePath("/admin/mayoristas");
+  return { ok: `Saldo ajustado. Nuevo saldo: ${formatClp(result.balance)}.` };
+}
+
+export async function cambiarEstadoMayorista(formData: FormData) {
+  const userId = Number(formData.get("user_id"));
+  await withErrorRedirect(`/admin/mayoristas/${userId}`, async () => {
+    await guard();
+    const accion = String(formData.get("accion"));
+    if (accion === "bloquear" || accion === "activar") {
+      run("UPDATE reseller_users SET status = ? WHERE id = ?", [
+        accion === "bloquear" ? "blocked" : "active",
+        userId,
+      ]);
+      // Un cliente bloqueado no puede seguir usando una sesión abierta.
+      if (accion === "bloquear") run("DELETE FROM reseller_sessions WHERE user_id = ?", [userId]);
+    } else if (accion === "descuento") {
+      const valor = Math.min(90, Math.max(0, Number(formData.get("descuento")) || 0));
+      run("UPDATE reseller_users SET discount_percent = ? WHERE id = ?", [valor, userId]);
+    } else if (accion === "nota") {
+      run("UPDATE reseller_users SET admin_note = ? WHERE id = ?", [
+        String(formData.get("nota") ?? "").slice(0, 1000),
+        userId,
+      ]);
+    }
+    revalidatePath(`/admin/mayoristas/${userId}`);
+  });
+}
+
+/** Confirma o rechaza una recarga por transferencia. */
+export async function resolverRecarga(formData: FormData) {
+  await withErrorRedirect("/admin/recargas", async () => {
+    await guard();
+    const id = Number(formData.get("topup_id"));
+    const accion = String(formData.get("accion"));
+    if (accion === "acreditar") {
+      const result = acreditar(id, String(formData.get("referencia") ?? "").trim() || "transferencia");
+      if (!result.ok) throw new Error(result.error);
+    } else if (accion === "rechazar") {
+      rechazar(id, String(formData.get("referencia") ?? "").trim() || "Rechazada por el administrador");
+    }
+    revalidatePath("/admin/recargas");
+    revalidatePath("/admin");
+  });
+}
+
+/** Devuelve al saldo un pedido del panel que no se va a entregar. */
+export async function reembolsarPedido(formData: FormData) {
+  const id = Number(formData.get("order_id"));
+  await withErrorRedirect(`/admin/pedidos/${id}`, async () => {
+    await guard();
+    const result = reembolsar(id, String(formData.get("motivo") ?? "").trim() || "Pedido no entregado");
+    if (!result.ok) throw new Error(result.error ?? "No se pudo reembolsar.");
+    revalidatePath(`/admin/pedidos/${id}`);
+    revalidatePath("/admin/pedidos");
+  });
+}
+
+/** Responde un ticket del panel y, si corresponde, lo cierra. */
+export async function responderTicket(formData: FormData) {
+  const id = Number(formData.get("ticket_id"));
+  await withErrorRedirect(`/admin/tickets/${id}`, async () => {
+    await guard();
+    const accion = String(formData.get("accion") ?? "responder");
+    const cuerpo = String(formData.get("body") ?? "").trim();
+
+    if (accion === "cerrar") {
+      if (cuerpo) agregarMensaje(id, "admin", cuerpo);
+      cerrarTicket(id);
+    } else if (accion === "reabrir") {
+      reabrirTicket(id);
+    } else if (cuerpo) {
+      agregarMensaje(id, "admin", cuerpo);
+    }
+    revalidatePath(`/admin/tickets/${id}`);
+    revalidatePath("/admin/tickets");
+  });
+}
+
+/** Pide al proveedor la reposición del pedido de un ticket. */
+export async function reposicionDesdeTicket(formData: FormData) {
+  const id = Number(formData.get("ticket_id"));
+  await withErrorRedirect(`/admin/tickets/${id}`, async () => {
+    await guard();
+    const orderId = Number(formData.get("order_id"));
+    const order = get<{ provider_order_id: number | null; code: string }>(
+      "SELECT provider_order_id, code FROM orders WHERE id = ?",
+      [orderId],
+    );
+    if (!order?.provider_order_id) throw new Error("Ese pedido nunca salió al proveedor.");
+
+    try {
+      const result = await provider.refill(order.provider_order_id);
+      logEvent(orderId, "refill", `Reposición solicitada al proveedor (ID ${result.refill}).`);
+      agregarMensaje(id, "admin", `Pedimos la reposición al proveedor (referencia ${result.refill}).`);
+    } catch (error) {
+      const mensaje = (error as Error).message;
+      logEvent(orderId, "error", `No se pudo pedir la reposición: ${mensaje}`);
+      throw new Error(`El proveedor rechazó la reposición: ${mensaje}`);
+    }
+    revalidatePath(`/admin/tickets/${id}`);
+  });
 }
 
 // -------------------------------------------------- catálogo del proveedor

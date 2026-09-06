@@ -60,13 +60,23 @@ export default function CatalogPage() {
                 const items = groupByServiceType(
                   products.filter((product) => product.platform === p.platform),
                 ).flatMap((grupo) => grupo.items);
+                if (items.length < 3) {
+                  // Una o dos tarjetas angostas dejan la fila vacía: van anchas.
+                  return (
+                    <div className="mt-4 space-y-3 sm:mt-5">
+                      {items.map((product) => (
+                        <ProductCard key={product.id} product={product} fila />
+                      ))}
+                    </div>
+                  );
+                }
                 return (
                   <>
                     <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
                       {items.map((product, i) => (
                         /* En teléfono mostramos los primeros cuatro: 35 tarjetas
                            seguidas eran diez pantallas de scroll. */
-                        <div key={product.id} className={i >= 3 ? "hidden sm:block" : ""}>
+                        <div key={product.id} className={"h-full " + (i >= 3 ? "hidden sm:block" : "")}>
                           <ProductCard product={product} />
                         </div>
                       ))}

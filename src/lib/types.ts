@@ -109,6 +109,8 @@ export type Order = {
   provider_order_id: number | null;
   /** Fecha en que lo marcaste como despachado a mano, fuera del panel. */
   manual_dispatch_at: string | null;
+  /** Cliente del panel SMM que lo pidió con su saldo. Null = venta de la tienda. */
+  reseller_user_id: number | null;
   provider_status: string | null;
   start_count: number | null;
   remains: number | null;
@@ -131,3 +133,66 @@ export type OrderStatus =
   | "refunded";
 
 export type FaqItem = { q: string; a: string };
+
+// ------------------------------------------------------------------ panel SMM
+
+export type ResellerUser = {
+  id: number;
+  email: string;
+  password_hash: string;
+  name: string;
+  phone: string | null;
+  balance_clp: number;
+  discount_percent: number;
+  status: "active" | "blocked" | string;
+  admin_note: string | null;
+  created_at: string;
+  last_login_at: string | null;
+};
+
+export type WalletEntry = {
+  id: number;
+  user_id: number;
+  kind: "recarga" | "pedido" | "reembolso" | "ajuste" | string;
+  amount_clp: number;
+  balance_after: number;
+  order_id: number | null;
+  topup_id: number | null;
+  note: string;
+  created_at: string;
+};
+
+export type Topup = {
+  id: number;
+  code: string;
+  user_id: number;
+  amount_clp: number;
+  method: "flow" | "transferencia" | string;
+  status: "pending" | "paid" | "rejected" | string;
+  payment_token: string | null;
+  payment_ref: string | null;
+  transfer_reference: string | null;
+  notified_at: string | null;
+  created_at: string;
+  paid_at: string | null;
+};
+
+export type Ticket = {
+  id: number;
+  code: string;
+  user_id: number;
+  order_id: number | null;
+  subject: string;
+  kind: "consulta" | "problema" | "reposicion" | string;
+  status: "abierto" | "respondido" | "cerrado" | string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TicketMessage = {
+  id: number;
+  ticket_id: number;
+  author: "cliente" | "admin" | string;
+  body: string;
+  created_at: string;
+};

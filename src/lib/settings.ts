@@ -47,6 +47,29 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   transfer_email: "",
   transfer_instructions: "",
 
+  // Correos transaccionales (Resend)
+  email_enabled: "1",
+  resend_api_key: "",
+  // Remitente. Puede ser solo la dirección ("pedidos@tusseguidores.cl") o el
+  // formato completo ("TusSeguidores <pedidos@tusseguidores.cl>"). El dominio
+  // tiene que estar verificado en Resend.
+  email_from: "",
+  email_reply_to: "",
+  // A dónde llegan los avisos internos. Vacío = el correo de contacto.
+  email_admin: "",
+  email_admin_alerts: "1",
+  // Aviso de cada pedido que entra, aunque todavía no esté pagado.
+  email_admin_new_orders: "1",
+
+  // Panel SMM de reventa (clientes mayoristas con saldo)
+  reseller_enabled: "1",
+  // Margen sobre el costo del proveedor. Muy por debajo del de la tienda: el
+  // mayorista compra volumen y paga por adelantado.
+  reseller_margin_percent: "30",
+  reseller_min_topup_clp: "10000",
+  reseller_min_order_clp: "200",
+  reseller_welcome: "",
+
   // Flow.cl
   flow_api_key: "",
   flow_secret_key: "",

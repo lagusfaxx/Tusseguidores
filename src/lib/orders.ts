@@ -6,6 +6,10 @@ import { provider, mapProviderStatus, ProviderError, providerConfigured } from "
 import { getBoolSetting } from "./settings";
 import { orderCode } from "./utils";
 import { pickService } from "./routing";
+import {
+  notificarPagoConfirmado, notificarPedidoCompletado, notificarPedidoTrabado,
+  notificarVentaPagada,
+} from "./notify";
 import type { Order, OrderStatus } from "./types";
 
 /** Comentarios escritos por el cliente: una línea por comentario, sin vacías. */
@@ -220,6 +224,10 @@ export async function setStatusManual(
   }
   setStatus(orderId, status, `Estado cambiado a mano desde el panel: ${ORDER_STATUS_LABEL[status]}.`);
 
+  if (status === "completed" || status === "partial") {
+    await notificarPedidoCompletado(getOrderById(orderId)!, status === "partial");
+  }
+
   // Poner "En proceso", "Entrega parcial" o "Completado" en un pedido que
   // nunca salió del panel solo puede significar que lo despachaste tú: se
   // registra como envío manual para que deje de figurar como pendiente.
@@ -294,6 +302,10 @@ export async function markPaid(orderId: number, paymentRef: string): Promise<voi
       ? `Transferencia confirmada a mano${paymentRef && paymentRef !== "manual" ? ` (${paymentRef})` : ""}.`
       : `Pago confirmado (referencia ${paymentRef}).`,
   );
+
+  const pagado = getOrderById(orderId)!;
+  await notificarPagoConfirmado(pagado);
+  await notificarVentaPagada(pagado);
 
   if (getBoolSetting("auto_send_to_provider", true)) {
     await sendToProvider(orderId);
@@ -399,6 +411,9 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
         ? `Sin saldo en el proveedor: ${message}. El pedido se reintenta solo al recargar.`
         : `No se pudo enviar al proveedor: ${message}`,
     );
+    // Plata cobrada sin entregar: el dueño se entera por correo, una sola vez
+    // por pedido, sin tener que estar mirando el panel.
+    await notificarPedidoTrabado(order, message);
     return { ok: false, error: message };
   }
 }
@@ -485,6 +500,9 @@ export async function syncOpenOrders(limit = 100): Promise<{ checked: number; up
         if (current && current.status !== status) {
           logEvent(orderId, status, `Estado actualizado por el proveedor: ${info.status}.`);
           updated++;
+          if (status === "completed" || status === "partial") {
+            await notificarPedidoCompletado(getOrderById(orderId)!, status === "partial");
+          }
         }
       }
     } catch {

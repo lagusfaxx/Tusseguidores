@@ -24,6 +24,16 @@ import type { FaqItem } from "@/lib/types";
 
 type Params = { params: Promise<{ slug: string }> };
 
+/**
+ * La copia generada trae un bloque "Qué incluye" con los mismos puntos que ya
+ * se muestran arriba en la lista de vistos buenos. Verlos dos veces en la
+ * misma pantalla parece un error de armado, así que en la ficha se saca uno.
+ */
+function sinQueIncluye(html: string, bullets: number): string {
+  if (!bullets) return html;
+  return html.replace(/<h2>\s*Qué incluye\s*<\/h2>\s*<ul>[\s\S]*?<\/ul>/i, "");
+}
+
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const product = getProductBySlug(slug);
@@ -78,6 +88,8 @@ export default async function ProductPage({ params }: Params) {
 
   // Los otros niveles del mismo servicio, con su precio a la misma cantidad.
   const niveles = comparadorDeNiveles(product);
+
+  const mayorista = getBoolSetting("reseller_enabled", true);
 
   const related = getProductsByPlatform(product.platform)
     .filter((p) => p.id !== product.id)
@@ -210,7 +222,10 @@ export default async function ProductPage({ params }: Params) {
 
             {/* -------------------------------------------------- Contenido largo */}
             <div className="lg:col-start-1 lg:row-start-2">
-              <div className="overflow-hidden rounded-2xl border border-white/10">
+              {/* La portada es un degradado con un icono: a media página se comía
+                  el espacio del contenido, así que va como banda con velo, del
+                  mismo alto que en las tarjetas del catálogo. */}
+              <div className="relative overflow-hidden rounded-2xl border border-white/10">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={product.image_url || "/img/productos/generico.svg"}
@@ -218,15 +233,34 @@ export default async function ProductPage({ params }: Params) {
                   width={600}
                   height={400}
                   fetchPriority="high"
-                  className="aspect-[5/2] w-full object-cover sm:aspect-[3/2]"
+                  className="aspect-[16/6] w-full object-cover sm:aspect-[16/5]"
                 />
+                <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/85 via-ink-950/15 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 flex items-center gap-2 p-3 text-xs font-semibold sm:p-4">
+                  <PlatformIcon slug={product.platform} className="h-4 w-4" />
+                  {platformLabel(product.platform)}
+                  <span className="text-ink-400">·</span>
+                  {serviceTypeLabel(product.service_type)}
+                  {product.badge ? (
+                    <span className="ml-auto rounded-md bg-ink-950/70 px-2 py-1 text-[10px] uppercase tracking-wide backdrop-blur">
+                      {product.badge}
+                    </span>
+                  ) : null}
+                </div>
               </div>
 
-              <dl className="mt-5 grid grid-cols-3 gap-2 sm:gap-3">
+              {/* Cuatro datos, no tres: el rango de cantidades es la pregunta
+                  que más llega por WhatsApp. */}
+              <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {[
                   { icon: BoltIcon, label: "Entrega", value: deliveryLabel },
                   { icon: CheckIcon, label: "Calidad", value: product.quality_label },
                   { icon: ShieldIcon, label: "Garantía", value: guaranteeText },
+                  {
+                    icon: CheckIcon,
+                    label: "Cantidad",
+                    value: `${formatNumber(minQty)} a ${formatNumber(maxQty)}`,
+                  },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="card p-3 sm:p-4">
                     <dt className="flex items-center gap-1.5 text-[11px] text-ink-400 sm:text-xs">
@@ -259,7 +293,7 @@ export default async function ProductPage({ params }: Params) {
                 <article
                   className="prose-ts relative max-h-[22rem] max-w-none overflow-hidden peer-checked:max-h-none after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-24 after:bg-gradient-to-t after:from-ink-950 after:to-transparent peer-checked:after:hidden sm:max-h-none sm:after:hidden"
                   dangerouslySetInnerHTML={{
-                    __html: sanitizeHtml(product.description_html) + (datos ?? ""),
+                    __html: sinQueIncluye(sanitizeHtml(product.description_html), bullets.length) + (datos ?? ""),
                   }}
                 />
                 <label
@@ -269,6 +303,23 @@ export default async function ProductPage({ params }: Params) {
                   Leer la descripción completa
                 </label>
               </div>
+
+              {/* Puente al panel: quien compra seguido no debería pagar el
+                  precio de la tienda, y si no se lo decimos aquí no se entera. */}
+              {mayorista ? (
+                <aside className="card mt-8 flex flex-wrap items-center justify-between gap-4 p-5">
+                  <div>
+                    <h2 className="font-bold">¿Compras seguido o revendes?</h2>
+                    <p className="mt-1 max-w-lg text-sm leading-relaxed text-ink-400">
+                      En el panel mayorista pides el mismo servicio al costo del proveedor más un
+                      margen chico, cargando saldo por adelantado.
+                    </p>
+                  </div>
+                  <Link href="/panel" className="btn btn-ghost shrink-0 text-sm">
+                    Ver el panel mayorista
+                  </Link>
+                </aside>
+              ) : null}
 
               <LevelCompare filas={niveles} />
 
@@ -330,7 +381,7 @@ export default async function ProductPage({ params }: Params) {
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
                 {related.map((item, i) => (
-                  <div key={item.id} className={i >= 2 ? "hidden sm:block" : ""}>
+                  <div key={item.id} className={"h-full " + (i >= 2 ? "hidden sm:block" : "")}>
                     <ProductCard product={item} />
                   </div>
                 ))}

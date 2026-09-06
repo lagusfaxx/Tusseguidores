@@ -7,6 +7,9 @@ import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { getSettings, getNumberSetting } from "@/lib/settings";
 import { flowConfigured } from "@/lib/flow";
+import { emailConfigured } from "@/lib/email";
+import { contarRecargasPorConfirmar } from "@/lib/topups";
+import { contarTicketsAbiertos } from "@/lib/tickets";
 import { providerConfigured, cachedBalance, refreshBalance } from "@/lib/provider";
 import type { Order } from "@/lib/types";
 
@@ -35,7 +38,19 @@ export default async function AdminDashboard() {
 
   const lowBalance = getNumberSetting("low_balance_usd", 10);
 
+  const recargasPendientes = contarRecargasPorConfirmar();
+  const ticketsAbiertos = contarTicketsAbiertos();
+
   const alerts = [
+    recargasPendientes > 0 && {
+      text: `${recargasPendientes} recarga(s) de saldo por confirmar en el panel mayorista.`,
+      href: "/admin/recargas",
+      urgente: true,
+    },
+    ticketsAbiertos > 0 && {
+      text: `${ticketsAbiertos} ticket(s) de mayoristas esperando respuesta.`,
+      href: "/admin/tickets",
+    },
     stats.transferenciasAvisadas > 0 && {
       text: `${stats.transferenciasAvisadas} cliente(s) avisaron que transfirieron y esperan tu confirmación.`,
       href: "/admin/pedidos?estado=transferencias",
@@ -63,6 +78,10 @@ export default async function AdminDashboard() {
     },
     !flowConfigured() && {
       text: "Flow no está configurado: los clientes no pueden pagar en línea.",
+      href: "/admin/ajustes",
+    },
+    !emailConfigured() && {
+      text: "Resend no está configurado: nadie recibe la confirmación de su pedido por correo.",
       href: "/admin/ajustes",
     },
     settings.orders_enabled !== "1" && {

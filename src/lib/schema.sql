@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS orders (
 
   provider_order_id   INTEGER,
   manual_dispatch_at  TEXT,                               -- lo despachaste tú fuera del panel
+  reseller_user_id    INTEGER REFERENCES reseller_users(id), -- pedido hecho desde el panel SMM
   provider_status     TEXT,
   start_count         INTEGER,
   remains             INTEGER,
@@ -166,6 +167,20 @@ CREATE INDEX IF NOT EXISTS idx_orders_status  ON orders(status, created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_token   ON orders(payment_token);
 CREATE INDEX IF NOT EXISTS idx_orders_email   ON orders(email);
+
+-- Correos que se mandaron por cada pedido. Además del registro, es lo que
+-- evita que el cliente reciba el mismo aviso en cada pasada del cron: antes de
+-- enviar se mira si ya salió (ver notify.ts).
+CREATE TABLE IF NOT EXISTS email_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id    INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  kind        TEXT    NOT NULL,   -- pago_confirmado, pedido_completado...
+  recipient   TEXT    NOT NULL,
+  provider_id TEXT,               -- id que devuelve Resend
+  error       TEXT,               -- NULL = salió bien
+  created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_email_log ON email_log(order_id, kind);
 
 CREATE TABLE IF NOT EXISTS order_events (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -195,6 +210,98 @@ CREATE TABLE IF NOT EXISTS media (
   size       INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- ------------------------------------------------------------------ panel SMM
+-- Clientes mayoristas: compran al costo + un margen chico y pagan con saldo.
+CREATE TABLE IF NOT EXISTS reseller_users (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  email            TEXT    NOT NULL UNIQUE,
+  password_hash    TEXT    NOT NULL,
+  name             TEXT    NOT NULL DEFAULT '',
+  phone            TEXT,
+  -- Espejo del saldo para poder consultarlo barato. La verdad está en
+  -- wallet_entries: este número se recalcula solo dentro de la transacción que
+  -- escribe el movimiento (ver wallet.ts).
+  balance_clp      INTEGER NOT NULL DEFAULT 0,
+  -- Descuento extra sobre el precio mayorista, por cliente.
+  discount_percent REAL    NOT NULL DEFAULT 0,
+  status           TEXT    NOT NULL DEFAULT 'active',   -- active | blocked
+  admin_note       TEXT,
+  created_at       TEXT    NOT NULL DEFAULT (datetime('now')),
+  last_login_at    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS reseller_sessions (
+  token      TEXT PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES reseller_users(id) ON DELETE CASCADE,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_rsessions_exp ON reseller_sessions(expires_at);
+
+-- Recargas de saldo. Una recarga por Flow se acredita sola; una por
+-- transferencia espera a que el dueño la confirme en el panel.
+CREATE TABLE IF NOT EXISTS topups (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  code               TEXT    NOT NULL UNIQUE,          -- SL-7K2F9Q
+  user_id            INTEGER NOT NULL REFERENCES reseller_users(id) ON DELETE CASCADE,
+  amount_clp         INTEGER NOT NULL,
+  method             TEXT    NOT NULL,                 -- flow | transferencia
+  status             TEXT    NOT NULL DEFAULT 'pending', -- pending | paid | rejected
+  payment_token      TEXT,
+  payment_ref        TEXT,
+  transfer_reference TEXT,
+  notified_at        TEXT,                             -- el cliente avisó que transfirió
+  created_at         TEXT    NOT NULL DEFAULT (datetime('now')),
+  paid_at            TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_topups_user  ON topups(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_topups_state ON topups(status, method);
+
+-- Libro mayor del saldo: cada peso que entra o sale deja una línea aquí.
+CREATE TABLE IF NOT EXISTS wallet_entries (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES reseller_users(id) ON DELETE CASCADE,
+  kind          TEXT    NOT NULL,   -- recarga | pedido | reembolso | ajuste
+  amount_clp    INTEGER NOT NULL,   -- positivo suma, negativo descuenta
+  balance_after INTEGER NOT NULL,
+  order_id      INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  topup_id      INTEGER REFERENCES topups(id) ON DELETE SET NULL,
+  note          TEXT    NOT NULL DEFAULT '',
+  created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_wallet_user  ON wallet_entries(user_id, id DESC);
+-- Un pedido descuenta una sola vez y se reembolsa una sola vez, pase lo que
+-- pase con los reintentos: esto lo garantiza la base, no el código.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_order_kind
+  ON wallet_entries(order_id, kind) WHERE order_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_topup
+  ON wallet_entries(topup_id) WHERE topup_id IS NOT NULL;
+
+-- Tickets de soporte del panel. Una solicitud de reposición es un ticket con
+-- kind = 'reposicion' y el pedido enganchado.
+CREATE TABLE IF NOT EXISTS tickets (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  code       TEXT    NOT NULL UNIQUE,
+  user_id    INTEGER NOT NULL REFERENCES reseller_users(id) ON DELETE CASCADE,
+  order_id   INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  subject    TEXT    NOT NULL,
+  kind       TEXT    NOT NULL DEFAULT 'consulta',  -- consulta | problema | reposicion
+  status     TEXT    NOT NULL DEFAULT 'abierto',   -- abierto | respondido | cerrado
+  created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_user  ON tickets(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tickets_state ON tickets(status, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS ticket_messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ticket_id  INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+  author     TEXT    NOT NULL,   -- cliente | admin
+  body       TEXT    NOT NULL,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_tmessages ON ticket_messages(ticket_id, id);
 
 CREATE TABLE IF NOT EXISTS admin_users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,

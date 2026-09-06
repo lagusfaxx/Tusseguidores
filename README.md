@@ -74,6 +74,8 @@ Todo se configura en `/admin/ajustes`; no hace falta volver a desplegar.
 | **Precios** | Valor del dólar, margen global y precios mínimos. |
 | **Proveedor** | La API key de honestsmm (la sacas de tu página de cuenta). |
 | **Pagos** | API key y secret key de Flow. Arriba de la sección dice en qué entorno se está cobrando de verdad. |
+| **Correos (Resend)** | API key de Resend y el remitente. Sin esto la tienda no manda ningún correo. |
+| **Panel mayorista** | Margen de reventa, recarga mínima y cobro mínimo por pedido. |
 | **SEO** | Título, descripción y verificación de Google Search Console. |
 
 En el panel de **Flow** configura:
@@ -258,8 +260,10 @@ los datos de tu cuenta con su código de pedido como mensaje, y ahí se detiene.
 El pedido **no sale al proveedor hasta que tú lo confirmes** en el panel.
 
 1. El cliente elige transferencia y ve tus datos bancarios y el monto exacto.
+   Los mismos datos le llegan por correo, que es donde los va a buscar cuando
+   abra el banco.
 2. Cuando transfiere puede apretar «Ya transferí» y dejar el número de
-   comprobante. Eso no confirma nada: solo te avisa.
+   comprobante. Eso no confirma nada: solo te avisa, en el panel y por correo.
 3. En el resumen aparece una alerta y el pedido queda en el filtro
    **Transferencias por confirmar**.
 4. Revisas tu cuenta y aprietas «Confirmar transferencia y enviar». Recién ahí
@@ -271,6 +275,102 @@ que ya están pagados.
 Se activa en **Ajustes → Transferencia bancaria**, y el botón solo aparece si
 están el banco, el número de cuenta y el titular: un botón que lleva a una
 pantalla sin datos pierde la venta.
+
+### Correos automáticos (Resend)
+
+La tienda avisa por correo en los cuatro momentos que importan, con
+[Resend](https://resend.com). Se configura en **Ajustes → Correos**:
+
+| Cuándo | A quién | Qué dice |
+|---|---|---|
+| Pedido por transferencia recién creado | Cliente | Los datos de tu cuenta, el monto exacto y el código que tiene que poner como mensaje. |
+| Pago confirmado (Flow o transferencia) | Cliente | Que el pedido va en camino, con el enlace de seguimiento. |
+| Entrega terminada o parcial | Cliente | Qué se entregó y qué hacer si algo no cuadra. |
+| **Entra un pedido**, aunque no esté pagado | Tienda | Qué compraron, por cuánto, con qué forma de pago y quién. |
+| **Se confirma el pago** | Tienda | La venta, con el enlace a la ficha del pedido. |
+| El cliente avisa que transfirió | Tienda | Que hay una transferencia por revisar, con el comprobante. |
+| Un pedido pagado no pudo salir al proveedor | Tienda | El motivo (normalmente falta de saldo) y el enlace a la ficha. |
+
+Los dos avisos internos de arriba tienen su propia casilla: «Recibir los avisos
+internos» manda sobre todos, y «Avisarme también de cada pedido nuevo» apaga
+solo el primero, que es el único que llega aunque el cliente nunca pague.
+
+Tres cosas que conviene saber:
+
+- **Cada correo sale una sola vez por pedido.** Flow reintenta la confirmación
+  y el cron pasa cada diez minutos: el registro de `email_log` es lo que evita
+  que el cliente reciba el mismo aviso veinte veces. Un envío que falló sí se
+  puede reintentar; uno que salió, no se repite.
+- **Un correo caído nunca tumba una venta.** Si Resend responde con un error,
+  el pedido sigue su curso y el motivo queda escrito en el historial del pedido
+  («no se pudo enviar el correo…»), donde se lee sin entrar al servidor.
+- **El dominio del remitente tiene que estar verificado en Resend** (SPF y
+  DKIM). Mientras no lo esté, Resend rechaza los envíos con un mensaje claro:
+  el botón «Enviar prueba» de Ajustes te lo muestra tal cual.
+
+Para no dejar la clave en la base de datos, `RESEND_API_KEY` como variable de
+entorno manda sobre el panel, igual que las de Flow y el proveedor.
+
+### Panel mayorista (reventa con saldo)
+
+Además de la tienda, el sitio tiene un **panel SMM de reventa** en `/panel`.
+Es la otra mitad del negocio: quien compra seguido no paga el precio de la
+tienda, sino el costo del proveedor más un margen chico, y a cambio carga saldo
+por adelantado.
+
+**Cómo funciona para el cliente**
+
+1. Crea su cuenta en `/panel/crear-cuenta` (gratis, sin aprobación).
+2. Recarga saldo desde el mínimo configurado, por **Webpay** (se acredita solo)
+   o por **transferencia** (la confirmas tú).
+3. En **Servicios** entra por red y dentro de cada una encuentra sus categorías
+   plegadas, con cuántos servicios tiene y desde qué precio. Al abrir una ve los
+   doce mejores —con precio por 1.000, rango, retención, velocidad, reposición y
+   plazo— y, si quiere todos, pasa a la página de esa categoría, paginada. El
+   buscador se salta los dos pasos y busca en todo el catálogo por nombre o ID.
+   Casi dos mil servicios en una sola lista no se recorren: se abandonan.
+4. Elige uno, pega el enlace y la cantidad. El precio se calcula mientras
+   escribe y el botón queda bloqueado si la cantidad está fuera de rango o el
+   saldo no alcanza.
+5. Al enviar, **el saldo se descuenta y el pedido sale al proveedor**, con el
+   mismo despacho, reintento y seguimiento de estados que los de la tienda.
+6. Sigue cada pedido en `/panel/pedidos`, pide la **reposición** cuando el
+   servicio la incluye, y abre **tickets** de soporte que se responden desde el
+   panel de administración.
+
+**Cómo funciona para ti**
+
+| Dónde | Qué haces |
+|---|---|
+| **Mayoristas** | Ves cada cuenta, su saldo, su libro de movimientos, sus pedidos; le pones un descuento propio, le ajustas el saldo a mano (con motivo) o la suspendes. |
+| **Recargas** | Confirmas o rechazas las transferencias. Las de Webpay ya están acreditadas cuando las ves. |
+| **Tickets** | Respondes, cierras y, en las solicitudes de reposición, se la pides al proveedor con un botón. |
+| **Pedidos** | Los del panel se ven igual que los de la tienda, con un botón extra para devolver el saldo si no se pudieron entregar. |
+
+Se configura en **Ajustes → Panel mayorista**: margen, recarga mínima, cobro
+mínimo por pedido y un interruptor para apagarlo entero.
+
+#### El saldo no se puede descuadrar
+
+Es lo más delicado del panel, así que está construido para que no dependa de
+que el código se porte bien:
+
+- **Un solo módulo toca el saldo** (`wallet.ts`). Nadie más escribe
+  `balance_clp`.
+- **Cada peso deja una línea en el libro** (`wallet_entries`) con el saldo que
+  quedó, y la línea y el saldo se escriben en la misma transacción de SQLite.
+- **El saldo se lee dentro de la transacción**, así que dos pedidos a la vez no
+  pueden gastar la misma plata: el segundo ve el saldo ya descontado. Un saldo
+  negativo es imposible.
+- **Un pedido cobra una vez y se reembolsa una vez**, y **una recarga acredita
+  una vez**, lo garantiza un índice único de la base —no el código—, así que ni
+  un doble clic, ni dos pestañas, ni un reintento de Flow pueden duplicar nada.
+- La ficha del cliente en el panel compara el libro con el saldo y avisa en
+  rojo si alguna vez no cuadran.
+
+Si un pedido del panel no se puede entregar, el dinero no se pierde: queda
+pagado y sin despachar (el cron lo reintenta solo) y, si no hay forma, el botón
+de **devolver el saldo** lo acredita de vuelta con su línea en el libro.
 
 ### Pedido, de principio a fin
 
@@ -284,7 +384,9 @@ pantalla sin datos pierde la venta.
    idempotente porque Flow reintenta.
 5. Con el pago confirmado se vuelve a elegir el mejor servicio (pudo cambiar
    entre la compra y el pago) y el pedido se envía solo al proveedor.
-6. El cron consulta el avance y el cliente lo sigue en `/pedido/<código>`.
+6. Sale el correo de «pago confirmado» y el cron consulta el avance, que el
+   cliente también sigue en `/pedido/<código>`. Al terminar la entrega se manda
+   el último correo.
 
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
 y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rota.
@@ -384,9 +486,11 @@ src/
     producto/[slug]/            ficha de producto
     pedido/[code]/              seguimiento
     pago/retorno/               vuelta desde Flow
-    admin/(panel)/              panel (protegido)
+    admin/(panel)/              panel de administración (protegido)
+    panel/                      panel mayorista de reventa (clientes con saldo)
     api/flow/confirmar/         webhook de Flow
     api/cron/sincronizar/       actualización de estados
+    api/flow/recarga/           webhook de las recargas de saldo
   lib/
     schema.sql                  esquema de la base de datos
     pricing.ts                  motor de precios
@@ -399,7 +503,16 @@ src/
     autolevels.ts               publicación automática del catálogo por niveles
     copy.mjs                    textos y SEO en español de cada producto
     flow.ts                     cliente de Flow
+    email.ts                    cliente de Resend
+    email-templates.ts          los correos que ve el cliente
+    notify.ts                   qué correo sale en cada momento del pedido
     orders.ts                   ciclo de vida de los pedidos
+    wallet.ts                   saldo de los mayoristas (libro + transacciones)
+    reseller-auth.ts            sesiones del panel de reventa
+    reseller-catalog.ts         catálogo y precios mayoristas
+    reseller-orders.ts          pedidos pagados con saldo
+    topups.ts                   recargas por Webpay y transferencia
+    tickets.ts                  soporte y solicitudes de reposición
     taxonomy.mjs                clasificación de servicios
 scripts/
   parse-catalog.mjs             listas del proveedor -> catalog.json
@@ -414,6 +527,6 @@ scripts/
 - Las contraseñas del panel se guardan con `scrypt` y sal aleatoria.
 - El HTML que escribes en el panel se filtra al guardar: solo pasan etiquetas de
   texto, y los enlaces salen con `rel="nofollow noopener"`.
-- Las variables de entorno `PROVIDER_API_KEY`, `FLOW_API_KEY`, `FLOW_SECRET_KEY`
-  y `CRON_SECRET` tienen prioridad sobre lo guardado en el panel: úsalas si
-  prefieres no dejar las claves en la base de datos.
+- Las variables de entorno `PROVIDER_API_KEY`, `FLOW_API_KEY`, `FLOW_SECRET_KEY`,
+  `RESEND_API_KEY` y `CRON_SECRET` tienen prioridad sobre lo guardado en el
+  panel: úsalas si prefieres no dejar las claves en la base de datos.

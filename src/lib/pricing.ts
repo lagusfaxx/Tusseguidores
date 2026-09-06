@@ -256,3 +256,59 @@ export function formatDuration(minutes: number | null | undefined): string | nul
   }
   return `${Math.round(minutes / 1440)} días`;
 }
+
+/**
+ * -------------------------------------------------------------- panel mayorista
+ *
+ * El panel SMM vende el mismo catálogo mucho más barato, y por eso no usa nada
+ * de lo de arriba: ni el piso por cada 1.000 ni el ticket mínimo de la tienda,
+ * que son justamente los que hacen que un servicio de centavos se venda a
+ * $1.990. Aquí el precio es el costo del proveedor con un margen chico, y
+ * quien compra ya sabe lo que está comprando.
+ *
+ * A cambio, el cliente paga con saldo cargado por adelantado: la plata está
+ * antes que el pedido, que es lo que hace que un margen así se sostenga.
+ */
+
+export type ResellerContext = {
+  usdClp: number;
+  marginPercent: number;
+  /** Cobro mínimo por pedido: bajo esto no vale la pena ni el registro. */
+  minOrderClp: number;
+  minTopupClp: number;
+};
+
+export function resellerContext(): ResellerContext {
+  return {
+    usdClp: getNumberSetting("usd_clp", 980),
+    marginPercent: getNumberSetting("reseller_margin_percent", 30),
+    minOrderClp: getNumberSetting("reseller_min_order_clp", 200),
+    minTopupClp: getNumberSetting("reseller_min_topup_clp", 10000),
+  };
+}
+
+/** Precio mayorista por 1.000 unidades, sin redondear. Se usa en el catálogo. */
+export function resellerRatePer1000(
+  rateUsdPer1000: number,
+  ctx: ResellerContext,
+  discountPercent = 0,
+): number {
+  const bruto = rateUsdPer1000 * ctx.usdClp * (1 + ctx.marginPercent / 100);
+  return bruto * (1 - Math.min(90, Math.max(0, discountPercent)) / 100);
+}
+
+/**
+ * Lo que se le descuenta del saldo por un pedido.
+ *
+ * Se redondea hacia arriba al peso: el saldo son enteros y no queremos que un
+ * pedido de $12,4 termine cobrando $12 mil veces.
+ */
+export function resellerPriceClp(
+  rateUsdPer1000: number,
+  quantity: number,
+  ctx: ResellerContext,
+  discountPercent = 0,
+): number {
+  const precio = (resellerRatePer1000(rateUsdPer1000, ctx, discountPercent) / 1000) * quantity;
+  return Math.max(ctx.minOrderClp, Math.ceil(precio));
+}

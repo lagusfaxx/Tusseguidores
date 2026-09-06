@@ -117,6 +117,7 @@ export default async function PlatformPage({ params }: Params) {
             // sigue viendo todos los productos en el HTML).
             const visibles = items.slice(0, VISIBLES_POR_CATEGORIA);
             const resto = items.slice(VISIBLES_POR_CATEGORIA);
+            const enFila = items.length < 3;
             return (
               <section key={serviceType} id={serviceType} className="mt-9 scroll-mt-24 lg:mt-12">
                 <div className="flex items-end justify-between gap-4">
@@ -127,11 +128,21 @@ export default async function PlatformPage({ params }: Params) {
                     <span className="shrink-0 text-xs text-ink-400">{items.length} opciones</span>
                   ) : null}
                 </div>
-                <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
-                  {visibles.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
+                {/* Con uno o dos productos la grilla de cuatro deja la fila casi
+                    vacía: ahí las tarjetas van en fila ancha. */}
+                {enFila ? (
+                  <div className="mt-4 space-y-3 sm:mt-5">
+                    {visibles.map((product) => (
+                      <ProductCard key={product.id} product={product} fila />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-3 sm:mt-5 sm:grid-cols-2 sm:gap-5 lg:grid-cols-4">
+                    {visibles.map((product) => (
+                      <ProductCard key={product.id} product={product} />
+                    ))}
+                  </div>
+                )}
                 {resto.length ? (
                   <>
                     <input type="checkbox" id={`mas-${serviceType}`} className="peer sr-only" />

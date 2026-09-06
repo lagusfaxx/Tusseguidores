@@ -63,6 +63,7 @@ function migrate(database: Database.Database) {
     ["products", "level", "TEXT NOT NULL DEFAULT ''"],
     ["products", "auto_managed", "INTEGER NOT NULL DEFAULT 0"],
     ["orders", "manual_dispatch_at", "TEXT"],
+    ["orders", "reseller_user_id", "INTEGER"],
   ];
 
   const added: string[] = [];
@@ -79,6 +80,9 @@ function migrate(database: Database.Database) {
   // falla y se lleva puesto el arranque entero.
   database.exec(
     "CREATE INDEX IF NOT EXISTS idx_products_level ON products(platform, service_type, level)",
+  );
+  database.exec(
+    "CREATE INDEX IF NOT EXISTS idx_orders_reseller ON orders(reseller_user_id, id DESC)",
   );
 
   // Las columnas nuevas quedan con su valor por defecto, que para los puntajes
