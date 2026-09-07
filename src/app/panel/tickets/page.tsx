@@ -26,8 +26,7 @@ export default async function PanelTicketsPage({
     <>
       <h1 className="text-2xl font-bold">Soporte</h1>
       <p className="mt-1 text-sm text-ink-400">
-        Abre un ticket y te respondemos aquí mismo. Para pedir una reposición, entra al pedido y usa
-        el botón de reposición: así llega con todos los datos.
+        Las reposiciones se piden desde el pedido.
       </p>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1.1fr] lg:items-start [&>*]:min-w-0">
@@ -53,7 +52,7 @@ export default async function PanelTicketsPage({
               ))}
             </select>
 
-            <label className="field-label mt-4" htmlFor="body">Cuéntanos qué pasa</label>
+            <label className="field-label mt-4" htmlFor="body">Mensaje</label>
             <textarea id="body" name="body" rows={5} required className="field" maxLength={4000} />
           </PanelForm>
         </div>
@@ -88,7 +87,7 @@ export default async function PanelTicketsPage({
               </Link>
             ))}
             {tickets.length === 0 ? (
-              <p className="p-8 text-center text-sm text-ink-400">Todavía no tienes tickets.</p>
+              <p className="p-8 text-center text-sm text-ink-400">Sin tickets.</p>
             ) : null}
           </div>
         </section>

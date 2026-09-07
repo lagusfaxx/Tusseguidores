@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/order-status";
 import { getOrderById, getOrderEvents, ORDER_STATUS_LABEL } from "@/lib/orders";
-import { orderAction, reembolsarPedido } from "@/app/admin/actions";
+import { orderAction, reembolsarPedido, editarDestino } from "@/app/admin/actions";
 import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { get } from "@/lib/db";
@@ -95,6 +95,19 @@ export default async function AdminOrderDetail({
                     {order.link}
                   </a>
                 </dd>
+                {/* Corregir el enlace mal pegado sin cancelar el pedido: solo
+                    mientras no haya salido. */}
+                {!order.provider_order_id && !order.manual_dispatch_at ? (
+                  <form action={editarDestino} className="mt-2 flex flex-wrap gap-2">
+                    <input type="hidden" name="order_id" value={order.id} />
+                    <input
+                      name="link"
+                      defaultValue={order.link}
+                      className="field min-w-0 flex-1 font-mono text-xs"
+                    />
+                    <button type="submit" className="btn btn-ghost text-xs">Corregir</button>
+                  </form>
+                ) : null}
               </div>
               <div><dt className="text-ink-400">Cliente</dt><dd>{order.email}</dd></div>
               <div><dt className="text-ink-400">Teléfono</dt><dd>{order.phone || "—"}</dd></div>

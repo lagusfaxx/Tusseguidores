@@ -47,8 +47,9 @@ export default async function AdminTicketsPage({
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{t.subject}</p>
               <p className="truncate text-xs text-ink-400">
-                <span className="font-mono">{t.code}</span> · {t.user_email} ·{" "}
+                <span className="font-mono">{t.code}</span> · {t.contacto || "sin correo"} ·{" "}
                 {TIPO_TICKET[t.kind] ?? t.kind}
+                {t.user_id ? " · mayorista" : " · tienda"}
                 {t.order_code ? ` · pedido ${t.order_code}` : ""}
               </p>
             </div>

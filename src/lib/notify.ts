@@ -4,6 +4,7 @@ import { emailConfig, emailConfigured, sendEmail, type SendEmailResult } from ".
 import { getBoolSetting } from "./settings";
 import {
   correoAdminPedidoNuevo,
+  correoRespuestaTicket,
   correoBienvenidaPanel,
   correoAdminPedidoPagado,
   correoAdminPedidoTrabado,
@@ -202,6 +203,35 @@ export async function notificarBienvenidaPanel(user: {
   try {
     await sendEmail({
       to: user.email,
+      subject: contenido.subject,
+      html: contenido.html,
+      text: contenido.text,
+    });
+  } catch (error) {
+    console.error("[email]", error);
+  }
+}
+
+/**
+ * Avisa al cliente que contestamos su ticket.
+ *
+ * Sin esto la respuesta se queda en una página que el cliente ya cerró. Vale
+ * tanto para el mayorista como para el cliente de la tienda, que ni siquiera
+ * tiene cuenta: su única forma de enterarse es el correo.
+ */
+export async function notificarRespuestaTicket(input: {
+  to: string;
+  code: string;
+  subject: string;
+  mensaje: string;
+  orderCode?: string | null;
+  url: string;
+}): Promise<void> {
+  if (!emailConfigured() || !input.to.trim()) return;
+  const contenido = correoRespuestaTicket(input);
+  try {
+    await sendEmail({
+      to: input.to,
       subject: contenido.subject,
       html: contenido.html,
       text: contenido.text,

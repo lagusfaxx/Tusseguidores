@@ -1,7 +1,7 @@
 import "server-only";
 import { db, get, run, all } from "./db";
 import { getProductById } from "./catalog";
-import { pricingContext, priceCustomQuantity, costUsd } from "./pricing";
+import { pricingContext, priceCustomQuantity, costUsd, minutosDeEntrega } from "./pricing";
 import { provider, mapProviderStatus, ProviderError, providerConfigured } from "./provider";
 import { getBoolSetting } from "./settings";
 import { orderCode } from "./utils";
@@ -117,6 +117,11 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
       maxCostRatio: product.max_cost_ratio,
       variant: product.variant,
       orderKind: product.order_kind,
+      // El plazo que vio el cliente en la ficha: nadie más lento que eso.
+      promisedMinutes: minutosDeEntrega({
+        avg_minutes: product.avg_minutes,
+        start_minutes: product.start_minutes,
+      }),
     },
     product.auto_select === 1,
   );
@@ -332,6 +337,11 @@ function resolveDispatchService(order: Order): number {
       maxCostRatio: product.max_cost_ratio,
       variant: product.variant,
       orderKind: product.order_kind,
+      // El plazo que vio el cliente en la ficha: nadie más lento que eso.
+      promisedMinutes: minutosDeEntrega({
+        avg_minutes: product.avg_minutes,
+        start_minutes: product.start_minutes,
+      }),
     },
     product.auto_select === 1,
   );

@@ -17,15 +17,13 @@ export default async function PanelLoginPage() {
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Panel mayorista</h1>
         <p className="mt-3 text-ink-200">
-          Los mismos servicios de la tienda a precio de mayorista, sin el precio mínimo de la
-          tienda. Cargas saldo una vez y desde ahí mandas los pedidos que necesites, cuando los
-          necesites.
+          Los mismos servicios, a precio de mayorista. Cargas saldo y pides lo que necesites.
         </p>
-        <ul className="mt-6 space-y-2.5 text-sm text-ink-200">
-          <li>· Precio por cada 1.000 unidades, sin ticket mínimo de la tienda.</li>
-          <li>· Recarga desde {formatClp(ctx.minTopupClp)} por Webpay o transferencia.</li>
-          <li>· Cada pedido descuenta del saldo al instante y entra a entrega solo.</li>
-          <li>· Reposición y soporte por ticket, respondido por nosotros.</li>
+        <ul className="mt-6 space-y-2 text-sm text-ink-200">
+          <li>Precio por cada 1.000 unidades</li>
+          <li>Recarga desde {formatClp(ctx.minTopupClp)}, Webpay o transferencia</li>
+          <li>El saldo se descuenta al pedir</li>
+          <li>Reposición y soporte por ticket</li>
         </ul>
       </div>
 
@@ -47,7 +45,7 @@ export default async function PanelLoginPage() {
         </PanelForm>
         <p className="mt-4 text-sm text-ink-400">
           ¿No tienes cuenta?{" "}
-          <Link href="/panel/crear-cuenta" className="text-brand-300 hover:text-white">Créala gratis</Link>
+          <Link href="/panel/crear-cuenta" className="text-brand-300 hover:text-white">Créala aquí</Link>
         </p>
       </div>
     </div>

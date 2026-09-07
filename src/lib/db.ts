@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, detectOrderKind,
+  startMinutesFromName,
 } from "./quality.mjs";
 
 export const DATA_DIR = process.env.DATA_DIR
@@ -54,6 +55,7 @@ function migrate(database: Database.Database) {
     ["provider_services", "geo", "TEXT NOT NULL DEFAULT 'global'"],
     ["provider_services", "variant", "TEXT NOT NULL DEFAULT ''"],
     ["provider_services", "order_kind", "TEXT NOT NULL DEFAULT 'default'"],
+    ["provider_services", "start_minutes", "INTEGER"],
     ["orders", "comments", "TEXT"],
     ["orders", "transfer_notified_at", "TEXT"],
     ["orders", "transfer_reference", "TEXT"],
@@ -74,6 +76,43 @@ function migrate(database: Database.Database) {
     }
   }
 
+  // `tickets` nació solo para los mayoristas, con user_id obligatorio. Los
+  // clientes de la tienda no tienen cuenta, así que la columna pasa a ser
+  // opcional. SQLite no sabe quitar un NOT NULL: hay que rehacer la tabla.
+  const ticketsInfo = database.pragma("table_info(tickets)") as {
+    name: string;
+    notnull: number;
+  }[];
+  const userIdObligatorio = ticketsInfo.some((c) => c.name === "user_id" && c.notnull === 1);
+  if (userIdObligatorio) {
+    database.exec(`
+      PRAGMA foreign_keys=off;
+      BEGIN;
+      CREATE TABLE tickets_nueva (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        code        TEXT    NOT NULL UNIQUE,
+        user_id     INTEGER REFERENCES reseller_users(id) ON DELETE CASCADE,
+        guest_email TEXT,
+        order_id    INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+        subject     TEXT    NOT NULL,
+        kind        TEXT    NOT NULL DEFAULT 'consulta',
+        status      TEXT    NOT NULL DEFAULT 'abierto',
+        created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+      );
+      INSERT INTO tickets_nueva (id, code, user_id, order_id, subject, kind, status, created_at, updated_at)
+        SELECT id, code, user_id, order_id, subject, kind, status, created_at, updated_at FROM tickets;
+      DROP TABLE tickets;
+      ALTER TABLE tickets_nueva RENAME TO tickets;
+      COMMIT;
+      PRAGMA foreign_keys=on;
+    `);
+    database.exec("CREATE INDEX IF NOT EXISTS idx_tickets_user  ON tickets(user_id, updated_at DESC)");
+    database.exec("CREATE INDEX IF NOT EXISTS idx_tickets_state ON tickets(status, updated_at DESC)");
+  } else if (!ticketsInfo.some((c) => c.name === "guest_email")) {
+    database.exec("ALTER TABLE tickets ADD COLUMN guest_email TEXT");
+  }
+
   // Índices que dependen de columnas agregadas por esta misma función. No
   // pueden vivir en schema.sql: ese archivo se ejecuta antes de migrar y sobre
   // una base ya existente la columna todavía no está, así que el CREATE INDEX
@@ -92,6 +131,7 @@ function migrate(database: Database.Database) {
     "provider_services.refill_days", "provider_services.drop_score",
     "provider_services.speed_score", "provider_services.geo",
     "provider_services.variant", "provider_services.order_kind",
+    "provider_services.start_minutes",
   ];
   if (added.some((column) => quality.includes(column))) {
     rescoreServices(database);
@@ -109,7 +149,8 @@ export function rescoreServices(database: Database.Database = db): number {
 
   const update = database.prepare(
     `UPDATE provider_services
-        SET refill_days = ?, drop_score = ?, speed_score = ?, geo = ?, variant = ?, order_kind = ?
+        SET refill_days = ?, drop_score = ?, speed_score = ?, geo = ?, variant = ?,
+            order_kind = ?, start_minutes = ?
       WHERE service_id = ?`,
   );
 
@@ -124,6 +165,7 @@ export function rescoreServices(database: Database.Database = db): number {
         detectGeo(name),
         detectVariant(name),
         detectOrderKind(name, row.service_type),
+        startMinutesFromName(name),
         row.service_id,
       );
     }

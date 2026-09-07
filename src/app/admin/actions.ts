@@ -11,6 +11,7 @@ import { testEmail } from "@/lib/email";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant, orderKindFromApiType,
+  startMinutesFromName,
 } from "@/lib/quality.mjs";
 import {
   sendToProvider, setStatus, setStatusManual, markDispatchedManually, syncOpenOrders, logEvent,
@@ -19,11 +20,15 @@ import {
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
-import { publicarNiveles } from "@/lib/autolevels";
+import { publicarNiveles, refrescarEtiquetasDeEntrega } from "@/lib/autolevels";
 import { movimiento } from "@/lib/wallet";
 import { acreditar, rechazar } from "@/lib/topups";
 import { reembolsar } from "@/lib/reseller-orders";
-import { agregarMensaje, cerrarTicket, reabrirTicket } from "@/lib/tickets";
+import {
+  agregarMensaje, cerrarTicket, reabrirTicket, ticketPorId, contactoDeTicket,
+} from "@/lib/tickets";
+import { notificarRespuestaTicket } from "@/lib/notify";
+import { absoluteUrl } from "@/lib/seo";
 import { formatClp } from "@/lib/pricing";
 import type { OrderStatus } from "@/lib/types";
 
@@ -583,6 +588,37 @@ export async function syncOrders() {
   revalidatePath("/admin");
 }
 
+/**
+ * Corrige el destino de un pedido.
+ *
+ * Es lo que pasa cuando el cliente pega mal su usuario: hasta ahora había que
+ * cancelar y rehacer. Si el pedido todavía no salió se cambia y ya está; si ya
+ * salió, no se toca, porque el destino real está en manos de la entrega y
+ * cambiarlo aquí solo serviría para no saber a dónde se mandó.
+ */
+export async function editarDestino(formData: FormData) {
+  const id = Number(formData.get("order_id"));
+  await withErrorRedirect(`/admin/pedidos/${id}`, async () => {
+    await guard();
+    const order = get<{ link: string; provider_order_id: number | null; manual_dispatch_at: string | null }>(
+      "SELECT link, provider_order_id, manual_dispatch_at FROM orders WHERE id = ?",
+      [id],
+    );
+    if (!order) throw new Error("Pedido no encontrado.");
+    if (order.provider_order_id || order.manual_dispatch_at) {
+      throw new Error("El pedido ya salió a entrega: el destino no se puede cambiar.");
+    }
+
+    const link = String(formData.get("link") ?? "").trim();
+    if (!link) throw new Error("Escribe el nuevo destino.");
+    if (link === order.link) return;
+
+    run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [link, id]);
+    logEvent(id, "info", `Destino corregido desde el panel: ${order.link} → ${link}`);
+    revalidatePath(`/admin/pedidos/${id}`);
+  });
+}
+
 // ------------------------------------------------------------ panel mayorista
 
 /** Ajusta el saldo de un cliente a mano, con su motivo. */
@@ -671,6 +707,27 @@ export async function responderTicket(formData: FormData) {
     } else if (cuerpo) {
       agregarMensaje(id, "admin", cuerpo);
     }
+
+    // La respuesta también sale por correo: el cliente de la tienda no tiene
+    // panel donde volver a mirar.
+    if (cuerpo) {
+      const ticket = ticketPorId(id);
+      if (ticket) {
+        const pedido = ticket.order_id
+          ? get<{ code: string }>("SELECT code FROM orders WHERE id = ?", [ticket.order_id])
+          : undefined;
+        await notificarRespuestaTicket({
+          to: contactoDeTicket(ticket),
+          code: ticket.code,
+          subject: ticket.subject,
+          mensaje: cuerpo,
+          orderCode: pedido?.code ?? null,
+          url: ticket.user_id
+            ? absoluteUrl(`/panel/tickets/${ticket.code}`)
+            : absoluteUrl(`/pedido/${pedido?.code ?? ""}#soporte`),
+        });
+      }
+    }
     revalidatePath(`/admin/tickets/${id}`);
     revalidatePath("/admin/tickets");
   });
@@ -732,10 +789,10 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
     INSERT INTO provider_services
       (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
        min_qty, max_qty, refill, cancel, refill_days, drop_score, speed_score, geo, variant,
-       order_kind, provider_enabled, synced_at)
+       order_kind, start_minutes, provider_enabled, synced_at)
     VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
             @min_qty, @max_qty, @refill, @cancel, @refill_days, @drop_score, @speed_score,
-            @geo, @variant, @order_kind, 1, datetime('now'))
+            @geo, @variant, @order_kind, @start_minutes, 1, datetime('now'))
     ON CONFLICT(service_id) DO UPDATE SET
       name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
       platform = excluded.platform, service_type = excluded.service_type,
@@ -744,7 +801,7 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
       refill = excluded.refill, cancel = excluded.cancel,
       refill_days = excluded.refill_days, drop_score = excluded.drop_score,
       speed_score = excluded.speed_score, geo = excluded.geo, variant = excluded.variant,
-      order_kind = excluded.order_kind,
+      order_kind = excluded.order_kind, start_minutes = excluded.start_minutes,
       provider_enabled = 1, synced_at = datetime('now')
   `);
 
@@ -777,6 +834,7 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
         // El campo `type` de la API manda: dice si el servicio espera texto,
         // un número de opción o simplemente una cantidad.
         order_kind: orderKindFromApiType(row.type, clean, serviceType),
+        start_minutes: startMinutesFromName(clean),
       });
     }
     // Lo que el proveedor ya no lista queda deshabilitado, no se borra: así los
@@ -826,9 +884,17 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
 export async function rescoreCatalog(_prev: ActionState): Promise<ActionState> {
   await guard();
   const total = rescoreServices();
+  // Los productos guardan el plazo con el que se publicaron: si el recálculo
+  // cambió lo que sabemos, hay que actualizarlos o seguirán prometiendo lo que
+  // ya no es verdad.
+  const etiquetas = refrescarEtiquetasDeEntrega();
   refreshStore();
   revalidatePath("/admin/catalogo");
-  return { ok: `Recalculados ${total} servicios.` };
+  return {
+    ok:
+      `Recalculados ${total} servicios.` +
+      (etiquetas ? ` Se actualizó el plazo de entrega de ${etiquetas} producto(s).` : ""),
+  };
 }
 
 /** Guarda o borra el texto SEO propio de una página. */

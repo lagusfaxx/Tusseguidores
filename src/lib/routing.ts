@@ -26,6 +26,13 @@ export type RoutingInput = {
   referenceServiceId: number;
   referenceRateUsd: number;
   maxCostRatio: number;
+  /**
+   * Plazo prometido al cliente, en minutos. Ningún candidato puede tardar
+   * mucho más que esto: la ficha decía "inicio inmediato" y el pedido salía a
+   * un servicio de veinte horas, que es exactamente la promesa que no hay que
+   * romper.
+   */
+  promisedMinutes?: number | null;
   /** Subtipo del servicio de referencia: solo enrutamos dentro del mismo. */
   variant?: string;
   /**
@@ -49,6 +56,15 @@ const GEO_MARKS = ROUTABLE_GEOS.map(() => "?").join(",");
  */
 export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
   const budget = input.referenceRateUsd * Math.max(1, input.maxCostRatio);
+
+  // Tope de tiempo: hasta el doble de lo prometido, y nunca más de un día si
+  // se prometió algo rápido. Un servicio sin plazo declarado (NULL) pasa: es
+  // lo que hay para casi todo el catálogo y descartarlo dejaría sin candidatos.
+  const techo =
+    input.promisedMinutes != null && input.promisedMinutes > 0
+      ? Math.max(input.promisedMinutes * 2, 120)
+      : null;
+
   return all<Candidate>(
     `SELECT s.*, ${SCORE} AS score
        FROM provider_services s
@@ -62,12 +78,15 @@ export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
         AND s.max_qty >= ?
         AND s.rate_usd_per_1000 > 0
         AND s.rate_usd_per_1000 <= ?
+        ${techo != null ? "AND COALESCE(s.avg_minutes, s.start_minutes) <= ?" : ""}
       ORDER BY score DESC, s.rate_usd_per_1000 ASC
       LIMIT ?`,
     [
       input.platform, input.serviceType, input.variant ?? "",
       input.orderKind ?? "default", ...ROUTABLE_GEOS,
-      input.quantity, input.quantity, budget, limit,
+      input.quantity, input.quantity, budget,
+      ...(techo != null ? [techo] : []),
+      limit,
     ],
   );
 }
@@ -109,7 +128,12 @@ export function pickService(input: RoutingInput, autoSelect: boolean): Routed | 
     };
   }
 
-  const best = rankCandidates(input, 1)[0];
+  // Con el tope de tiempo puede no quedar ninguno: se reintenta sin él, porque
+  // es mejor entregar tarde que no entregar.
+  const best = rankCandidates(input, 1)[0] ??
+    (input.promisedMinutes != null
+      ? rankCandidates({ ...input, promisedMinutes: null }, 1)[0]
+      : undefined);
   if (!best) {
     if (!referenceUsable) return null;
     return {

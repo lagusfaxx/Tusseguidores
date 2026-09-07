@@ -132,8 +132,7 @@ export function correoTransferenciaPendiente(order: Order): EmailContent {
       filas,
       aviso: datos.instrucciones ? escape(datos.instrucciones) : undefined,
       cta: { texto: "Ver mi pedido y avisar que transferí", url },
-      cierre:
-        "Cuando hayas transferido, avísanos desde esa página: así lo revisamos antes y no queda esperando.",
+      cierre: "Cuando transfieras, avísanos desde esa página.",
     }),
     text: texto([
       `Reservamos tu pedido ${order.code}.`,
@@ -165,12 +164,11 @@ export function correoPagoConfirmado(order: Order): EmailContent {
     subject: `Pago confirmado · pedido ${order.code} en camino`,
     html: layout({
       titulo: "Recibimos tu pago",
-      intro:
-        "Tu pedido ya está en la fila de entrega. Empieza en unos minutos y avanza solo; no tienes que hacer nada más.",
+      intro: "Tu pedido está en la fila de entrega. Empieza en unos minutos.",
       filas: detalle(order),
       aviso:
-        "Mantén el perfil o la publicación en <strong>público</strong> hasta que termine la entrega. " +
-        "Si se pone en privado a mitad de camino, la entrega se detiene.",
+        "Mantén el perfil o la publicación en <strong>público</strong> hasta que termine: si se " +
+        "pone en privado, la entrega se detiene.",
       cta: { texto: "Seguir mi pedido", url },
     }),
     text: texto([
@@ -202,9 +200,8 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
     html: layout({
       titulo: parcial ? "Entregamos parte de tu pedido" : "Tu pedido está entregado",
       intro: parcial
-        ? `Alcanzamos a entregar ${escape(entregado)} de ${escape(formatNumber(order.quantity))}. ` +
-          "No pudimos completar el resto; escríbenos y lo resolvemos."
-        : "Ya está todo entregado. Si algo no cuadra, respóndenos este correo dentro de las próximas horas y lo revisamos.",
+        ? `Entregamos ${escape(entregado)} de ${escape(formatNumber(order.quantity))}. Escríbenos y lo resolvemos.`
+        : "Ya está todo entregado. Si algo no cuadra, respóndenos este correo.",
       filas: detalle(order),
       cta: { texto: "Ver el detalle", url },
     }),
@@ -242,33 +239,53 @@ export function correoBienvenidaPanel(input: {
     subject: `Tu cuenta mayorista en ${tienda} está lista`,
     html: layout({
       titulo: nombre ? `Bienvenido, ${nombre}` : "Bienvenido al panel mayorista",
-      intro:
-        "Tu cuenta ya está activa. Compras el mismo catálogo a precio de mayorista —muy por " +
-        "debajo del de la tienda y sin su precio mínimo— y pagas con saldo cargado por adelantado.",
+      intro: "Tu cuenta ya está activa. Compras a precio de mayorista, pagando con saldo.",
       filas: [
         ["Tu cuenta", input.email],
         ["Recarga mínima", formatClp(input.minTopupClp)],
         ["Formas de pago", "Webpay o transferencia"],
       ],
-      aviso:
-        "Cómo funciona: cargas saldo, eliges el servicio, pegas el enlace y la cantidad. Cada " +
-        "pedido se descuenta del saldo al instante y entra a entrega solo.",
+      aviso: "Cargas saldo, eliges el servicio y pides. Cada pedido se descuenta al instante.",
       cta: { texto: "Entrar al panel", url },
-      cierre:
-        "Si un pedido sale mal, abres un ticket desde el panel y lo revisamos. En los servicios " +
-        "con reposición, la pides desde la ficha del pedido.",
+      cierre: "Si un pedido sale mal, abres un ticket desde el panel.",
     }),
     text: texto([
       nombre ? `Bienvenido, ${nombre}.` : "Bienvenido al panel mayorista.",
       "",
       `Tu cuenta ${input.email} ya está activa.`,
-      "Precio mayorista, muy por debajo del de la tienda.",
-      `Recarga mínima: ${formatClp(input.minTopupClp)} por Webpay o transferencia.`,
+      `Recarga mínima: ${formatClp(input.minTopupClp)}, por Webpay o transferencia.`,
       "",
-      "Cargas saldo, eliges el servicio, pegas el enlace y la cantidad. Cada pedido se descuenta",
-      "del saldo al instante y entra a entrega solo.",
+      "Cargas saldo, eliges el servicio y pides. Cada pedido se descuenta al instante.",
       "",
       `Entra en: ${url}`,
+    ]),
+  };
+}
+
+/** Respuesta del soporte en un ticket. */
+export function correoRespuestaTicket(input: {
+  code: string;
+  subject: string;
+  mensaje: string;
+  orderCode?: string | null;
+  url: string;
+}): EmailContent {
+  return {
+    subject: `Respondimos tu consulta · ${input.code}`,
+    html: layout({
+      titulo: "Te respondimos",
+      intro: `Sobre <strong>${escape(input.subject)}</strong>${
+        input.orderCode ? ` (pedido ${escape(input.orderCode)})` : ""
+      }:`,
+      aviso: escape(input.mensaje).replace(/\n/g, "<br>"),
+      cta: { texto: "Ver la conversación", url: input.url },
+    }),
+    text: texto([
+      `Respondimos tu consulta ${input.code}.`,
+      "",
+      input.mensaje,
+      "",
+      input.url,
     ]),
   };
 }

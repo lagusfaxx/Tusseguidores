@@ -59,12 +59,15 @@ export function speedScore(name, avgMinutes) {
     else if (avgMinutes <= 4320) score = 28;
     else score = 14;
   } else {
-    // Sin dato de tiempo nos guiamos por lo que promete el nombre.
-    if (/\binstant\b|\b0\s*-\s*(1h|15\s*min|30\s*min)\b|\bimmediate\b/i.test(n)) score = 82;
-    else if (/\bsuper\s*fast\b|\bultra\s*fast\b|\bfastest\b/i.test(n)) score = 76;
-    else if (/\bfast\b|\bquick\b/i.test(n)) score = 68;
-    else if (/\bslow\b/i.test(n)) score = 30;
-    else score = 50;
+    // Sin dato del proveedor nos guiamos por el plazo que promete el nombre.
+    const prometido = startMinutesFromName(n);
+    if (prometido == null) score = 50;
+    else if (prometido <= 30) score = 82;
+    else if (prometido <= 60) score = 76;
+    else if (prometido <= 180) score = 68;
+    else if (prometido <= 720) score = 55;
+    else if (prometido <= 1440) score = 42;
+    else score = 28;
   }
 
   if (/\binstant\b/i.test(n)) score += 4;
@@ -72,6 +75,81 @@ export function speedScore(name, avgMinutes) {
   if (/\bdrip[-\s]?feed\b/i.test(n)) score -= 10;
 
   return clamp(score);
+}
+
+/**
+ * Minutos que promete el nombre del servicio para *empezar* la entrega.
+ *
+ * Los paneles SMM escriben el plazo dentro del nombre —"Instant", "0-1H",
+ * "1-12 Hours", "24-48H", "Start Time: 0-6 Hrs"— y esa es toda la información
+ * que hay: la API de servicios no devuelve el tiempo promedio.
+ *
+ * Se devuelve **el extremo alto** del rango a propósito. Un "0-24H" que
+ * prometemos como inmediato es una promesa incumplida en veinticuatro horas;
+ * prometido como "hasta 24 h", es un pedido que llegó antes.
+ *
+ * Devuelve null cuando el nombre no dice nada: ahí no hay que inventar un
+ * plazo, hay que decir que no está garantizado.
+ */
+export function startMinutesFromName(name) {
+  const n = String(name ?? "").toLowerCase();
+
+  // El plazo de reposición no es el de entrega. "30D Refill" y "365 Days
+  // Guarantee" hablan de cuánto reponen, no de cuándo empiezan, así que se
+  // sacan del texto antes de buscar nada.
+  const limpio = n
+    .replace(/\d+\s*(?:d|days?|día|dias|días)\s*(?:refill|guarante\w*|garant\w*)/g, " ")
+    .replace(/(?:refill|guarante\w*|garant\w*)\s*\d+\s*(?:d|days?)/g, " ")
+    .replace(/lifetime\s*(?:refill|guarante\w*)/g, " ")
+    // Los ritmos tampoco son plazos: "100-300 Hour/Day" es cuánto entrega por
+    // día, no cuándo empieza. Todo lo que lleve una barra detrás se va.
+    .replace(
+      /\d+[\d\s.,\-–]*(?:k|m)?\s*(?:hours?|hrs?|h|minutes?|mins?|m|days?|d)?\s*\/\s*(?:day|days|d|hour|hours|hr|h|week|month)\b/g,
+      " ",
+    );
+
+  // Rangos explícitos: "0-1h", "1 - 12 hours", "24-48 hrs", "30-60 min".
+  const rango = limpio.match(
+    /\b(\d+)\s*(?:-|–|to)\s*(\d+)\s*(h|hr|hrs|hour|hours|m|min|mins|minutes|d|day|days)\b/,
+  );
+  if (rango) return enMinutos(Number(rango[2]), rango[3]);
+
+  // Un número con unidad, precedido de la palabra que lo enmarca. Las palabras
+  // van con límite de palabra a propósito: sin él, el "in" de "Instant"
+  // enganchaba el "30 d" de "30D Refill" y un servicio inmediato quedaba
+  // marcado como de treinta días.
+  const simple = limpio.match(
+    /\b(?:start|starts|starting|speed|delivery|deliver|within|in|after|time)\b\W{0,12}(\d+)\s*(h|hr|hrs|hour|hours|m|min|mins|minutes|d|day|days)\b/,
+  );
+  if (simple) return enMinutos(Number(simple[1]), simple[2]);
+
+  // Un plazo suelto con unidad de tiempo y nada que lo contradiga.
+  const suelto = limpio.match(/\b(\d+)\s*(h|hr|hrs|hour|hours)\b/);
+  if (suelto) return enMinutos(Number(suelto[1]), suelto[2]);
+
+  // "Instant" e "Immediate" son la promesa más común y la más repetida.
+  if (/\binstant\w*\b|\bimmediate\w*\b|\bno\s*delay\b/.test(limpio)) return 30;
+  if (/\bsuper\s*fast\b|\bultra\s*fast\b|\bfastest\b/.test(limpio)) return 60;
+  if (/\bfast\b|\bquick\b/.test(limpio)) return 180;
+  if (/\bslow\b|\bgradual\b|\bdrip\s*feed\b/.test(limpio)) return 1440;
+
+  return null;
+}
+
+function enMinutos(valor, unidad) {
+  if (!Number.isFinite(valor) || valor <= 0) return null;
+  if (/^m/.test(unidad)) return Math.min(valor, 60 * 24 * 30);
+  if (/^h/.test(unidad)) return Math.min(valor * 60, 60 * 24 * 30);
+  return Math.min(valor * 60 * 24, 60 * 24 * 30);
+}
+
+/**
+ * El plazo con el que trabajamos: el promedio real si el proveedor lo dio, y
+ * si no, lo que promete el nombre. Null si no hay ninguno de los dos.
+ */
+export function tiempoDeEntrega(name, avgMinutes) {
+  if (avgMinutes != null && avgMinutes > 0) return avgMinutes;
+  return startMinutesFromName(name);
 }
 
 /** Peso con el que se combinan ambos ejes al elegir servicio. */

@@ -3,12 +3,17 @@ import { all, get, run } from "./db";
 import type { Ticket, TicketMessage } from "./types";
 
 /**
- * Tickets de soporte del panel.
+ * Tickets de soporte.
+ *
+ * Los abre un mayorista desde su panel o un cliente de la tienda desde el
+ * seguimiento de su pedido. En el segundo caso no hay cuenta: el ticket queda
+ * colgado del pedido y el código del pedido es la llave para verlo, igual que
+ * para ver el pedido mismo.
  *
  * Una solicitud de reposición es un ticket con `kind = 'reposicion'` y el
- * pedido enganchado, en vez de una tabla aparte: el dueño contesta, pide la
- * reposición al proveedor desde la misma pantalla y cierra. Un solo lugar
- * donde mirar es lo que hace que nada se quede sin respuesta.
+ * pedido enganchado, en vez de una tabla aparte: el dueño contesta, gestiona
+ * la reposición desde la misma pantalla y cierra. Un solo lugar donde mirar es
+ * lo que hace que nada se quede sin respuesta.
  */
 
 export const ETIQUETA_TICKET: Record<string, string> = {
@@ -35,7 +40,10 @@ function codigoLibre(): string {
 }
 
 export type CrearTicketInput = {
-  userId: number;
+  /** Mayorista con cuenta. Null en los tickets de la tienda. */
+  userId?: number | null;
+  /** Correo del pedido, cuando no hay cuenta. */
+  guestEmail?: string | null;
   subject: string;
   body: string;
   kind?: "consulta" | "problema" | "reposicion";
@@ -63,9 +71,20 @@ export function crearTicket(input: CrearTicketInput): CrearTicketResult {
     }
   }
 
+  if (!input.userId && !input.guestEmail) {
+    return { ok: false, error: "Falta identificar quién abre el ticket." };
+  }
+
   const info = run(
-    "INSERT INTO tickets (code, user_id, order_id, subject, kind) VALUES (?, ?, ?, ?, ?)",
-    [codigoLibre(), input.userId, input.orderId ?? null, subject, input.kind ?? "consulta"],
+    "INSERT INTO tickets (code, user_id, guest_email, order_id, subject, kind) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      codigoLibre(),
+      input.userId ?? null,
+      input.userId ? null : (input.guestEmail ?? "").trim().toLowerCase(),
+      input.orderId ?? null,
+      subject,
+      input.kind ?? "consulta",
+    ],
   );
   const ticket = ticketPorId(Number(info.lastInsertRowid))!;
   agregarMensaje(ticket.id, "cliente", body);
@@ -123,10 +142,12 @@ export function ticketsDelCliente(userId: number, limit = 50): Ticket[] {
 }
 
 export type TicketConCliente = Ticket & {
-  user_email: string;
-  user_name: string;
+  user_email: string | null;
+  user_name: string | null;
   order_code: string | null;
   mensajes: number;
+  /** Correo con el que contestarle, tenga cuenta o no. */
+  contacto: string;
 };
 
 export function ticketsParaAdmin(estado = "abiertos", limit = 100): TicketConCliente[] {
@@ -138,9 +159,10 @@ export function ticketsParaAdmin(estado = "abiertos", limit = 100): TicketConCli
         : "WHERE t.status != 'cerrado'";
   return all<TicketConCliente>(
     `SELECT t.*, u.email AS user_email, u.name AS user_name, o.code AS order_code,
+            COALESCE(u.email, t.guest_email, o.email, '') AS contacto,
             (SELECT COUNT(*) FROM ticket_messages m WHERE m.ticket_id = t.id) AS mensajes
        FROM tickets t
-       JOIN reseller_users u ON u.id = t.user_id
+       LEFT JOIN reseller_users u ON u.id = t.user_id
        LEFT JOIN orders o ON o.id = t.order_id
        ${where}
       ORDER BY (t.status = 'abierto') DESC, t.updated_at DESC
@@ -151,4 +173,35 @@ export function ticketsParaAdmin(estado = "abiertos", limit = 100): TicketConCli
 
 export function contarTicketsAbiertos(): number {
   return get<{ n: number }>("SELECT COUNT(*) AS n FROM tickets WHERE status = 'abierto'")?.n ?? 0;
+}
+
+/** Tickets de un pedido de la tienda, para mostrarlos en su seguimiento. */
+export function ticketsDePedido(orderId: number): Ticket[] {
+  return all<Ticket>(
+    "SELECT * FROM tickets WHERE order_id = ? ORDER BY id DESC",
+    [orderId],
+  );
+}
+
+/** Un ticket del pedido, comprobando que de verdad sea de ese pedido. */
+export function ticketDePedido(orderId: number, code: string): Ticket | undefined {
+  return get<Ticket>("SELECT * FROM tickets WHERE code = ? AND order_id = ?", [
+    code.trim().toUpperCase(),
+    orderId,
+  ]);
+}
+
+/** Con quién hay que hablar en este ticket. */
+export function contactoDeTicket(ticket: Ticket): string {
+  if (ticket.user_id) {
+    return (
+      get<{ email: string }>("SELECT email FROM reseller_users WHERE id = ?", [ticket.user_id])
+        ?.email ?? ""
+    );
+  }
+  if (ticket.guest_email) return ticket.guest_email;
+  if (ticket.order_id) {
+    return get<{ email: string }>("SELECT email FROM orders WHERE id = ?", [ticket.order_id])?.email ?? "";
+  }
+  return "";
 }
