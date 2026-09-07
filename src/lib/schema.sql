@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS provider_services (
   -- Puntajes de calidad (0-100) con los que la tienda elige a qué servicio
   -- pedirle cada pedido. Se recalculan en cada importación.
   refill_days          INTEGER NOT NULL DEFAULT 0,
+  -- Minutos que promete el nombre para empezar ("0-1H", "24-48H", "Instant").
+  -- La API de servicios no devuelve el tiempo promedio, así que sin esto no
+  -- hay ningún plazo del que hablarle al cliente.
+  start_minutes        INTEGER,
   drop_score           INTEGER NOT NULL DEFAULT 50,
   speed_score          INTEGER NOT NULL DEFAULT 50,
   -- Región a la que apunta el servicio y subtipo dentro de su categoría.
@@ -278,12 +282,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_order_kind
 CREATE UNIQUE INDEX IF NOT EXISTS idx_wallet_topup
   ON wallet_entries(topup_id) WHERE topup_id IS NOT NULL;
 
--- Tickets de soporte del panel. Una solicitud de reposición es un ticket con
--- kind = 'reposicion' y el pedido enganchado.
+-- Tickets de soporte. Los abre un mayorista desde su panel o un cliente
+-- normal desde el seguimiento de su pedido; en ese caso no hay cuenta y el
+-- correo del pedido es toda la identidad que existe. Una solicitud de
+-- reposición es un ticket con kind = 'reposicion' y el pedido enganchado.
 CREATE TABLE IF NOT EXISTS tickets (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   code       TEXT    NOT NULL UNIQUE,
-  user_id    INTEGER NOT NULL REFERENCES reseller_users(id) ON DELETE CASCADE,
+  user_id    INTEGER REFERENCES reseller_users(id) ON DELETE CASCADE,
+  guest_email TEXT,
   order_id   INTEGER REFERENCES orders(id) ON DELETE SET NULL,
   subject    TEXT    NOT NULL,
   kind       TEXT    NOT NULL DEFAULT 'consulta',  -- consulta | problema | reposicion

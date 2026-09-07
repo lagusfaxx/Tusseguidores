@@ -3,7 +3,7 @@ import { buildCopy } from "./copy.mjs";
 import { LADDERS, cantidadDeReferencia } from "./offers";
 import { LEVELS, nivelesDeOferta, rasgosDeServicio, type Candidate, type LevelDef, type PickedLevel } from "./levels";
 import { platformLabel, serviceTypeLabel, PLATFORM_PRIORITY } from "./labels";
-import { formatDuration } from "./pricing";
+import { formatDuration, minutosDeEntrega } from "./pricing";
 import { SUPPORTED_ORDER_KINDS, ROUTABLE_GEOS } from "./quality.mjs";
 import { slugify } from "./utils";
 
@@ -59,9 +59,20 @@ function escalera(serviceType: string, orderKind: string, service: Candidate): n
   return ladder.length ? ladder : [Math.max(1, service.min_qty)];
 }
 
-function etiquetaEntrega(avgMinutes: number | null): string {
-  const texto = formatDuration(avgMinutes);
-  return texto ? `Entrega en ~${texto}` : "Inicio inmediato";
+/**
+ * Lo que se promete en la tarjeta y en la ficha.
+ *
+ * Con plazo conocido va el plazo. Sin plazo no se promete inmediatez: se dice
+ * que empieza el mismo día, que es lo único que se puede sostener.
+ */
+function etiquetaEntrega(service: { avg_minutes: number | null; start_minutes?: number | null }): string {
+  const minutos = minutosDeEntrega(service);
+  if (minutos == null) return "Entrega el mismo día";
+  // Solo lo que arranca en minutos se llama inmediato. Media hora ya es un
+  // número que el cliente prefiere ver escrito.
+  if (minutos <= 10) return "Inicio inmediato";
+  const texto = formatDuration(minutos);
+  return texto ? `Entrega en ~${texto}` : "Entrega el mismo día";
 }
 
 function garantia(service: Candidate): string {
@@ -277,7 +288,7 @@ export function publicarNiveles({
           link_label: copia.link.label,
           link_placeholder: copia.link.placeholder,
           link_help: copia.link.help,
-          delivery_label: etiquetaEntrega(elegido.service.avg_minutes),
+          delivery_label: etiquetaEntrega(elegido.service),
           quality_label: etiquetaCalidad(elegido.level, elegido.service),
           refill_days: elegido.service.refill_days,
           guarantee_text: garantia(elegido.service),
@@ -359,4 +370,33 @@ function sembrarPacks(productId: number, ladder: number[]) {
       [productId, quantity, i === popular ? 1 : 0, i],
     ),
   );
+}
+
+/**
+ * Vuelve a escribir la etiqueta de entrega de los productos publicados.
+ *
+ * Los productos guardan la etiqueta con la que se publicaron. Cuando cambia lo
+ * que sabemos del plazo —una sincronización nueva, el lector de plazos
+ * corregido— hay productos vivos prometiendo "inicio inmediato" sobre un
+ * servicio que declara veinte horas. Esto los pone al día sin tocar nada más.
+ */
+export function refrescarEtiquetasDeEntrega(): number {
+  const filas = all<{ id: number; delivery_label: string; avg_minutes: number | null; start_minutes: number | null }>(
+    `SELECT p.id, p.delivery_label, s.avg_minutes, s.start_minutes
+       FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id`,
+  );
+  const update = db.prepare("UPDATE products SET delivery_label = ? WHERE id = ?");
+  let cambiados = 0;
+  const aplicar = db.transaction(() => {
+    for (const fila of filas) {
+      const nueva = etiquetaEntrega(fila);
+      if (nueva !== fila.delivery_label) {
+        update.run(nueva, fila.id);
+        cambiados++;
+      }
+    }
+  });
+  aplicar();
+  return cambiados;
 }

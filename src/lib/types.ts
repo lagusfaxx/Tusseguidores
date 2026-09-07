@@ -13,6 +13,8 @@ export type ProviderService = {
   cancel: number;
   provider_description: string | null;
   refill_days: number;
+  /** Minutos que promete el nombre para empezar. Null = no dice nada. */
+  start_minutes: number | null;
   drop_score: number;
   speed_score: number;
   geo: string;
@@ -180,7 +182,10 @@ export type Topup = {
 export type Ticket = {
   id: number;
   code: string;
-  user_id: number;
+  /** Mayorista con cuenta, o null si lo abrió un cliente de la tienda. */
+  user_id: number | null;
+  /** Correo del cliente sin cuenta. */
+  guest_email: string | null;
   order_id: number | null;
   subject: string;
   kind: "consulta" | "problema" | "reposicion" | string;

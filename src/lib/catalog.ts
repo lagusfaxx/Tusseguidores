@@ -10,6 +10,7 @@ export type ProductWithService = Product & {
   provider_max: number;
   provider_enabled: number;
   avg_minutes: number | null;
+  start_minutes: number | null;
   provider_name: string;
   /** Subtipo, forma de pedido y calidad del servicio de referencia. */
   variant: string;
@@ -26,6 +27,7 @@ const PRODUCT_SELECT = `
          s.max_qty        AS provider_max,
          s.provider_enabled,
          s.avg_minutes,
+         s.start_minutes,
          s.name           AS provider_name,
          s.variant,
          s.order_kind,

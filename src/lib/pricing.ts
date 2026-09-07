@@ -245,6 +245,23 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("es-CL").format(Math.round(value));
 }
 
+/**
+ * Plazo con el que se le habla al cliente: el promedio real del proveedor si
+ * existe, y si no, lo que promete el nombre del servicio.
+ *
+ * Sin ninguno de los dos devuelve null, y ahí no se inventa: la etiqueta lo
+ * dice. Prometer "inicio inmediato" porque no sabemos nada es cómo termina un
+ * pedido de veinte horas vendido como instantáneo.
+ */
+export function minutosDeEntrega(service: {
+  avg_minutes?: number | null;
+  start_minutes?: number | null;
+}): number | null {
+  if (service.avg_minutes != null && service.avg_minutes > 0) return service.avg_minutes;
+  if (service.start_minutes != null && service.start_minutes > 0) return service.start_minutes;
+  return null;
+}
+
 /** "1 h 30 min" a partir de minutos. */
 export function formatDuration(minutes: number | null | undefined): string | null {
   if (minutes == null || minutes <= 0) return null;

@@ -262,6 +262,34 @@ export function correoBienvenidaPanel(input: {
   };
 }
 
+/** Respuesta del soporte en un ticket. */
+export function correoRespuestaTicket(input: {
+  code: string;
+  subject: string;
+  mensaje: string;
+  orderCode?: string | null;
+  url: string;
+}): EmailContent {
+  return {
+    subject: `Respondimos tu consulta · ${input.code}`,
+    html: layout({
+      titulo: "Te respondimos",
+      intro: `Sobre <strong>${escape(input.subject)}</strong>${
+        input.orderCode ? ` (pedido ${escape(input.orderCode)})` : ""
+      }:`,
+      aviso: escape(input.mensaje).replace(/\n/g, "<br>"),
+      cta: { texto: "Ver la conversación", url: input.url },
+    }),
+    text: texto([
+      `Respondimos tu consulta ${input.code}.`,
+      "",
+      input.mensaje,
+      "",
+      input.url,
+    ]),
+  };
+}
+
 // ------------------------------------------------------------ avisos internos
 
 function fichaAdmin(order: Order): string {

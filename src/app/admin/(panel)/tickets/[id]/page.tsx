@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { get } from "@/lib/db";
-import { ticketPorId, mensajesDeTicket, ETIQUETA_TICKET, TIPO_TICKET } from "@/lib/tickets";
+import {
+  ticketPorId, mensajesDeTicket, contactoDeTicket, ETIQUETA_TICKET, TIPO_TICKET,
+} from "@/lib/tickets";
 import { getOrderById } from "@/lib/orders";
 import { responderTicket, reposicionDesdeTicket } from "@/app/admin/actions";
 import { formatClp, formatNumber } from "@/lib/pricing";
@@ -23,10 +25,13 @@ export default async function AdminTicketDetalle({
   const ticket = ticketPorId(Number(id));
   if (!ticket) notFound();
 
-  const cliente = get<{ email: string; name: string; balance_clp: number }>(
-    "SELECT email, name, balance_clp FROM reseller_users WHERE id = ?",
-    [ticket.user_id],
-  );
+  const cliente = ticket.user_id
+    ? get<{ email: string; name: string; balance_clp: number }>(
+        "SELECT email, name, balance_clp FROM reseller_users WHERE id = ?",
+        [ticket.user_id],
+      )
+    : undefined;
+  const contacto = contactoDeTicket(ticket);
   const mensajes = mensajesDeTicket(ticket.id);
   const order = ticket.order_id ? getOrderById(ticket.order_id) : undefined;
 
@@ -39,9 +44,13 @@ export default async function AdminTicketDetalle({
           <h1 className="text-xl font-bold">{ticket.subject}</h1>
           <p className="mt-1 text-xs text-ink-400">
             <span className="font-mono">{ticket.code}</span> · {TIPO_TICKET[ticket.kind] ?? ticket.kind} ·{" "}
-            <Link href={`/admin/mayoristas/${ticket.user_id}`} className="text-brand-300 hover:text-white">
-              {cliente?.email}
-            </Link>
+            {ticket.user_id ? (
+              <Link href={`/admin/mayoristas/${ticket.user_id}`} className="text-brand-300 hover:text-white">
+                {contacto}
+              </Link>
+            ) : (
+              <a href={`mailto:${contacto}`} className="text-brand-300 hover:text-white">{contacto}</a>
+            )}
           </p>
         </div>
         <span
@@ -72,7 +81,7 @@ export default async function AdminTicketDetalle({
                 className={`card p-4 ${m.author === "admin" ? "border-brand-400/30 bg-brand-500/5" : ""}`}
               >
                 <p className="text-xs font-semibold text-ink-400">
-                  {m.author === "admin" ? "Tú" : cliente?.email} · {formatDateCl(m.created_at)}
+                  {m.author === "admin" ? "Tú" : contacto} · {formatDateCl(m.created_at)}
                 </p>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-200">{m.body}</p>
               </div>
@@ -101,19 +110,25 @@ export default async function AdminTicketDetalle({
         </div>
 
         <aside className="space-y-4">
-          {cliente ? (
-            <section className="card p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">Cliente</h2>
-              <p className="mt-3 text-sm">{cliente.name || cliente.email}</p>
-              <p className="mt-1 text-sm text-ink-400">Saldo: {formatClp(cliente.balance_clp)}</p>
-              <Link
-                href={`/admin/mayoristas/${ticket.user_id}`}
-                className="btn btn-ghost mt-4 w-full text-sm"
-              >
-                Ver la cuenta
-              </Link>
-            </section>
-          ) : null}
+          <section className="card p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-ink-400">Cliente</h2>
+            <p className="mt-3 text-sm">{cliente?.name || contacto || "—"}</p>
+            {cliente ? (
+              <>
+                <p className="mt-1 text-sm text-ink-400">Saldo: {formatClp(cliente.balance_clp)}</p>
+                <Link
+                  href={`/admin/mayoristas/${ticket.user_id}`}
+                  className="btn btn-ghost mt-4 w-full text-sm"
+                >
+                  Ver la cuenta
+                </Link>
+              </>
+            ) : (
+              <p className="mt-1 text-sm text-ink-400">
+                Cliente de la tienda, sin cuenta de mayorista.
+              </p>
+            )}
+          </section>
 
           {order ? (
             <section className="card p-5">
