@@ -24,6 +24,7 @@ export function PanelOrderForm({
   minOrderClp,
   balanceClp,
   orderKind,
+  porPublicacion,
   linkSugerido,
 }: {
   serviceId: number;
@@ -34,6 +35,8 @@ export function PanelOrderForm({
   minOrderClp: number;
   balanceClp: number;
   orderKind: string;
+  /** El servicio se entrega sobre una publicación y no sobre el perfil. */
+  porPublicacion: boolean;
   linkSugerido: string;
 }) {
   const esComentarios = orderKind === "custom_comments";
@@ -64,7 +67,7 @@ export function PanelOrderForm({
       <h2 className="mt-1 font-bold leading-snug">{serviceName}</h2>
 
       <label className="field-label mt-5" htmlFor="link">
-        {esComentarios ? "Enlace de la publicación" : "Enlace o usuario de destino"}
+        {porPublicacion ? "Enlace de la publicación" : "Enlace o usuario de destino"}
       </label>
       <input
         id="link"
@@ -74,6 +77,11 @@ export function PanelOrderForm({
         placeholder={linkSugerido}
         autoComplete="off"
       />
+      {porPublicacion ? (
+        <p className="mt-1.5 text-xs leading-relaxed text-amber-200/90">
+          Este servicio se entrega sobre una publicación: pega su enlace, no el del perfil.
+        </p>
+      ) : null}
 
       {esComentarios ? (
         <>

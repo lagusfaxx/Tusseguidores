@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { panelUser } from "@/lib/reseller-auth";
 import { servicioVendible, etiquetaRetencion, etiquetaVelocidad } from "@/lib/reseller-catalog";
 import { resellerRatePer1000, resellerContext, formatClp, formatNumber, formatDuration } from "@/lib/pricing";
+import { necesitaPublicacion } from "@/lib/targets";
 import { platformLabel, serviceTypeLabel } from "@/lib/labels";
 import { PanelOrderForm } from "@/components/panel-order-form";
 
@@ -63,6 +64,7 @@ export default async function PanelNuevoPedido({
           minOrderClp={ctx.minOrderClp}
           balanceClp={user.balance_clp}
           orderKind={service.order_kind}
+          porPublicacion={necesitaPublicacion(service.service_type, service.order_kind)}
           linkSugerido={EJEMPLO[service.platform] ?? "https://..."}
         />
 

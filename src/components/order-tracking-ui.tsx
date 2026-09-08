@@ -40,25 +40,43 @@ function Aviso({ state }: { state: PedidoState }) {
 
 export function CorregirDestino({
   code,
-  link,
+  links,
   etiqueta,
 }: {
   code: string;
-  link: string;
+  /** Todos los destinos del pedido: uno, o una publicación por línea. */
+  links: string[];
   etiqueta: string;
 }) {
   const [state, action] = useActionState<PedidoState, FormData>(corregirDestino, {});
+  const varios = links.length > 1;
   return (
     <form action={action} className="card p-5">
       <input type="hidden" name="code" value={code} />
-      <h2 className="font-bold">¿Te equivocaste de cuenta?</h2>
+      <h2 className="font-bold">
+        {varios ? "¿Te equivocaste de publicación?" : "¿Te equivocaste de cuenta?"}
+      </h2>
       <p className="mt-1 text-sm text-ink-400">
-        Puedes corregir el destino mientras el pedido no haya salido.
+        {varios
+          ? "Puedes corregir los enlaces mientras el pedido no haya salido. Uno por línea, y tienen que seguir siendo los mismos."
+          : "Puedes corregir el destino mientras el pedido no haya salido."}
       </p>
-      <label className="field-label mt-4" htmlFor="link">{etiqueta}</label>
-      <input id="link" name="link" defaultValue={link} className="field font-mono text-xs" />
+      <label className="field-label mt-4" htmlFor="link">{varios ? "Enlaces" : etiqueta}</label>
+      {varios ? (
+        <textarea
+          id="link"
+          name="link"
+          rows={Math.min(8, links.length + 1)}
+          defaultValue={links.join("\n")}
+          className="field font-mono text-xs"
+        />
+      ) : (
+        <input id="link" name="link" defaultValue={links[0] ?? ""} className="field font-mono text-xs" />
+      )}
       <div className="mt-4">
-        <Boton pendiente="Guardando…">Guardar el nuevo destino</Boton>
+        <Boton pendiente="Guardando…">
+          {varios ? "Guardar los nuevos destinos" : "Guardar el nuevo destino"}
+        </Boton>
       </div>
       <Aviso state={state} />
     </form>

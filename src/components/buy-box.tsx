@@ -30,6 +30,12 @@ type Props = {
    * comentarios y la cantidad son las líneas que escribió.
    */
   orderKind: string;
+  /**
+   * El servicio se entrega sobre una publicación (me gusta, vistas,
+   * comentarios…) y no sobre el perfil. Cambia dos cosas: el aviso de qué
+   * enlace pegar y la posibilidad de repartir el pedido entre varias.
+   */
+  porPublicacion: boolean;
   /** Si está activo, se muestra el segundo botón de pago por transferencia. */
   transferencia: boolean;
 };
@@ -101,11 +107,26 @@ export function BuyBox(props: Props) {
   const [comments, setComments] = useState("");
   const [state, formAction] = useActionState<CheckoutState, FormData>(startCheckout, {});
 
+  // Reparto entre publicaciones. Solo tiene sentido en los servicios que se
+  // entregan sobre una publicación: repartir seguidores entre dos perfiles
+  // sería otro pedido, no este.
+  const puedeRepartir = props.porPublicacion && !isCustomComments;
+  const [repartir, setRepartir] = useState(false);
+  const [enlaces, setEnlaces] = useState("");
+
+  const listaEnlaces = useMemo(
+    () => enlaces.split(/[\r\n,]+/).map((l) => l.trim()).filter(Boolean),
+    [enlaces],
+  );
+  const destinos = repartir ? Math.max(1, listaEnlaces.length) : 1;
+
   const commentLines = useMemo(
     () => comments.split("\n").map((line) => line.trim()).filter(Boolean),
     [comments],
   );
 
+  // `quantity` es la cantidad por destino, igual que en el servidor: cada
+  // publicación recibe esa cantidad y se cobra una vez por cada una.
   const { quantity, price } = useMemo(() => {
     if (isCustomComments) {
       const qty = commentLines.length;
@@ -121,6 +142,9 @@ export function BuyBox(props: Props) {
     return { quantity: tier?.quantity ?? minQty, price: tier?.priceClp ?? minPriceClp };
   }, [isCustomComments, commentLines.length, selected, customQty, tiers, defaultTier,
       minQty, maxQty, ratePer1000Clp, minPriceClp, props.rounding]);
+
+  const totalUnidades = quantity * destinos;
+  const totalPrecio = price * destinos;
 
   return (
     <form action={formAction} className="card p-5 sm:p-6">
@@ -223,17 +247,65 @@ export function BuyBox(props: Props) {
 
       <div className="mt-5 space-y-4">
         <div>
-          <label className="field-label" htmlFor="link">{props.linkLabel}</label>
-          <input
-            id="link"
-            name="link"
-            type="text"
-            required
-            autoComplete="off"
-            className="field"
-            placeholder={props.linkPlaceholder}
-          />
-          <p className="mt-1.5 text-xs leading-relaxed text-ink-400">{props.linkHelp}</p>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <label className="field-label" htmlFor={repartir ? "links" : "link"}>
+              {repartir ? "Enlaces de las publicaciones" : props.linkLabel}
+            </label>
+            {puedeRepartir ? (
+              <button
+                type="button"
+                onClick={() => setRepartir((v) => !v)}
+                className="text-xs font-semibold text-brand-300 hover:text-white"
+              >
+                {repartir ? "Volver a una sola" : "Repartir entre varias publicaciones"}
+              </button>
+            ) : null}
+          </div>
+
+          {repartir ? (
+            <>
+              <textarea
+                id="links"
+                name="links"
+                rows={4}
+                required
+                className="field mt-1 font-mono text-xs leading-relaxed"
+                placeholder={`${props.linkPlaceholder}\n${props.linkPlaceholder}`}
+                value={enlaces}
+                onChange={(event) => setEnlaces(event.target.value)}
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-400">
+                Un enlace por línea. Cada publicación recibe {num.format(quantity)} y se cobra
+                aparte: son pedidos distintos para la plataforma.
+              </p>
+              <p className="mt-1 text-xs text-ink-300">
+                {listaEnlaces.length === 0
+                  ? "Todavía no pegas ninguno."
+                  : `${num.format(listaEnlaces.length)} publicación${
+                      listaEnlaces.length === 1 ? "" : "es"
+                    } · ${num.format(totalUnidades)} en total`}
+              </p>
+            </>
+          ) : (
+            <>
+              <input
+                id="link"
+                name="link"
+                type="text"
+                required
+                autoComplete="off"
+                className="field mt-1"
+                placeholder={props.linkPlaceholder}
+              />
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-400">{props.linkHelp}</p>
+              {props.porPublicacion ? (
+                <p className="mt-1 text-xs leading-relaxed text-amber-200/90">
+                  Tiene que ser el enlace de la publicación, no el de tu perfil: aquí no se
+                  entrega sobre la cuenta.
+                </p>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div>
@@ -263,9 +335,12 @@ export function BuyBox(props: Props) {
       <div className="mt-5 flex items-center justify-between rounded-xl border border-white/10 bg-white/4 px-4 py-3">
         <div>
           <span className="block text-xs text-ink-400">
-            {num.format(quantity)} {isCustomComments ? "comentarios" : "unidades"}
+            {num.format(totalUnidades)} {isCustomComments ? "comentarios" : "unidades"}
+            {repartir && listaEnlaces.length > 1
+              ? ` · ${num.format(quantity)} en cada una de ${num.format(listaEnlaces.length)}`
+              : ""}
           </span>
-          <span className="text-2xl font-extrabold">{clp.format(price)}</span>
+          <span className="text-2xl font-extrabold">{clp.format(totalPrecio)}</span>
         </div>
         <span className="text-right text-xs leading-relaxed text-ink-400">
           {props.deliveryLabel}
@@ -280,13 +355,18 @@ export function BuyBox(props: Props) {
       ) : null}
 
       <BotonesDePago
-        price={price}
+        price={totalPrecio}
         transferencia={props.transferencia}
-        disabled={isCustomComments && (commentLines.length < minQty || commentLines.length > maxQty)}
+        disabled={
+          (isCustomComments && (commentLines.length < minQty || commentLines.length > maxQty)) ||
+          (repartir && listaEnlaces.length === 0)
+        }
         label={
-          commentLines.length > maxQty
-            ? `Máximo ${num.format(maxQty)} comentarios`
-            : `Escribe al menos ${num.format(minQty)} comentario${minQty === 1 ? "" : "s"}`
+          repartir && listaEnlaces.length === 0
+            ? "Pega al menos un enlace"
+            : commentLines.length > maxQty
+              ? `Máximo ${num.format(maxQty)} comentarios`
+              : `Escribe al menos ${num.format(minQty)} comentario${minQty === 1 ? "" : "s"}`
         }
       />
 

@@ -190,6 +190,30 @@ CREATE TABLE IF NOT EXISTS email_log (
 );
 CREATE INDEX IF NOT EXISTS idx_email_log ON email_log(order_id, kind);
 
+-- Destinos de un pedido: una fila por publicación (o una sola, la del perfil).
+-- Cada una se le pide al proveedor por separado, porque el proveedor entrega
+-- un enlace por pedido: repartir 3.000 me gusta entre tres publicaciones son
+-- tres pedidos suyos y un pedido nuestro.
+CREATE TABLE IF NOT EXISTS order_targets (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  order_id          INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  position          INTEGER NOT NULL DEFAULT 0,
+  link              TEXT    NOT NULL,
+  quantity          INTEGER NOT NULL,
+  comments          TEXT,
+  provider_service_id INTEGER,
+  provider_order_id INTEGER,
+  provider_status   TEXT,
+  provider_error    TEXT,
+  start_count       INTEGER,
+  remains           INTEGER,
+  status            TEXT    NOT NULL DEFAULT 'pending',
+  created_at        TEXT    NOT NULL DEFAULT (datetime('now')),
+  updated_at        TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_targets_order    ON order_targets(order_id, position);
+CREATE INDEX IF NOT EXISTS idx_targets_provider ON order_targets(provider_order_id);
+
 CREATE TABLE IF NOT EXISTS order_events (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,

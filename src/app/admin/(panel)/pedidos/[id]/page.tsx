@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/order-status";
-import { getOrderById, getOrderEvents, ORDER_STATUS_LABEL } from "@/lib/orders";
+import { getOrderById, getOrderEvents, orderTargets, ORDER_STATUS_LABEL } from "@/lib/orders";
 import { orderAction, reembolsarPedido, editarDestino } from "@/app/admin/actions";
 import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
@@ -24,6 +24,15 @@ export default async function AdminOrderDetail({
   if (!order) notFound();
 
   const events = getOrderEvents(order.id);
+  // Los pedidos viejos no tienen fila de destinos: se muestra el suyo igual.
+  const guardados = orderTargets(order.id);
+  const destinos = guardados.length
+    ? guardados
+    : [{
+        id: 0, link: order.link, quantity: order.quantity,
+        provider_order_id: order.provider_order_id, provider_status: order.provider_status,
+        provider_error: order.provider_error, status: order.status,
+      }];
   const ctx = pricingContext();
   const service = get<{ clean_name: string; rate_usd_per_1000: number; provider_enabled: number }>(
     "SELECT clean_name, rate_usd_per_1000, provider_enabled FROM provider_services WHERE service_id = ?",
@@ -89,22 +98,55 @@ export default async function AdminOrderDetail({
                 </dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-ink-400">Destino</dt>
-                <dd className="break-all font-mono text-xs">
-                  <a href={order.link} target="_blank" rel="noopener noreferrer" className="text-brand-300 hover:underline">
-                    {order.link}
-                  </a>
+                <dt className="text-ink-400">
+                  {destinos.length > 1
+                    ? `Destinos · ${destinos.length} publicaciones, ${formatNumber(destinos[0].quantity)} en cada una`
+                    : "Destino"}
+                </dt>
+                {/* Un pedido repartido son varios pedidos del proveedor: cada
+                    fila muestra el suyo, con su estado y su error si lo tuvo. */}
+                <dd className="space-y-1.5">
+                  {destinos.map((destino) => (
+                    <div key={destino.id} className="break-all font-mono text-xs">
+                      <a
+                        href={destino.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-300 hover:underline"
+                      >
+                        {destino.link}
+                      </a>
+                      {destinos.length > 1 || destino.provider_order_id ? (
+                        <span className="ml-2 font-sans text-[11px] text-ink-400">
+                          {destino.provider_order_id
+                            ? `proveedor #${destino.provider_order_id} · ${destino.provider_status ?? destino.status}`
+                            : destino.provider_error
+                              ? `sin enviar · ${destino.provider_error}`
+                              : "sin enviar"}
+                        </span>
+                      ) : null}
+                    </div>
+                  ))}
                 </dd>
                 {/* Corregir el enlace mal pegado sin cancelar el pedido: solo
                     mientras no haya salido. */}
                 {!order.provider_order_id && !order.manual_dispatch_at ? (
                   <form action={editarDestino} className="mt-2 flex flex-wrap gap-2">
                     <input type="hidden" name="order_id" value={order.id} />
-                    <input
-                      name="link"
-                      defaultValue={order.link}
-                      className="field min-w-0 flex-1 font-mono text-xs"
-                    />
+                    {destinos.length > 1 ? (
+                      <textarea
+                        name="link"
+                        rows={Math.min(8, destinos.length + 1)}
+                        defaultValue={destinos.map((d) => d.link).join("\n")}
+                        className="field min-w-0 flex-1 font-mono text-xs"
+                      />
+                    ) : (
+                      <input
+                        name="link"
+                        defaultValue={destinos[0]?.link ?? order.link}
+                        className="field min-w-0 flex-1 font-mono text-xs"
+                      />
+                    )}
                     <button type="submit" className="btn btn-ghost text-xs">Corregir</button>
                   </form>
                 ) : null}

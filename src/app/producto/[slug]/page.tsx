@@ -19,6 +19,7 @@ import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
 import { comparadorDeNiveles, levelLabel } from "@/lib/levels";
 import { getBoolSetting } from "@/lib/settings";
+import { necesitaPublicacion } from "@/lib/targets";
 import { aggregateRatingLd, productRating } from "@/lib/ratings";
 import { Stars } from "@/components/stars";
 import { transferenciaDisponible } from "@/lib/transfer";
@@ -221,6 +222,7 @@ export default async function ProductPage({ params }: Params) {
                 minPriceClp={minPriceFor(ctx, margin)}
                 rounding={ctx.rounding}
                 orderKind={product.order_kind}
+                porPublicacion={necesitaPublicacion(product.service_type, product.order_kind)}
                 transferencia={transferenciaDisponible()}
               />
             </div>

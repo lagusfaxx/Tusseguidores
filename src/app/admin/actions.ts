@@ -15,8 +15,9 @@ import {
 } from "@/lib/quality.mjs";
 import {
   sendToProvider, setStatus, setStatusManual, markDispatchedManually, syncOpenOrders, logEvent,
-  markPaid, retryUndispatched,
+  markPaid, retryUndispatched, ensureTargets, getOrderById,
 } from "@/lib/orders";
+import { separarDestinos } from "@/lib/targets";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
@@ -616,12 +617,24 @@ export async function editarDestino(formData: FormData) {
       throw new Error("El pedido ya salió a entrega: el destino no se puede cambiar.");
     }
 
-    const link = String(formData.get("link") ?? "").trim();
-    if (!link) throw new Error("Escribe el nuevo destino.");
-    if (link === order.link) return;
+    const links = separarDestinos(String(formData.get("link") ?? ""));
+    if (!links.length) throw new Error("Escribe el nuevo destino.");
 
-    run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [link, id]);
-    logEvent(id, "info", `Destino corregido desde el panel: ${order.link} → ${link}`);
+    const completo = getOrderById(id)!;
+    const destinos = ensureTargets(completo);
+    if (links.length !== destinos.length) {
+      throw new Error(
+        `Este pedido va a ${destinos.length} destino(s): deja ${destinos.length}, uno por línea.`,
+      );
+    }
+    const antes = destinos.map((d) => d.link);
+    if (antes.join("\n") === links.join("\n")) return;
+
+    destinos.forEach((destino, i) =>
+      run("UPDATE order_targets SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[i], destino.id]),
+    );
+    run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[0], id]);
+    logEvent(id, "info", `Destino corregido desde el panel: ${antes.join(", ")} → ${links.join(", ")}`);
     revalidatePath(`/admin/pedidos/${id}`);
   });
 }

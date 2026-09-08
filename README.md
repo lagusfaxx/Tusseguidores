@@ -194,6 +194,33 @@ descripción, preguntas frecuentes y SEO en español, listos para editar.
 El catálogo del proveedor sigue disponible para cuando necesites un servicio
 concreto (un país específico, un subtipo raro), pero no es la vía normal.
 
+### A dónde va el pedido
+
+Los servicios que se entregan sobre una publicación —me gusta, visualizaciones,
+comentarios, guardados, compartidos, votos, vistas de historias— **exigen el
+enlace de la publicación**. Si el comprador pega el de su perfil, o escribe su
+usuario, el formulario lo rechaza en el momento y le dice qué copiar, con un
+ejemplo de esa red. Antes eso se aceptaba, el usuario suelto se convertía en la
+URL del perfil y el error aparecía recién en el proveedor, con la plata ya
+cobrada. Al revés también se revisa: un enlace de publicación en un servicio de
+seguidores no pasa.
+
+**Repartir entre varias publicaciones.** En esos mismos servicios, el comprador
+puede pegar varios enlaces (uno por línea) y cada publicación recibe la cantidad
+elegida: 500 me gusta en tres publicaciones son 1.500 en total y se cobran tres
+veces el pack de 500, que es lo que le cuesta a la tienda.
+
+Por dentro, cada publicación es un pedido del proveedor: es la única forma en
+que sabe entregar —un enlace por pedido—. La tabla `order_targets` guarda uno
+por destino con su número de pedido del proveedor, su estado y su error, y el
+pedido que ve el cliente sigue siendo uno solo: se le suma lo entregado y se le
+resume el estado (todas completas = completado; alguna en curso = en proceso).
+Si una publicación no entra —el proveedor rechaza ese enlace, o se queda sin
+saldo— el resto sale igual, el pedido queda marcado como pendiente de envío por
+esa parte y el cron reintenta solo la que falta, sin repetir las que ya
+salieron. El destino se puede corregir desde el seguimiento y desde el panel
+mientras no haya salido, con las mismas revisiones.
+
 ### Formas de pedido
 
 La API del proveedor no pide lo mismo para todos los servicios, y equivocarse
@@ -545,6 +572,7 @@ src/
     topups.ts                   recargas por Webpay y transferencia
     tickets.ts                  soporte y solicitudes de reposición
     taxonomy.mjs                clasificación de servicios
+    targets.ts                  destino del pedido: perfil o publicación
     ratings.ts                  calificación de la tienda y de cada producto
 scripts/
   parse-catalog.mjs             listas del proveedor -> catalog.json
