@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusBadge } from "@/components/order-status";
-import { getOrderByCode } from "@/lib/orders";
+import { getOrderByCode, orderTargets, ORDER_STATUS_LABEL } from "@/lib/orders";
 import {
   pasosDelPedido, resumenDeEstado, avanceDelPedido, puedeCorregirDestino,
 } from "@/lib/order-tracking";
@@ -48,6 +48,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
   const resumen = resumenDeEstado(order);
   const avance = avanceDelPedido(order);
   const tickets = ticketsDePedido(order.id);
+  const destinos = orderTargets(order.id);
   const producto = order.product_id
     ? get<{ link_label: string; image_url: string | null; slug: string }>(
         "SELECT link_label, image_url, slug FROM products WHERE id = ?",
@@ -156,8 +157,31 @@ export default async function OrderPage({ params, searchParams }: Params) {
 
             <dl className="mt-5 grid gap-x-6 gap-y-3 border-t border-white/8 pt-5 text-sm sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <dt className="text-ink-400">Destino</dt>
-                <dd className="mt-0.5 break-all font-mono text-xs text-ink-200">{order.link}</dd>
+                <dt className="text-ink-400">
+                  {destinos.length > 1 ? `Destinos (${destinos.length} publicaciones)` : "Destino"}
+                </dt>
+                {destinos.length > 1 ? (
+                  <dd className="mt-1 space-y-1.5">
+                    {destinos.map((destino) => (
+                      <div
+                        key={destino.id}
+                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 rounded-lg border border-white/8 bg-white/3 px-3 py-2"
+                      >
+                        <span className="min-w-0 flex-1 break-all font-mono text-xs text-ink-200">
+                          {destino.link}
+                        </span>
+                        <span className="shrink-0 text-xs text-ink-400">
+                          {formatNumber(destino.quantity)} ·{" "}
+                          {destino.provider_order_id
+                            ? ORDER_STATUS_LABEL[destino.status] ?? destino.status
+                            : "en la fila"}
+                        </span>
+                      </div>
+                    ))}
+                  </dd>
+                ) : (
+                  <dd className="mt-0.5 break-all font-mono text-xs text-ink-200">{order.link}</dd>
+                )}
               </div>
               <div>
                 <dt className="text-ink-400">Fecha</dt>
@@ -202,7 +226,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
             {puedeCorregirDestino(order) ? (
               <CorregirDestino
                 code={order.code}
-                link={order.link}
+                links={destinos.length ? destinos.map((d) => d.link) : [order.link]}
                 etiqueta={producto?.link_label ?? "Enlace o usuario"}
               />
             ) : (

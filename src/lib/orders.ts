@@ -10,7 +10,8 @@ import {
   notificarPagoConfirmado, notificarPedidoCompletado, notificarPedidoTrabado,
   notificarVentaPagada,
 } from "./notify";
-import type { Order, OrderStatus } from "./types";
+import { necesitaPublicacion, revisarDestinos } from "./targets";
+import type { Order, OrderStatus, OrderTarget } from "./types";
 
 /** Comentarios escritos por el cliente: una línea por comentario, sin vacías. */
 export function cleanComments(raw: string): string[] {
@@ -40,6 +41,41 @@ export function getOrderEvents(orderId: number) {
   );
 }
 
+/** Los destinos de un pedido, en el orden en que los pidió el cliente. */
+export function orderTargets(orderId: number): OrderTarget[] {
+  return all<OrderTarget>(
+    "SELECT * FROM order_targets WHERE order_id = ? ORDER BY position, id",
+    [orderId],
+  );
+}
+
+/**
+ * Garantiza que el pedido tenga sus destinos en la tabla.
+ *
+ * Los pedidos anteriores a esta tabla —y los del panel mayorista, que se
+ * insertan por su cuenta— traen el destino en `orders.link`. Se les crea una
+ * fila con lo que ya tienen, incluido el pedido del proveedor si ya salió,
+ * para que el despacho y la sincronización tengan un solo camino.
+ */
+export function ensureTargets(order: Order): OrderTarget[] {
+  const existentes = orderTargets(order.id);
+  if (existentes.length) return existentes;
+
+  run(
+    `INSERT INTO order_targets
+       (order_id, position, link, quantity, comments, provider_service_id,
+        provider_order_id, provider_status, start_count, remains, status)
+     VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      order.id, order.link, order.quantity, order.comments,
+      order.provider_service_id, order.provider_order_id, order.provider_status,
+      order.start_count, order.remains,
+      order.provider_order_id ? order.status : "pending",
+    ],
+  );
+  return orderTargets(order.id);
+}
+
 export type CouponResult = { code: string; discountClp: number } | null;
 
 export function applyCoupon(rawCode: string, amountClp: number): CouponResult {
@@ -63,8 +99,18 @@ export function applyCoupon(rawCode: string, amountClp: number): CouponResult {
 
 export type CreateOrderInput = {
   productId: number;
+  /**
+   * Cantidad por destino. Con una sola publicación (o con el perfil) es la
+   * cantidad del pedido; repartido entre varias, es lo que recibe cada una.
+   */
   quantity: number;
   link: string;
+  /**
+   * Publicaciones entre las que se reparte el pedido. Manda sobre `link`
+   * cuando viene con algo. Cada una recibe `quantity` y sale al proveedor como
+   * un pedido suyo, que es la única forma que tiene de entregarlas.
+   */
+  links?: string[];
   /** Solo para servicios de comentarios personalizados: uno por línea. */
   comments?: string;
   email: string;
@@ -93,16 +139,47 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   if (isCustomComments && commentLines.length === 0) {
     return { ok: false, error: "Escribe al menos un comentario, uno por línea." };
   }
-  const quantity = isCustomComments ? commentLines.length : Math.round(input.quantity);
 
-  if (!Number.isFinite(quantity) || quantity < min || quantity > max) {
+  // Destinos: uno solo, o varias publicaciones entre las que se reparte. Se
+  // revisan contra el tipo de servicio, así que un enlace de perfil en un
+  // servicio de me gusta se rechaza aquí y no en el proveedor con el pedido
+  // ya cobrado.
+  const crudos = input.links?.length ? input.links : [input.link];
+  const revision = revisarDestinos(
+    crudos, product.platform, product.service_type, product.order_kind,
+  );
+  if (!revision.ok) return { ok: false, error: revision.error };
+  const links = revision.links;
+
+  if (links.length > 1 && !necesitaPublicacion(product.service_type, product.order_kind)) {
+    return {
+      ok: false,
+      error: "Este servicio va a una sola cuenta: no se puede repartir entre varios destinos.",
+    };
+  }
+  if (links.length > 1 && isCustomComments) {
+    return {
+      ok: false,
+      error: "Los comentarios personalizados van a una sola publicación. Haz un pedido por cada una.",
+    };
+  }
+
+  // La cantidad es por destino: los límites del proveedor se aplican a cada
+  // pedido suyo, y cada publicación es uno.
+  const porDestino = isCustomComments ? commentLines.length : Math.round(input.quantity);
+
+  if (!Number.isFinite(porDestino) || porDestino < min || porDestino > max) {
     return {
       ok: false,
       error: isCustomComments
-        ? `Tienes que escribir entre ${min} y ${max} comentarios (uno por línea). Escribiste ${quantity}.`
-        : `La cantidad debe estar entre ${min} y ${max}.`,
+        ? `Tienes que escribir entre ${min} y ${max} comentarios (uno por línea). Escribiste ${porDestino}.`
+        : links.length > 1
+          ? `Cada publicación tiene que llevar entre ${min} y ${max}.`
+          : `La cantidad debe estar entre ${min} y ${max}.`,
     };
   }
+
+  const quantity = porDestino * links.length;
 
   // El servicio definitivo se elige al despachar, pero comprobamos ya que
   // exista al menos uno capaz de atenderlo: así no cobramos algo que no
@@ -111,7 +188,9 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
     {
       platform: product.platform,
       serviceType: product.service_type,
-      quantity,
+      // La que ve el proveedor es la de cada destino: sus mínimos y máximos
+      // se aplican a cada pedido suyo, no al total repartido.
+      quantity: porDestino,
       referenceServiceId: product.provider_service_id,
       referenceRateUsd: product.rate_usd_per_1000,
       maxCostRatio: product.max_cost_ratio,
@@ -128,15 +207,19 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   if (!routed) return { ok: false, error: "Este servicio está temporalmente pausado. Inténtalo más tarde." };
 
   const ctx = pricingContext();
-  // El precio se recalcula aquí en el servidor: nunca confiamos en el del formulario.
+  // El precio se recalcula aquí en el servidor: nunca confiamos en el del
+  // formulario. Se calcula por destino y se multiplica: repartir 500 me gusta
+  // entre tres publicaciones cuesta tres veces el pack de 500, que es
+  // exactamente lo que le cuesta a la tienda.
   const tier = get<{ price_clp: number | null }>(
     "SELECT price_clp FROM product_tiers WHERE product_id = ? AND quantity = ?",
-    [product.id, quantity],
+    [product.id, porDestino],
   );
-  const base =
+  const unitario =
     product.price_mode === "manual" && tier?.price_clp != null
       ? tier.price_clp
-      : priceCustomQuantity(quantity, product, product.rate_usd_per_1000, ctx);
+      : priceCustomQuantity(porDestino, product, product.rate_usd_per_1000, ctx);
+  const base = unitario * links.length;
 
   const coupon = input.couponCode ? applyCoupon(input.couponCode, base) : null;
   const amount = base - (coupon?.discountClp ?? 0);
@@ -150,7 +233,7 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'pending', ?)`,
     [
       code, product.id, product.name, routed.service.service_id, product.provider_service_id,
-      quantity, input.link.trim(), commentLines.length ? commentLines.join("\n") : null,
+      quantity, links[0], commentLines.length ? commentLines.join("\n") : null,
       input.email.trim().toLowerCase(), input.phone?.trim() || null,
       amount, coupon?.discountClp ?? 0, coupon?.code ?? null,
       costUsd(routed.service.rate_usd_per_1000, quantity),
@@ -159,10 +242,23 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   );
 
   const order = getOrderById(Number(info.lastInsertRowid))!;
+
+  // Un destino por publicación. Cada uno sale al proveedor por separado.
+  const comentarios = commentLines.length ? commentLines.join("\n") : null;
+  links.forEach((link, i) =>
+    run(
+      "INSERT INTO order_targets (order_id, position, link, quantity, comments) VALUES (?, ?, ?, ?, ?)",
+      [order.id, i, link, porDestino, comentarios],
+    ),
+  );
+
   logEvent(
     order.id,
     "created",
     `Pedido creado por ${amount.toLocaleString("es-CL")} CLP` +
+      (links.length > 1
+        ? `, repartido entre ${links.length} publicaciones (${porDestino.toLocaleString("es-CL")} en cada una)`
+        : "") +
       (order.payment_provider === "transferencia" ? ", a pagar por transferencia." : "."),
   );
   if (coupon) run("UPDATE coupons SET used = used + 1 WHERE code = ?", [coupon.code]);
@@ -369,7 +465,12 @@ function resolveDispatchService(order: Order): number {
 export async function sendToProvider(orderId: number): Promise<SendResult> {
   const order = getOrderById(orderId);
   if (!order) return { ok: false, error: "Pedido no encontrado." };
-  if (order.provider_order_id) return { ok: true, providerOrderId: order.provider_order_id };
+  // Con el pedido repartido entre publicaciones, "ya salió" significa que
+  // salieron todas: si una quedó en el camino hay que volver por ella.
+  const yaEnviados = ensureTargets(order).filter((t) => t.provider_order_id);
+  if (yaEnviados.length && yaEnviados.length === orderTargets(orderId).length) {
+    return { ok: true, providerOrderId: yaEnviados[0].provider_order_id! };
+  }
   if (order.manual_dispatch_at) {
     return { ok: false, error: "Este pedido figura como enviado a mano: no se vuelve a mandar al proveedor." };
   }
@@ -392,40 +493,139 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
   // habilitado otro mejor.
   const serviceId = resolveDispatchService(order);
 
-  try {
-    // Los comentarios personalizados van como texto y sin "quantity": el
-    // proveedor cuenta las líneas.
-    const response = await provider.addOrder(
-      order.comments
-        ? { service: serviceId, link: order.link, comments: order.comments }
-        : { service: serviceId, link: order.link, quantity: order.quantity },
-    );
-    const providerOrderId = Number(response.order);
-    if (!providerOrderId) throw new ProviderError("El proveedor no devolvió un número de pedido.");
+  // Una publicación, un pedido del proveedor: es la única forma en que sabe
+  // entregar. Los que ya salieron no se vuelven a mandar, así que reintentar
+  // un pedido a medio despachar solo manda lo que falta.
+  const pendientes = orderTargets(orderId).filter((t) => !t.provider_order_id);
+  const total = orderTargets(orderId).length;
+  const enviados: number[] = [];
+  let fallo: string | null = null;
 
-    run(
-      `UPDATE orders SET provider_order_id = ?, status = 'processing', provider_status = 'In progress',
-              provider_error = NULL, updated_at = datetime('now')
-        WHERE id = ?`,
-      [providerOrderId, orderId],
-    );
-    logEvent(orderId, "sent", `Enviado al proveedor, servicio #${serviceId} (pedido ${providerOrderId}).`);
-    return { ok: true, providerOrderId };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Error desconocido del proveedor.";
-    run("UPDATE orders SET provider_error = ?, updated_at = datetime('now') WHERE id = ?", [message, orderId]);
-    logEvent(
-      orderId,
-      "error",
-      isFundsError(message)
-        ? `Sin saldo en el proveedor: ${message}. El pedido se reintenta solo al recargar.`
-        : `No se pudo enviar al proveedor: ${message}`,
-    );
+  for (const destino of pendientes) {
+    try {
+      // Los comentarios personalizados van como texto y sin "quantity": el
+      // proveedor cuenta las líneas.
+      const response = await provider.addOrder(
+        destino.comments
+          ? { service: serviceId, link: destino.link, comments: destino.comments }
+          : { service: serviceId, link: destino.link, quantity: destino.quantity },
+      );
+      const providerOrderId = Number(response.order);
+      if (!providerOrderId) throw new ProviderError("El proveedor no devolvió un número de pedido.");
+
+      run(
+        `UPDATE order_targets
+            SET provider_order_id = ?, provider_service_id = ?, provider_status = 'In progress',
+                provider_error = NULL, status = 'processing', updated_at = datetime('now')
+          WHERE id = ?`,
+        [providerOrderId, serviceId, destino.id],
+      );
+      enviados.push(providerOrderId);
+      logEvent(
+        orderId,
+        "sent",
+        total > 1
+          ? `Publicación ${destino.position + 1} de ${total} enviada al proveedor, ` +
+            `servicio #${serviceId} (pedido ${providerOrderId}): ${destino.link}`
+          : `Enviado al proveedor, servicio #${serviceId} (pedido ${providerOrderId}).`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Error desconocido del proveedor.";
+      fallo = message;
+      run(
+        "UPDATE order_targets SET provider_error = ?, updated_at = datetime('now') WHERE id = ?",
+        [message, destino.id],
+      );
+      logEvent(
+        orderId,
+        "error",
+        (total > 1 ? `Publicación ${destino.position + 1} de ${total}: ` : "") +
+          (isFundsError(message)
+            ? `Sin saldo en el proveedor: ${message}. Se reintenta solo al recargar.`
+            : `No se pudo enviar al proveedor: ${message}`),
+      );
+      // Sin saldo el resto va a fallar igual: no gastamos más llamadas.
+      if (isFundsError(message)) break;
+    }
+  }
+
+  refrescarDesdeDestinos(orderId);
+
+  if (!enviados.length) {
+    const message = fallo ?? "El proveedor no aceptó el pedido.";
     // Plata cobrada sin entregar: el dueño se entera por correo, una sola vez
     // por pedido, sin tener que estar mirando el panel.
     await notificarPedidoTrabado(order, message);
     return { ok: false, error: message };
   }
+
+  if (fallo) {
+    // Parte salió y parte no: el pedido queda en curso, con lo que falta
+    // pendiente para el reintento automático.
+    await notificarPedidoTrabado(order, fallo);
+    return { ok: false, error: fallo };
+  }
+
+  return { ok: true, providerOrderId: enviados[0] };
+}
+
+/**
+ * Vuelve a calcular el estado del pedido a partir de sus destinos.
+ *
+ * El pedido que ve el cliente es uno solo aunque por dentro sean tres pedidos
+ * del proveedor: aquí se suma lo entregado, se elige el estado que representa
+ * al conjunto y se deja en `orders` para que todo lo demás —el panel, el
+ * seguimiento, los correos— siga leyendo un pedido y no una lista.
+ */
+export function refrescarDesdeDestinos(orderId: number): Order | undefined {
+  const order = getOrderById(orderId);
+  if (!order) return undefined;
+  const destinos = orderTargets(orderId);
+  if (!destinos.length) return order;
+
+  const enviados = destinos.filter((t) => t.provider_order_id);
+  const errores = destinos
+    .filter((t) => !t.provider_order_id && t.provider_error)
+    .map((t) => (destinos.length > 1 ? `Publicación ${t.position + 1}: ${t.provider_error}` : t.provider_error!));
+
+  // Lo que queda por entregar solo se sabe de los que ya salieron; los que no
+  // salieron cuentan completos como pendientes.
+  const conRemains = enviados.filter((t) => t.remains != null);
+  const remains =
+    enviados.length && conRemains.length === enviados.length
+      ? conRemains.reduce((sum, t) => sum + (t.remains ?? 0), 0) +
+        destinos.filter((t) => !t.provider_order_id).reduce((sum, t) => sum + t.quantity, 0)
+      : null;
+  const startCount = conRemains.length
+    ? enviados.reduce((sum, t) => sum + (t.start_count ?? 0), 0)
+    : null;
+
+  const estados = destinos.map((t) => (t.provider_order_id ? t.status : "pending"));
+  const terminales = ["completed", "partial", "canceled", "refunded"];
+  let status: OrderStatus = order.status;
+  if (enviados.length) {
+    if (estados.every((e) => e === "completed")) status = "completed";
+    else if (estados.every((e) => terminales.includes(e))) {
+      status = estados.some((e) => e === "completed" || e === "partial") ? "partial" : order.status;
+    } else status = "processing";
+  }
+
+  run(
+    `UPDATE orders
+        SET provider_order_id = ?, provider_status = ?, provider_error = ?,
+            start_count = ?, remains = ?, status = ?, updated_at = datetime('now')
+      WHERE id = ?`,
+    [
+      enviados[0]?.provider_order_id ?? null,
+      enviados[0]?.provider_status ?? null,
+      errores.length ? errores.join(" · ") : null,
+      startCount,
+      remains,
+      status,
+      orderId,
+    ],
+  );
+  return getOrderById(orderId);
 }
 
 /** ¿El proveedor rechazó el pedido por falta de saldo? */
@@ -441,12 +641,16 @@ export function isFundsError(message: string): boolean {
  */
 export function undispatchedOrders(limit = 100): Order[] {
   return all<Order>(
-    `SELECT * FROM orders
-      WHERE payment_status = 'paid'
-        AND provider_order_id IS NULL
-        AND manual_dispatch_at IS NULL
-        AND status NOT IN ('canceled', 'refunded')
-      ORDER BY paid_at ASC LIMIT ?`,
+    `SELECT * FROM orders o
+      WHERE o.payment_status = 'paid'
+        AND o.manual_dispatch_at IS NULL
+        AND o.status NOT IN ('canceled', 'refunded')
+        -- Sin destinos todavía, o con alguna publicación que no salió: un
+        -- pedido repartido está a medio entregar hasta que salen todas.
+        AND (o.provider_order_id IS NULL
+             OR EXISTS (SELECT 1 FROM order_targets t
+                         WHERE t.order_id = o.id AND t.provider_order_id IS NULL))
+      ORDER BY o.paid_at ASC LIMIT ?`,
     [limit],
   );
 }
@@ -474,29 +678,34 @@ export async function retryUndispatched(limit = 25): Promise<{ intentados: numbe
 
 /** Consulta al proveedor el estado de los pedidos en curso y los actualiza. */
 export async function syncOpenOrders(limit = 100): Promise<{ checked: number; updated: number }> {
-  const open = all<{ id: number; provider_order_id: number }>(
-    `SELECT id, provider_order_id FROM orders
-      WHERE provider_order_id IS NOT NULL
-        AND status IN ('processing', 'paid', 'partial')
-      ORDER BY updated_at ASC LIMIT ?`,
+  // Se consulta por destino, no por pedido: un pedido repartido entre tres
+  // publicaciones son tres pedidos del proveedor, cada uno con su avance.
+  const open = all<{ id: number; order_id: number; provider_order_id: number }>(
+    `SELECT t.id, t.order_id, t.provider_order_id
+       FROM order_targets t
+       JOIN orders o ON o.id = t.order_id
+      WHERE t.provider_order_id IS NOT NULL
+        AND t.status IN ('processing', 'paid', 'partial', 'pending')
+        AND o.status IN ('processing', 'paid', 'partial')
+      ORDER BY t.updated_at ASC LIMIT ?`,
     [limit],
   );
   if (!open.length || !providerConfigured()) return { checked: 0, updated: 0 };
 
-  const byProviderId = new Map(open.map((o) => [String(o.provider_order_id), o.id]));
+  const byProviderId = new Map(open.map((t) => [String(t.provider_order_id), t]));
+  const pedidos = new Set(open.map((t) => t.order_id));
   let updated = 0;
 
   for (let i = 0; i < open.length; i += 100) {
-    const batch = open.slice(i, i + 100).map((o) => o.provider_order_id);
+    const batch = open.slice(i, i + 100).map((t) => t.provider_order_id);
     try {
       const statuses = await provider.multiStatus(batch);
       for (const [providerId, info] of Object.entries(statuses)) {
-        const orderId = byProviderId.get(providerId);
-        if (!orderId || !info || info.error) continue;
+        const destino = byProviderId.get(providerId);
+        if (!destino || !info || info.error) continue;
         const status = mapProviderStatus(info.status);
-        const current = getOrderById(orderId);
         run(
-          `UPDATE orders SET status = ?, provider_status = ?, start_count = ?, remains = ?,
+          `UPDATE order_targets SET status = ?, provider_status = ?, start_count = ?, remains = ?,
                   updated_at = datetime('now')
             WHERE id = ?`,
           [
@@ -504,19 +713,25 @@ export async function syncOpenOrders(limit = 100): Promise<{ checked: number; up
             info.status ?? null,
             info.start_count != null ? Number(info.start_count) : null,
             info.remains != null ? Number(info.remains) : null,
-            orderId,
+            destino.id,
           ],
         );
-        if (current && current.status !== status) {
-          logEvent(orderId, status, `Estado actualizado por el proveedor: ${info.status}.`);
-          updated++;
-          if (status === "completed" || status === "partial") {
-            await notificarPedidoCompletado(getOrderById(orderId)!, status === "partial");
-          }
-        }
       }
     } catch {
       // Un fallo puntual del proveedor no debe romper la sincronización completa.
+    }
+  }
+
+  // Recién ahora se resume cada pedido: el cliente ve uno solo, con la suma de
+  // lo entregado en todas sus publicaciones.
+  for (const orderId of pedidos) {
+    const antes = getOrderById(orderId);
+    const despues = refrescarDesdeDestinos(orderId);
+    if (!antes || !despues || antes.status === despues.status) continue;
+    logEvent(orderId, despues.status, `Estado actualizado por el proveedor: ${despues.provider_status ?? despues.status}.`);
+    updated++;
+    if (despues.status === "completed" || despues.status === "partial") {
+      await notificarPedidoCompletado(despues, despues.status === "partial");
     }
   }
   return { checked: open.length, updated };
@@ -569,18 +784,25 @@ export function orderStats() {
           AND transfer_notified_at IS NOT NULL
           AND status NOT IN ('canceled', 'refunded')`,
     )?.n ?? 0,
-    // Pagados que nunca salieron: plata cobrada sin entregar.
+    // Pagados que nunca salieron, o que salieron a medias: plata cobrada sin
+    // entregar. Un pedido repartido cuenta mientras le falte una publicación.
     sinEnviar: get<{ n: number }>(
-      `SELECT COUNT(*) AS n FROM orders
-        WHERE payment_status = 'paid' AND provider_order_id IS NULL
-          AND manual_dispatch_at IS NULL
-          AND status NOT IN ('canceled', 'refunded')`,
+      `SELECT COUNT(*) AS n FROM orders o
+        WHERE o.payment_status = 'paid'
+          AND o.manual_dispatch_at IS NULL
+          AND o.status NOT IN ('canceled', 'refunded')
+          AND (o.provider_order_id IS NULL
+               OR EXISTS (SELECT 1 FROM order_targets t
+                           WHERE t.order_id = o.id AND t.provider_order_id IS NULL))`,
     )?.n ?? 0,
     sinEnviarClp: get<{ v: number }>(
-      `SELECT COALESCE(SUM(amount_clp), 0) AS v FROM orders
-        WHERE payment_status = 'paid' AND provider_order_id IS NULL
-          AND manual_dispatch_at IS NULL
-          AND status NOT IN ('canceled', 'refunded')`,
+      `SELECT COALESCE(SUM(o.amount_clp), 0) AS v FROM orders o
+        WHERE o.payment_status = 'paid'
+          AND o.manual_dispatch_at IS NULL
+          AND o.status NOT IN ('canceled', 'refunded')
+          AND (o.provider_order_id IS NULL
+               OR EXISTS (SELECT 1 FROM order_targets t
+                           WHERE t.order_id = o.id AND t.provider_order_id IS NULL))`,
     )?.v ?? 0,
     sinSaldo: get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM orders

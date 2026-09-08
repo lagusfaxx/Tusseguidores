@@ -121,12 +121,20 @@ export default async function PlatformPage({ params }: Params) {
             return (
               <section key={serviceType} id={serviceType} className="mt-9 scroll-mt-24 lg:mt-12">
                 <div className="flex items-end justify-between gap-4">
+                  {/* El título enlaza a la página propia de la categoría
+                      ("/instagram/seguidores"): es la que responde a la
+                      búsqueda concreta y necesita enlaces desde el sitio. */}
                   <h2 className="text-lg font-bold sm:text-xl">
-                    {serviceTypeLabel(serviceType)} para {label}
+                    <Link href={`/${platform}/${serviceType}`} className="hover:text-brand-300">
+                      {serviceTypeLabel(serviceType)} para {label}
+                    </Link>
                   </h2>
-                  {items.length > 1 ? (
-                    <span className="shrink-0 text-xs text-ink-400">{items.length} opciones</span>
-                  ) : null}
+                  <Link
+                    href={`/${platform}/${serviceType}`}
+                    className="shrink-0 text-xs text-ink-400 hover:text-white"
+                  >
+                    Ver {items.length > 1 ? `las ${items.length} opciones` : "la categoría"}
+                  </Link>
                 </div>
                 {/* Con uno o dos productos la grilla de cuatro deja la fila casi
                     vacía: ahí las tarjetas van en fila ancha. */}

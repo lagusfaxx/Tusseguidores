@@ -272,6 +272,85 @@ export function textoDeRed(platform: string): { html: string; faq: { q: string; 
   };
 }
 
+/**
+ * Cuerpo SEO de la página de una categoría dentro de una red
+ * ("/instagram/seguidores").
+ *
+ * Es la página que responde a la búsqueda concreta —"seguidores instagram"— y
+ * por eso el texto se arma solo con los productos de esa categoría: precios,
+ * plazos y reposición de esos servicios, no de toda la red. Sin eso la página
+ * sería un recorte de la de Instagram y Google trataría a las dos como la
+ * misma.
+ */
+export function textoDeTipo(
+  platform: string,
+  serviceType: string,
+): { html: string; faq: { q: string; a: string }[] } | null {
+  const filas = filasDePrecio(platform).filter((f) => f.serviceType === serviceType);
+  if (!filas.length) return null;
+
+  const red = platformLabel(platform);
+  const tipo = serviceTypeLabel(serviceType).toLowerCase();
+  const destino = DESTINO[platform] ?? "el enlace de tu perfil";
+  const barato = filas.reduce((min, f) => (f.desdeClp < min.desdeClp ? f : min));
+  const caro = filas.reduce((max, f) => (f.desdeClp > max.desdeClp ? f : max));
+  const conRefill = filas.filter((f) => f.refillDays > 0);
+  const rapidos = filas.filter((f) => f.minutos != null).sort((a, b) => (a.minutos ?? 0) - (b.minutos ?? 0));
+
+  const filasTabla = filas
+    .map(
+      (f) => `<tr>
+<td><a href="/producto/${esc(f.slug)}">${esc(f.nombre)}</a></td>
+<td>${f.nivel ? esc(levelLabel(f.nivel)) : "—"}</td>
+<td>${formatNumber(f.desdeQty)}</td>
+<td>${formatClp(f.desdeClp)}</td>
+<td>${f.minutos != null ? esc(formatDuration(f.minutos) ?? "—") : "Inicio inmediato"}</td>
+<td>${f.refillDays >= 9999 ? "De por vida" : f.refillDays > 0 ? `${f.refillDays} días` : "—"}</td>
+</tr>`,
+    )
+    .join("\n");
+
+  const html = [
+    `<h2>Comprar ${esc(tipo)} para ${esc(red)} en Chile</h2>`,
+    `<p>Esta página reúne los ${filas.length} servicios de ${esc(tipo)} para ${esc(red)} que ` +
+      `vendemos hoy, desde ${formatClp(barato.desdeClp)} por ${formatNumber(barato.desdeQty)} unidades ` +
+      `hasta ${formatClp(caro.desdeClp)} en el más caro. Pagas en pesos chilenos con Webpay, ` +
+      `transferencia o Mercado Pago, y no pedimos tu contraseña: para entregar basta con ${destino}, ` +
+      `con la cuenta pública mientras dura el pedido.</p>`,
+
+    `<h2>Precios de ${esc(tipo)} para ${esc(red)}</h2>`,
+    `<table><thead><tr><th>Servicio</th><th>Nivel</th><th>Desde</th><th>Precio</th><th>Entrega</th><th>Reposición</th></tr></thead>` +
+      `<tbody>${filasTabla}</tbody></table>`,
+    `<p>En la ficha de cada uno eliges la cantidad exacta que necesitas y el precio se recalcula solo, ` +
+      `sin saltos entre packs.</p>`,
+
+    `<h2>Cuánto demora</h2>`,
+    rapidos.length
+      ? `<p>El más rápido de esta categoría es ${esc(rapidos[0].nombre.toLowerCase())}, con una entrega ` +
+        `promedio de ${esc(formatDuration(rapidos[0].minutos) ?? "menos de una hora")} desde que Flow ` +
+        `confirma el pago. El resto parte casi siempre antes de diez minutos.</p>`
+      : `<p>La entrega parte apenas Flow confirma el pago, casi siempre antes de diez minutos. ` +
+        `El plazo total depende de la cantidad y aparece en la ficha de cada pack.</p>`,
+
+    conRefill.length
+      ? `<p>${conRefill.length} de estos ${filas.length} servicios incluyen reposición sin costo: si las ` +
+        `unidades entregadas bajan dentro del plazo, las reponemos. Si un pedido no se entrega, ` +
+        `devolvemos el 100%.</p>`
+      : `<p>Si un pedido no se entrega, devolvemos el 100% del monto pagado. Escríbenos con tu código ` +
+        `de pedido.</p>`,
+
+    `<h2>Cómo comprar ${esc(tipo)} para ${esc(red)}</h2>`,
+    `<ol>` +
+      `<li>Elige el pack de ${esc(tipo)} y la cantidad.</li>` +
+      `<li>Pega ${destino} y tu correo.</li>` +
+      `<li>Paga con Webpay, transferencia o Mercado Pago.</li>` +
+      `<li>Sigue el avance con el código que te damos al pagar.</li>` +
+      `</ol>`,
+  ].join("\n");
+
+  return { html, faq: [...(PREGUNTAS[platform] ?? []), ...PREGUNTAS_BASE] };
+}
+
 /** Cuerpo SEO de la portada, armado con lo que la tienda vende hoy. */
 export function textoDePortada(): string | null {
   const filas = all<{ platform: string; n: number }>(

@@ -50,25 +50,6 @@ export function slugify(input: string): string {
     .slice(0, 90);
 }
 
-/** Normaliza lo que escribe el comprador en el campo de destino. */
-export function normalizeTarget(raw: string, platform: string): string {
-  const value = raw.trim();
-  if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
-  const user = value.replace(/^@/, "");
-  const byPlatform: Record<string, string> = {
-    instagram: `https://www.instagram.com/${user}`,
-    tiktok: `https://www.tiktok.com/@${user}`,
-    twitter: `https://x.com/${user}`,
-    threads: `https://www.threads.net/@${user}`,
-    twitch: `https://www.twitch.tv/${user}`,
-    facebook: `https://www.facebook.com/${user}`,
-    youtube: `https://www.youtube.com/@${user}`,
-    telegram: `https://t.me/${user}`,
-  };
-  return byPlatform[platform] ?? value;
-}
-
 export function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(value.trim());
 }

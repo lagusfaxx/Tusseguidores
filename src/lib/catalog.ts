@@ -110,6 +110,52 @@ export function getPlatformsWithProducts(): PlatformSummary[] {
   );
 }
 
+export type PlatformTypeSummary = { platform: string; service_type: string; products: number };
+
+/**
+ * Las combinaciones red + tipo de servicio que la tienda vende hoy. Cada una
+ * tiene su propia página ("/instagram/seguidores"), que es la que responde a
+ * la búsqueda concreta —"seguidores instagram"— en vez de dejarla peleando
+ * contra la portada.
+ */
+export function getPlatformServiceTypes(): PlatformTypeSummary[] {
+  return all<PlatformTypeSummary>(
+    `SELECT p.platform, p.service_type, COUNT(*) AS products
+       FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id
+      WHERE p.published = 1 AND p.noindex = 0 AND s.provider_enabled = 1
+      GROUP BY p.platform, p.service_type
+      ORDER BY products DESC`,
+  );
+}
+
+export function getProductsByPlatformType(platform: string, serviceType: string): ProductWithService[] {
+  return sortProductsForStore(
+    all<ProductWithService>(
+      `${PRODUCT_SELECT}
+        WHERE p.published = 1 AND s.provider_enabled = 1
+          AND p.platform = ? AND p.service_type = ?`,
+      [platform, serviceType],
+    ),
+  );
+}
+
+/** Busca productos publicados por nombre, descripción, red o tipo. */
+export function searchProducts(query: string, limit = 40): ProductWithService[] {
+  const term = `%${query.trim().toLowerCase()}%`;
+  if (query.trim().length < 2) return [];
+  return all<ProductWithService>(
+    `${PRODUCT_SELECT}
+      WHERE p.published = 1 AND s.provider_enabled = 1
+        AND (lower(p.name) LIKE ? OR lower(p.short_description) LIKE ?
+             OR lower(p.platform) LIKE ? OR lower(p.service_type) LIKE ?
+             OR lower(s.clean_name) LIKE ?)
+      ORDER BY p.featured DESC, p.sort_order, p.name
+      LIMIT ?`,
+    [term, term, term, term, term, limit],
+  );
+}
+
 export function getProviderService(serviceId: number): ProviderService | undefined {
   return get<ProviderService>("SELECT * FROM provider_services WHERE service_id = ?", [serviceId]);
 }

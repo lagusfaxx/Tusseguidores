@@ -329,6 +329,36 @@ export function SettingsForm({
             placeholder="G-XXXXXXXXXX" />
         </Section>
 
+        <Section
+          title="Calificación del servicio"
+          hint="La nota que se muestra en la tienda y que se publica como aggregateRating: es lo que hace que el resultado de Google salga con estrellas debajo del título. Pon los números de tus opiniones reales; sin número de opiniones no se muestra nada."
+        >
+          <Check
+            label="Mostrar la calificación"
+            name="rating_enabled"
+            checked={settings.rating_enabled === "1"}
+            hint="Apágalo para sacar las estrellas de toda la tienda y de los datos estructurados."
+          />
+          <Field
+            label="Nota (1 a 5)"
+            name="rating_value"
+            type="number"
+            value={settings.rating_value}
+            hint="Se admite un decimal, por ejemplo 4.8. Fuera del rango 1–5 no se muestra."
+          />
+          <Field
+            label="Número de opiniones"
+            name="rating_count"
+            type="number"
+            value={settings.rating_count}
+            hint="Cuántas personas la calificaron. En 0 no se muestra la calificación en ninguna parte: Google no valida una nota sin opiniones detrás."
+          />
+          <p className="text-xs leading-relaxed text-ink-400">
+            Cada producto puede llevar su propia nota desde su ficha en el panel. Si la deja en 0,
+            usa esta.
+          </p>
+        </Section>
+
         <Section title="Operación">
           <Field label="Clave del cron" name="cron_secret" type="password" value={settings.cron_secret}
             hint="Necesaria para llamar a /api/cron/sincronizar y actualizar los estados de los pedidos." />

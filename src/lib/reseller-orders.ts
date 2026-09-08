@@ -1,6 +1,7 @@
 import "server-only";
 import { db, all, get, run } from "./db";
 import { getOrderById, cleanComments, logEvent, sendToProvider } from "./orders";
+import { revisarDestino } from "./targets";
 import { precioDePedido, servicioVendible } from "./reseller-catalog";
 import { costUsd } from "./pricing";
 import { orderCode } from "./utils";
@@ -54,10 +55,14 @@ export async function crearPedidoDePanel(input: CrearPedidoInput): Promise<Crear
     return { ok: false, error: "Ese servicio ya no está disponible. Elige otro del catálogo." };
   }
 
-  const link = input.link.trim();
-  if (!/^https?:\/\/\S+$/i.test(link) && !/^@?[\w.\-]{2,}$/.test(link)) {
-    return { ok: false, error: "Revisa el enlace o el usuario de destino." };
-  }
+  // El destino se revisa contra el tipo de servicio: un enlace de perfil en un
+  // servicio que se entrega sobre una publicación se rechaza aquí, con el
+  // saldo todavía en la cuenta.
+  const revision = revisarDestino(
+    input.link, service.platform, service.service_type, service.order_kind,
+  );
+  if (!revision.ok) return { ok: false, error: revision.error };
+  const link = revision.link;
 
   // En los comentarios personalizados la cantidad la ponen las líneas escritas,
   // no un número aparte: el proveedor cobra por comentario entregado.

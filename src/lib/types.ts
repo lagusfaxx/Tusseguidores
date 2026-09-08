@@ -63,6 +63,28 @@ export type Product = {
   featured: number;
   published: number;
   sort_order: number;
+  /** Calificación propia del producto. 0 = usa la calificación de la tienda. */
+  rating_value: number;
+  rating_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Una publicación (o el perfil) a la que va una parte del pedido. */
+export type OrderTarget = {
+  id: number;
+  order_id: number;
+  position: number;
+  link: string;
+  quantity: number;
+  comments: string | null;
+  provider_service_id: number | null;
+  provider_order_id: number | null;
+  provider_status: string | null;
+  provider_error: string | null;
+  start_count: number | null;
+  remains: number | null;
+  status: OrderStatus;
   created_at: string;
   updated_at: string;
 };

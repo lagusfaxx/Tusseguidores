@@ -4,6 +4,8 @@ import { formatClp, formatNumber } from "@/lib/pricing";
 import { platformLabel } from "@/lib/labels";
 import { levelLabel } from "@/lib/level-defs";
 import { ArrowIcon, BoltIcon, PlatformIcon } from "./icons";
+import { productRating } from "@/lib/ratings";
+import { RatingChip } from "./stars";
 
 /**
  * Tarjeta de producto del catálogo, en dos formas.
@@ -28,6 +30,7 @@ export function ProductCard({
 }) {
   const tier = highlightTier(product);
   const nivel = levelLabel(product.level);
+  const rating = productRating(product);
 
   const red = (
     <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-300">
@@ -50,6 +53,7 @@ export function ProductCard({
       {nivel ? (
         <span className="rounded-md bg-white/6 px-1.5 py-0.5 text-[11px] text-ink-200">{nivel}</span>
       ) : null}
+      {rating ? <RatingChip rating={rating} /> : null}
     </div>
   );
 

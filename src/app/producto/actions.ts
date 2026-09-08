@@ -10,7 +10,8 @@ import { absoluteUrl } from "@/lib/seo";
 import { getSettings, getBoolSetting } from "@/lib/settings";
 import { getProductById } from "@/lib/catalog";
 import { transferenciaDisponible } from "@/lib/transfer";
-import { isValidEmail, normalizeTarget } from "@/lib/utils";
+import { isValidEmail } from "@/lib/utils";
+import { separarDestinos } from "@/lib/targets";
 import { run } from "@/lib/db";
 
 export type CheckoutState = { error?: string };
@@ -26,6 +27,10 @@ export async function startCheckout(
   const productId = Number(formData.get("productId"));
   const quantity = Number(formData.get("quantity"));
   const rawLink = String(formData.get("link") ?? "");
+  // Repartido entre publicaciones: un enlace por línea. La validación de qué
+  // sirve como destino está en createOrder, que es por donde entran también
+  // los pedidos del panel mayorista.
+  const rawLinks = separarDestinos(String(formData.get("links") ?? ""));
   const email = String(formData.get("email") ?? "");
   const phone = String(formData.get("phone") ?? "");
   const coupon = String(formData.get("coupon") ?? "");
@@ -35,10 +40,8 @@ export async function startCheckout(
 
   const product = getProductById(productId);
   if (!product) return { error: "El producto ya no está disponible." };
-  if (!rawLink.trim()) return { error: "Falta el enlace o usuario de destino." };
+  if (!rawLink.trim() && !rawLinks.length) return { error: "Falta el enlace o usuario de destino." };
   if (!isValidEmail(email)) return { error: "Revisa tu correo: lo necesitamos para enviarte el comprobante." };
-
-  const link = normalizeTarget(rawLink, product.platform);
 
   const headerList = await headers();
   const ip = headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
@@ -50,7 +53,8 @@ export async function startCheckout(
   const created = createOrder({
     productId,
     quantity,
-    link,
+    link: rawLink,
+    links: rawLinks,
     comments,
     paymentProvider: metodo,
     email,

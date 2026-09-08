@@ -29,7 +29,10 @@ export function buildMetadata({ title, description, path, keywords, image, noind
     : absoluteUrl(`/api/og?t=${encodeURIComponent(title.split("|")[0].trim())}&s=${encodeURIComponent(description.slice(0, 90))}`);
 
   return {
-    title,
+    // Absoluto a propósito: la plantilla del layout ("%s | TusSeguidores")
+    // se sumaba a títulos que ya traen la marca y dejaba resultados con el
+    // nombre dos veces, comiéndose los caracteres útiles del snippet.
+    title: { absolute: title },
     description,
     keywords: keywords ? keywords.split(",").map((k) => k.trim()).filter(Boolean) : undefined,
     alternates: { canonical: url },

@@ -194,6 +194,33 @@ descripción, preguntas frecuentes y SEO en español, listos para editar.
 El catálogo del proveedor sigue disponible para cuando necesites un servicio
 concreto (un país específico, un subtipo raro), pero no es la vía normal.
 
+### A dónde va el pedido
+
+Los servicios que se entregan sobre una publicación —me gusta, visualizaciones,
+comentarios, guardados, compartidos, votos, vistas de historias— **exigen el
+enlace de la publicación**. Si el comprador pega el de su perfil, o escribe su
+usuario, el formulario lo rechaza en el momento y le dice qué copiar, con un
+ejemplo de esa red. Antes eso se aceptaba, el usuario suelto se convertía en la
+URL del perfil y el error aparecía recién en el proveedor, con la plata ya
+cobrada. Al revés también se revisa: un enlace de publicación en un servicio de
+seguidores no pasa.
+
+**Repartir entre varias publicaciones.** En esos mismos servicios, el comprador
+puede pegar varios enlaces (uno por línea) y cada publicación recibe la cantidad
+elegida: 500 me gusta en tres publicaciones son 1.500 en total y se cobran tres
+veces el pack de 500, que es lo que le cuesta a la tienda.
+
+Por dentro, cada publicación es un pedido del proveedor: es la única forma en
+que sabe entregar —un enlace por pedido—. La tabla `order_targets` guarda uno
+por destino con su número de pedido del proveedor, su estado y su error, y el
+pedido que ve el cliente sigue siendo uno solo: se le suma lo entregado y se le
+resume el estado (todas completas = completado; alguna en curso = en proceso).
+Si una publicación no entra —el proveedor rechaza ese enlace, o se queda sin
+saldo— el resto sale igual, el pedido queda marcado como pendiente de envío por
+esa parte y el cron reintenta solo la que falta, sin repetir las que ya
+salieron. El destino se puede corregir desde el seguimiento y desde el panel
+mientras no haya salido, con las mismas revisiones.
+
 ### Formas de pedido
 
 La API del proveedor no pide lo mismo para todos los servicios, y equivocarse
@@ -437,10 +464,39 @@ generado o uno tuyo, y puedes reemplazar cualquiera por el que quieras (el
 generado te queda a mano para copiarlo y editarlo). Se apaga entero desde
 Ajustes → SEO.
 
-- Metadatos, canonical y Open Graph por página, editables por producto.
-- JSON-LD: `Organization`, `WebSite`, `Product` con `AggregateOffer`,
-  `BreadcrumbList` y `FAQPage`.
+**Una página por búsqueda.** Además de la página de cada red, hay una por
+combinación red + servicio: `/instagram/seguidores`, `/tiktok/likes`,
+`/youtube/suscriptores`. Es la que responde a lo que la gente escribe de
+verdad —«seguidores instagram»—, con el término en la URL, en el título, en el
+`<h1>` y en un texto armado solo con los productos de esa categoría. Antes ese
+término competía contra la página de Instagram entera, que habla de seguidores,
+likes, vistas y guardados a la vez.
+
+Estas páginas se enlazan entre ellas y desde la portada («Lo más buscado») y
+desde el título de cada categoría en la página de la red, entran al
+`sitemap.xml` con prioridad más alta que la red completa, y llevan `Product`
+con `AggregateOffer` y `ItemList` en sus datos estructurados. Su texto también
+se edita desde **Panel → SEO**, debajo de la red a la que pertenecen.
+
+**Calificación con estrellas.** En **Ajustes → Calificación del servicio**
+pones la nota (1 a 5) y el número de opiniones de tu tienda. Se muestra en la
+portada, en las fichas, en las tarjetas del catálogo y en las páginas de
+categoría, y se publica como `aggregateRating`, que es lo que hace que el
+resultado de Google salga con estrellas debajo del título. Cada producto puede
+llevar su propia nota desde su ficha en el panel; con los dos campos en 0 usa
+la de la tienda. **Con el número de opiniones en 0 no se muestra nada**: una
+nota sin opiniones detrás ni Google la valida ni le sirve a nadie. Pon tus
+números reales.
+
+- Metadatos, canonical y Open Graph por página, editables por producto. El
+  título va absoluto: antes la plantilla del layout le sumaba la marca a
+  títulos que ya la traían y el resultado salía con el nombre dos veces.
+- JSON-LD: `Organization`, `WebSite`, `Product` con `AggregateOffer` y
+  `AggregateRating`, `ItemList`, `BreadcrumbList` y `FAQPage`.
 - `sitemap.xml` y `robots.txt` generados desde la base de datos.
+- Buscador en `/buscar`, que es el que los datos estructurados ya prometían
+  (`SearchAction`) y hasta ahora devolvía 404. Sus resultados van con `noindex`
+  y fuera del rastreo: son la misma información con otra URL.
 - Imagen social en PNG generada al vuelo en `/api/og`.
 - El panel de administración y las páginas de pedidos van con `noindex`.
 
@@ -483,6 +539,8 @@ src/
   app/
     page.tsx                    portada
     [platform]/                 página por red social
+    [platform]/[tipo]/          página por red + servicio (/instagram/seguidores)
+    buscar/                     buscador de la tienda
     producto/[slug]/            ficha de producto
     pedido/[code]/              seguimiento
     pago/retorno/               vuelta desde Flow
@@ -514,6 +572,8 @@ src/
     topups.ts                   recargas por Webpay y transferencia
     tickets.ts                  soporte y solicitudes de reposición
     taxonomy.mjs                clasificación de servicios
+    targets.ts                  destino del pedido: perfil o publicación
+    ratings.ts                  calificación de la tienda y de cada producto
 scripts/
   parse-catalog.mjs             listas del proveedor -> catalog.json
   seed.mjs                      importación y catálogo inicial

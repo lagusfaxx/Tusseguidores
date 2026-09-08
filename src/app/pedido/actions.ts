@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getOrderByCode, logEvent } from "@/lib/orders";
+import { ensureTargets, getOrderByCode, logEvent } from "@/lib/orders";
 import { puedeCorregirDestino } from "@/lib/order-tracking";
 import { crearTicket, agregarMensaje, ticketDePedido } from "@/lib/tickets";
 import { avisarAdmin } from "@/lib/notify";
-import { normalizeTarget } from "@/lib/utils";
+import { revisarDestinos, separarDestinos } from "@/lib/targets";
 import { absoluteUrl } from "@/lib/seo";
 import { run, get } from "@/lib/db";
 
@@ -39,28 +39,66 @@ export async function corregirDestino(_prev: PedidoState, formData: FormData): P
     return { error: "Este pedido ya salió a entrega y el destino no se puede cambiar." };
   }
 
-  const crudo = String(formData.get("link") ?? "").trim();
-  if (!crudo) return { error: "Escribe el enlace o usuario correcto." };
+  const crudos = separarDestinos(String(formData.get("link") ?? ""));
+  if (!crudos.length) return { error: "Escribe el enlace o usuario correcto." };
 
   const producto = order.product_id
-    ? get<{ platform: string }>("SELECT platform FROM products WHERE id = ?", [order.product_id])
+    ? get<{ platform: string; service_type: string }>(
+        "SELECT platform, service_type FROM products WHERE id = ?",
+        [order.product_id],
+      )
     : undefined;
-  const link = normalizeTarget(crudo, producto?.platform ?? "");
-  if (link === order.link) return { ok: "Ese es el destino que ya tenías guardado." };
+  const servicio = get<{ order_kind: string }>(
+    "SELECT order_kind FROM provider_services WHERE service_id = ?",
+    [order.reference_service_id ?? order.provider_service_id],
+  );
 
-  run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [link, order.id]);
-  logEvent(order.id, "info", `El cliente corrigió el destino: ${order.link} → ${link}`);
+  // Se revisa igual que al comprar: corregir un destino no puede dejar el
+  // pedido con un enlace que el proveedor no sabe entregar.
+  const revision = revisarDestinos(
+    crudos,
+    producto?.platform ?? "",
+    producto?.service_type ?? "",
+    servicio?.order_kind ?? "",
+  );
+  if (!revision.ok) return { error: revision.error };
+  const links = revision.links;
+
+  const destinos = ensureTargets(order);
+  if (links.length !== destinos.length) {
+    return {
+      error:
+        destinos.length > 1
+          ? `Este pedido va a ${destinos.length} publicaciones: deja ${destinos.length} enlaces, uno por línea. Para cambiar la cantidad, escríbenos.`
+          : "Este pedido va a un solo destino. Deja un enlace.",
+    };
+  }
+
+  const antes = destinos.map((d) => d.link);
+  if (antes.join("\n") === links.join("\n")) {
+    return { ok: "Ese es el destino que ya tenías guardado." };
+  }
+
+  destinos.forEach((destino, i) =>
+    run("UPDATE order_targets SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[i], destino.id]),
+  );
+  run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[0], order.id]);
+  logEvent(
+    order.id,
+    "info",
+    `El cliente corrigió el destino: ${antes.join(", ")} → ${links.join(", ")}`,
+  );
 
   await avisarAdmin(
     `Destino corregido · ${order.code}`,
     `<p>El cliente cambió el destino de su pedido <strong>${order.code}</strong>.</p>` +
-      `<p>Antes: ${order.link}<br>Ahora: ${link}</p>` +
+      `<p>Antes: ${antes.join("<br>")}<br><br>Ahora: ${links.join("<br>")}</p>` +
       `<p><a href="${absoluteUrl(`/admin/pedidos/${order.id}`)}">Ver el pedido</a></p>`,
-    `El cliente corrigió el destino de ${order.code}: ${order.link} -> ${link}`,
+    `El cliente corrigió el destino de ${order.code}: ${antes.join(", ")} -> ${links.join(", ")}`,
   );
 
   revalidatePath(`/pedido/${order.code}`);
-  return { ok: "Destino actualizado." };
+  return { ok: links.length > 1 ? "Destinos actualizados." : "Destino actualizado." };
 }
 
 /** Abrir un ticket desde el seguimiento del pedido. */

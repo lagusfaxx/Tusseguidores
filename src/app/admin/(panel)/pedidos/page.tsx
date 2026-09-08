@@ -27,10 +27,14 @@ export default async function AdminOrdersPage({
       "payment_provider = 'transferencia' AND payment_status = 'pending' AND status NOT IN ('canceled','refunded')",
     );
   } else if (estado === "sin-enviar") {
-    // Pagados que nunca salieron al proveedor: lo que hay que mirar primero.
+    // Pagados que nunca salieron al proveedor —o que salieron a medias, con
+    // alguna publicación pendiente—: lo que hay que mirar primero.
     where.push(
-      `payment_status = 'paid' AND provider_order_id IS NULL AND manual_dispatch_at IS NULL
-       AND status NOT IN ('canceled','refunded')`,
+      `payment_status = 'paid' AND manual_dispatch_at IS NULL
+       AND status NOT IN ('canceled','refunded')
+       AND (provider_order_id IS NULL
+            OR EXISTS (SELECT 1 FROM order_targets t
+                        WHERE t.order_id = orders.id AND t.provider_order_id IS NULL))`,
     );
   } else if (estado && estado !== "todos") {
     where.push("status = ?");

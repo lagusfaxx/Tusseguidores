@@ -15,8 +15,9 @@ import {
 } from "@/lib/quality.mjs";
 import {
   sendToProvider, setStatus, setStatusManual, markDispatchedManually, syncOpenOrders, logEvent,
-  markPaid, retryUndispatched,
+  markPaid, retryUndispatched, ensureTargets, getOrderById,
 } from "@/lib/orders";
+import { separarDestinos } from "@/lib/targets";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
@@ -104,6 +105,7 @@ const SETTING_KEYS = [
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",
+  "rating_enabled", "rating_value", "rating_count",
   "cron_secret", "orders_enabled",
 ];
 
@@ -130,7 +132,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
     "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
-    "reseller_enabled",
+    "reseller_enabled", "rating_enabled",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -256,6 +258,9 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
     featured: formData.get("featured") ? 1 : 0,
     published: formData.get("published") ? 1 : 0,
     sort_order: Number(formData.get("sort_order")) || 100,
+    // 0 en cualquiera de los dos = este producto usa la calificación general.
+    rating_value: Math.min(5, Math.max(0, Number(formData.get("rating_value")) || 0)),
+    rating_count: Math.max(0, Math.round(Number(formData.get("rating_count")) || 0)),
   };
 
   const tiers = tiersFromForm(formData);
@@ -278,6 +283,7 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
            delivery_label=@delivery_label, quality_label=@quality_label,
            refill_days=@refill_days, guarantee_text=@guarantee_text,
            featured=@featured, published=@published, sort_order=@sort_order,
+           rating_value=@rating_value, rating_count=@rating_count,
            updated_at=datetime('now')
          WHERE id=@id`,
       ).run({ ...values, id });
@@ -289,14 +295,16 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
             og_image, noindex, image_url, badge, price_mode, margin_override,
             level, auto_managed, auto_select, max_cost_ratio, min_qty, max_qty,
             link_label, link_placeholder, link_help, delivery_label, quality_label,
-            refill_days, guarantee_text, featured, published, sort_order)
+            refill_days, guarantee_text, featured, published, sort_order,
+            rating_value, rating_count)
          VALUES
            (@slug, @name, @platform, @service_type, @provider_service_id, @short_description,
             @description_html, @bullets_json, @faq_json, @seo_title, @seo_description, @seo_keywords,
             @og_image, @noindex, @image_url, @badge, @price_mode, @margin_override,
             @level, @auto_managed, @auto_select, @max_cost_ratio, @min_qty, @max_qty,
             @link_label, @link_placeholder, @link_help, @delivery_label, @quality_label,
-            @refill_days, @guarantee_text, @featured, @published, @sort_order)`,
+            @refill_days, @guarantee_text, @featured, @published, @sort_order,
+            @rating_value, @rating_count)`,
       ).run(values);
       productId = Number(info.lastInsertRowid);
     }
@@ -609,12 +617,24 @@ export async function editarDestino(formData: FormData) {
       throw new Error("El pedido ya salió a entrega: el destino no se puede cambiar.");
     }
 
-    const link = String(formData.get("link") ?? "").trim();
-    if (!link) throw new Error("Escribe el nuevo destino.");
-    if (link === order.link) return;
+    const links = separarDestinos(String(formData.get("link") ?? ""));
+    if (!links.length) throw new Error("Escribe el nuevo destino.");
 
-    run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [link, id]);
-    logEvent(id, "info", `Destino corregido desde el panel: ${order.link} → ${link}`);
+    const completo = getOrderById(id)!;
+    const destinos = ensureTargets(completo);
+    if (links.length !== destinos.length) {
+      throw new Error(
+        `Este pedido va a ${destinos.length} destino(s): deja ${destinos.length}, uno por línea.`,
+      );
+    }
+    const antes = destinos.map((d) => d.link);
+    if (antes.join("\n") === links.join("\n")) return;
+
+    destinos.forEach((destino, i) =>
+      run("UPDATE order_targets SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[i], destino.id]),
+    );
+    run("UPDATE orders SET link = ?, updated_at = datetime('now') WHERE id = ?", [links[0], id]);
+    logEvent(id, "info", `Destino corregido desde el panel: ${antes.join(", ")} → ${links.join(", ")}`);
     revalidatePath(`/admin/pedidos/${id}`);
   });
 }
@@ -901,7 +921,8 @@ export async function rescoreCatalog(_prev: ActionState): Promise<ActionState> {
 export async function saveSeoText(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await guard();
   const clave = String(formData.get("clave") ?? "");
-  if (!/^seo_text_[a-z0-9-]{2,30}$|^seo_home_text$/.test(clave)) {
+  // seo_text_<red> y seo_text_<red>_<tipo>, que es la página de categoría.
+  if (!/^seo_text_[a-z0-9-]{2,30}(_[a-z0-9-]{2,30})?$|^seo_home_text$/.test(clave)) {
     return { error: "Página desconocida." };
   }
   const html = sanitizeHtml(String(formData.get("html") ?? "").trim());

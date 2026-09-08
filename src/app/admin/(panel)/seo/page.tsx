@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { getPlatformsWithProducts } from "@/lib/catalog";
+import { getPlatformServiceTypes, getPlatformsWithProducts } from "@/lib/catalog";
 import { getSettings } from "@/lib/settings";
-import { platformLabel, sortPlatforms } from "@/lib/labels";
-import { textoDeRed, textoDePortada } from "@/lib/seo-text";
+import { platformLabel, serviceTypeLabel, sortPlatforms, sortServiceTypes } from "@/lib/labels";
+import { textoDeRed, textoDeTipo, textoDePortada } from "@/lib/seo-text";
 import { SeoTextEditor } from "@/components/seo-editor";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +11,7 @@ export default async function AdminSeoPage() {
   const settings = getSettings();
   const auto = settings.auto_seo_text === "1";
   const platforms = sortPlatforms(getPlatformsWithProducts());
+  const combinaciones = sortServiceTypes(getPlatformServiceTypes());
 
   const paginas = [
     {
@@ -20,15 +21,30 @@ export default async function AdminSeoPage() {
       manual: settings.seo_home_text ?? "",
       generado: textoDePortada() ?? "",
     },
-    ...platforms.map((p) => {
+    ...platforms.flatMap((p) => {
       const generado = textoDeRed(p.platform);
-      return {
+      const red = {
         clave: `seo_text_${p.platform}`,
         titulo: platformLabel(p.platform),
         url: `/${p.platform}`,
         manual: settings[`seo_text_${p.platform}`] ?? "",
         generado: generado?.html ?? "",
       };
+      // Debajo de cada red van sus páginas de categoría, que son las que
+      // responden a búsquedas como "seguidores instagram".
+      const categorias = combinaciones
+        .filter((c) => c.platform === p.platform)
+        .map((c) => {
+          const texto = textoDeTipo(c.platform, c.service_type);
+          return {
+            clave: `seo_text_${c.platform}_${c.service_type}`,
+            titulo: `${platformLabel(c.platform)} · ${serviceTypeLabel(c.service_type)}`,
+            url: `/${c.platform}/${c.service_type}`,
+            manual: settings[`seo_text_${c.platform}_${c.service_type}`] ?? "",
+            generado: texto?.html ?? "",
+          };
+        });
+      return [red, ...categorias];
     }),
   ];
 

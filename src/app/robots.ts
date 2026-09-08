@@ -10,7 +10,12 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/admin/", "/api/", "/pedido/", "/pago/", "/seguimiento"],
+        disallow: [
+          "/admin", "/admin/", "/api/", "/pedido/", "/pago/", "/seguimiento",
+          // El buscador devuelve las mismas fichas con otra URL: que Google
+          // gaste el rastreo en las páginas que sí queremos posicionar.
+          "/buscar",
+        ],
       },
     ],
     sitemap: `${base}/sitemap.xml`,
