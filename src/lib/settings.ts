@@ -88,6 +88,13 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   google_site_verification: "",
   google_analytics_id: "",
 
+  // Calificación del servicio. Se muestra en la tienda y se publica como
+  // aggregateRating: es lo que hace que el resultado de Google salga con
+  // estrellas. Sin número de opiniones no se muestra nada.
+  rating_enabled: "1",
+  rating_value: "4.8",
+  rating_count: "0",
+
   // Operación
   cron_secret: "",
   orders_enabled: "1",

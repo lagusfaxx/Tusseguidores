@@ -105,6 +105,10 @@ CREATE TABLE IF NOT EXISTS products (
   published           INTEGER NOT NULL DEFAULT 0,
   sort_order          INTEGER NOT NULL DEFAULT 100,
 
+  -- Calificación propia del producto. 0 = usa la de la tienda.
+  rating_value        REAL    NOT NULL DEFAULT 0,
+  rating_count        INTEGER NOT NULL DEFAULT 0,
+
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT    NOT NULL DEFAULT (datetime('now'))
 );

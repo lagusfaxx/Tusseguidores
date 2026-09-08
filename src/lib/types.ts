@@ -63,6 +63,9 @@ export type Product = {
   featured: number;
   published: number;
   sort_order: number;
+  /** Calificación propia del producto. 0 = usa la calificación de la tienda. */
+  rating_value: number;
+  rating_count: number;
   created_at: string;
   updated_at: string;
 };

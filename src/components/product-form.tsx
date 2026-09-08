@@ -236,6 +236,16 @@ export function ProductForm(props: Props) {
           </Section>
 
           <Section
+            title="Calificación"
+            hint="La nota de este producto, que se muestra en su ficha y se publica como aggregateRating. Deja los dos campos en 0 para usar la calificación general de la tienda."
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Nota (1 a 5)" name="rating_value" type="number" defaultValue={product?.rating_value ?? 0} />
+              <Field label="Opiniones" name="rating_count" type="number" defaultValue={product?.rating_count ?? 0} />
+            </div>
+          </Section>
+
+          <Section
             title="Elección del servicio"
             hint="El cliente elige el producto; la tienda decide a qué servicio del proveedor pedírselo."
           >

@@ -104,6 +104,7 @@ const SETTING_KEYS = [
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",
+  "rating_enabled", "rating_value", "rating_count",
   "cron_secret", "orders_enabled",
 ];
 
@@ -130,7 +131,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
     "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
-    "reseller_enabled",
+    "reseller_enabled", "rating_enabled",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -256,6 +257,9 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
     featured: formData.get("featured") ? 1 : 0,
     published: formData.get("published") ? 1 : 0,
     sort_order: Number(formData.get("sort_order")) || 100,
+    // 0 en cualquiera de los dos = este producto usa la calificación general.
+    rating_value: Math.min(5, Math.max(0, Number(formData.get("rating_value")) || 0)),
+    rating_count: Math.max(0, Math.round(Number(formData.get("rating_count")) || 0)),
   };
 
   const tiers = tiersFromForm(formData);
@@ -278,6 +282,7 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
            delivery_label=@delivery_label, quality_label=@quality_label,
            refill_days=@refill_days, guarantee_text=@guarantee_text,
            featured=@featured, published=@published, sort_order=@sort_order,
+           rating_value=@rating_value, rating_count=@rating_count,
            updated_at=datetime('now')
          WHERE id=@id`,
       ).run({ ...values, id });
@@ -289,14 +294,16 @@ export async function saveProduct(_prev: ActionState, formData: FormData): Promi
             og_image, noindex, image_url, badge, price_mode, margin_override,
             level, auto_managed, auto_select, max_cost_ratio, min_qty, max_qty,
             link_label, link_placeholder, link_help, delivery_label, quality_label,
-            refill_days, guarantee_text, featured, published, sort_order)
+            refill_days, guarantee_text, featured, published, sort_order,
+            rating_value, rating_count)
          VALUES
            (@slug, @name, @platform, @service_type, @provider_service_id, @short_description,
             @description_html, @bullets_json, @faq_json, @seo_title, @seo_description, @seo_keywords,
             @og_image, @noindex, @image_url, @badge, @price_mode, @margin_override,
             @level, @auto_managed, @auto_select, @max_cost_ratio, @min_qty, @max_qty,
             @link_label, @link_placeholder, @link_help, @delivery_label, @quality_label,
-            @refill_days, @guarantee_text, @featured, @published, @sort_order)`,
+            @refill_days, @guarantee_text, @featured, @published, @sort_order,
+            @rating_value, @rating_count)`,
       ).run(values);
       productId = Number(info.lastInsertRowid);
     }
@@ -901,7 +908,8 @@ export async function rescoreCatalog(_prev: ActionState): Promise<ActionState> {
 export async function saveSeoText(_prev: ActionState, formData: FormData): Promise<ActionState> {
   await guard();
   const clave = String(formData.get("clave") ?? "");
-  if (!/^seo_text_[a-z0-9-]{2,30}$|^seo_home_text$/.test(clave)) {
+  // seo_text_<red> y seo_text_<red>_<tipo>, que es la página de categoría.
+  if (!/^seo_text_[a-z0-9-]{2,30}(_[a-z0-9-]{2,30})?$|^seo_home_text$/.test(clave)) {
     return { error: "Página desconocida." };
   }
   const html = sanitizeHtml(String(formData.get("html") ?? "").trim());

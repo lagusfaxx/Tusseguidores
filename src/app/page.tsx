@@ -3,9 +3,12 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
-import { getFeaturedProducts, getPlatformsWithProducts, getPublishedProducts, cheapestTier } from "@/lib/catalog";
+import {
+  getFeaturedProducts, getPlatformServiceTypes, getPlatformsWithProducts,
+  getPublishedProducts, cheapestTier,
+} from "@/lib/catalog";
 import { getSettings } from "@/lib/settings";
-import { platformLabel, sortPlatforms } from "@/lib/labels";
+import { platformLabel, serviceTypeLabel, sortPlatforms } from "@/lib/labels";
 import { formatClp } from "@/lib/pricing";
 import { buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { BoltIcon, CheckIcon, LockIcon, PlatformIcon, ShieldIcon } from "@/components/icons";
@@ -13,6 +16,8 @@ import { sanitizeHtml } from "@/lib/utils";
 import { textoDePortada } from "@/lib/seo-text";
 import { getBoolSetting } from "@/lib/settings";
 import { LeerMas } from "@/components/leer-mas";
+import { Stars } from "@/components/stars";
+import { storeRating } from "@/lib/ratings";
 
 export function generateMetadata(): Metadata {
   const s = getSettings();
@@ -64,6 +69,11 @@ export default function HomePage() {
   const desde = prices.length ? Math.min(...prices) : 1990;
 
   const whatsapp = settings.contact_whatsapp.replace(/\D/g, "");
+  const rating = storeRating();
+  // Las combinaciones red + servicio que la gente busca por su nombre
+  // ("seguidores instagram"). Cada una tiene su página y desde aquí recibe el
+  // enlace que necesita para que Google la encuentre y la entienda.
+  const buscados = getPlatformServiceTypes().slice(0, 12);
 
   const cuerpoSeo = settings.seo_home_text
     ? sanitizeHtml(settings.seo_home_text)
@@ -94,6 +104,8 @@ export default function HomePage() {
                   Eliges cuántos quieres, pagas y empiezan a llegar en minutos. Sin contraseñas:
                   con tu usuario basta.
                 </p>
+
+                {rating ? <Stars rating={rating} tamano="md" className="mt-5" /> : null}
 
                 <div className="mt-7 flex flex-wrap items-center gap-3">
                   <Link href="#catalogo" className="btn btn-primary text-base">
@@ -291,6 +303,31 @@ export default function HomePage() {
             ))}
           </div>
         </section>
+
+        {/* ------------------------------------------------ Lo más buscado */}
+        {buscados.length ? (
+          <section className="border-t border-white/8 bg-ink-900/40">
+            <div className="mx-auto max-w-6xl px-4 py-12 sm:py-14">
+              <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo más buscado</h2>
+              <p className="mt-2 max-w-2xl text-sm text-ink-400">
+                Cada búsqueda tiene su página, con sus precios y sus plazos.
+              </p>
+              <ul className="mt-6 flex flex-wrap gap-2">
+                {buscados.map((c) => (
+                  <li key={`${c.platform}-${c.service_type}`}>
+                    <Link
+                      href={`/${c.platform}/${c.service_type}`}
+                      className="inline-block rounded-full border border-white/12 bg-white/5 px-3.5 py-2 text-sm text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white"
+                    >
+                      Comprar {serviceTypeLabel(c.service_type).toLowerCase()}{" "}
+                      {platformLabel(c.platform)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        ) : null}
 
         {/* Texto SEO: manual si lo escribiste, generado si no. */}
         {cuerpoSeo ? (
