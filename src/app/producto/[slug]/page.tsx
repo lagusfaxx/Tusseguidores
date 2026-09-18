@@ -18,6 +18,7 @@ import { absoluteUrl, breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/s
 import { sanitizeHtml } from "@/lib/utils";
 import { routingForProduct } from "@/lib/routing";
 import { comparadorDeNiveles, levelLabel } from "@/lib/levels";
+import { avisoSinReposicion } from "@/lib/level-defs";
 import { getBoolSetting } from "@/lib/settings";
 import { necesitaPublicacion } from "@/lib/targets";
 import { aggregateRatingLd, productRating } from "@/lib/ratings";
@@ -84,6 +85,11 @@ export default async function ProductPage({ params }: Params) {
       ? `Reposición gratis por ${refillDays} días`
       : product.guarantee_text || "Reembolso si el pedido no se entrega";
 
+  // El aviso sale del servicio al que de verdad se va a enrutar el pedido: si
+  // hoy el económico está saliendo por uno que sí repone, no corresponde
+  // asustar al cliente con algo que no le va a pasar.
+  const aviso = avisoSinReposicion(product.level, refillDays);
+
   const minQty = Math.max(product.min_qty, product.provider_min);
   const maxQty = Math.min(product.max_qty, product.provider_max);
   const cheapest = tiers.length ? tiers.reduce((a, b) => (a.priceClp < b.priceClp ? a : b)) : null;
@@ -124,7 +130,8 @@ export default async function ProductPage({ params }: Params) {
               ? "Este pack incluye reposición de por vida: si bajan, los reponemos."
               : refillDays > 0
                 ? `Este pack incluye ${refillDays} días de reposición sin costo.`
-                : "Si el pedido no se entrega, te devolvemos el dinero."}</p>`,
+                : "Si el pedido no se entrega, te devolvemos el dinero."}` +
+            `${aviso ? ` ${aviso}` : ""}</p>`,
           // Con niveles publicados, la comparación de precios es contenido
           // propio de esta ficha y no se repite en ninguna otra: es la
           // diferencia entre tres páginas distintas y tres páginas clonadas.
@@ -278,6 +285,12 @@ export default async function ProductPage({ params }: Params) {
                   </div>
                 ))}
               </dl>
+
+              {aviso ? (
+                <p className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/8 p-3 text-[13px] leading-relaxed text-amber-200 sm:p-4 sm:text-sm">
+                  {aviso}
+                </p>
+              ) : null}
 
               {bullets.length ? (
                 <ul className="mt-6 grid gap-2.5 sm:grid-cols-2">
