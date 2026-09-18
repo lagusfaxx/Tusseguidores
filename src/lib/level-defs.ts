@@ -78,3 +78,37 @@ export function levelOrder(id: string | null | undefined): number {
   const index = LEVELS.findIndex((level) => level.id === id);
   return index === -1 ? 99 : index;
 }
+
+/**
+ * Aviso para los niveles baratos que no reponen.
+ *
+ * El económico y el estándar salen de servicios que, cuando no traen
+ * reposición, se caen en buena parte a los pocos días. Eso no se puede
+ * esconder detrás de "el más barato": el cliente lo descubre igual la semana
+ * siguiente, y ahí ya es un reclamo. Dicho antes de comprar es una decisión
+ * informada —quien solo quiere empujar el número lo compra igual— y quien
+ * necesita que se mantenga se va al premium, que sí repone.
+ *
+ * Devuelve null cuando no corresponde: con reposición hay garantía, y el
+ * premium se vende justamente por no caerse.
+ */
+export function avisoSinReposicion(
+  level: string | null | undefined,
+  refillDays: number | null | undefined,
+): string | null {
+  if ((refillDays ?? 0) > 0) return null;
+  if (level !== "economico" && level !== "estandar") return null;
+  return (
+    "Sin garantía: este nivel no trae reposición y la mayoría de lo que llega " +
+    "se cae a los pocos días. Sirve para empujar el número; si necesitas que " +
+    "se mantenga, elige un nivel con reposición."
+  );
+}
+
+/** Versión corta del aviso, para las tarjetas del catálogo. */
+export function avisoCorto(
+  level: string | null | undefined,
+  refillDays: number | null | undefined,
+): string | null {
+  return avisoSinReposicion(level, refillDays) ? "sin garantía · se cae" : null;
+}

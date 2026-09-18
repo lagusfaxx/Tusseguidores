@@ -2,7 +2,7 @@ import Link from "next/link";
 import { highlightTier, type ProductWithService } from "@/lib/catalog";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { platformLabel } from "@/lib/labels";
-import { levelLabel } from "@/lib/level-defs";
+import { avisoCorto, levelLabel } from "@/lib/level-defs";
 import { ArrowIcon, BoltIcon, PlatformIcon } from "./icons";
 import { productRating } from "@/lib/ratings";
 import { RatingChip } from "./stars";
@@ -30,6 +30,9 @@ export function ProductCard({
 }) {
   const tier = highlightTier(product);
   const nivel = levelLabel(product.level);
+  // Los niveles baratos sin reposición se avisan en la misma fila de datos: el
+  // cliente compara cuatro tarjetas de un vistazo y ahí es donde decide.
+  const aviso = avisoCorto(product.level, product.refill_days);
   const rating = productRating(product);
 
   const red = (
@@ -52,6 +55,11 @@ export function ProductCard({
       ) : null}
       {nivel ? (
         <span className="rounded-md bg-white/6 px-1.5 py-0.5 text-[11px] text-ink-200">{nivel}</span>
+      ) : null}
+      {aviso ? (
+        <span className="rounded-md bg-amber-400/12 px-1.5 py-0.5 text-[11px] text-amber-300">
+          {aviso}
+        </span>
       ) : null}
       {rating ? <RatingChip rating={rating} /> : null}
     </div>

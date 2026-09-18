@@ -2,6 +2,7 @@ import { all, db, get, run } from "./db";
 import { buildCopy } from "./copy.mjs";
 import { LADDERS, cantidadDeReferencia } from "./offers";
 import { LEVELS, nivelesDeOferta, rasgosDeServicio, type Candidate, type LevelDef, type PickedLevel } from "./levels";
+import { avisoSinReposicion } from "./level-defs";
 import { platformLabel, serviceTypeLabel, PLATFORM_PRIORITY } from "./labels";
 import { formatDuration, minutosDeEntrega } from "./pricing";
 import { SUPPORTED_ORDER_KINDS, ROUTABLE_GEOS } from "./quality.mjs";
@@ -75,9 +76,15 @@ function etiquetaEntrega(service: { avg_minutes: number | null; start_minutes?: 
   return texto ? `Entrega en ~${texto}` : "Entrega el mismo día";
 }
 
-function garantia(service: Candidate): string {
+function garantia(service: Candidate, level?: LevelDef): string {
   if (service.refill_days >= 9999) return "Reposición de por vida si bajan";
   if (service.refill_days > 0) return `Reposición gratis por ${service.refill_days} días`;
+  // Sin reposición no hay garantía sobre lo que se caiga: lo único que
+  // cubrimos es el pedido que no llega. Escribirlo así evita que "garantía"
+  // se lea como una promesa de que no bajan.
+  if (avisoSinReposicion(level?.id, service.refill_days)) {
+    return "Sin reposición: solo reembolso si no se entrega";
+  }
   return "Reembolso si el pedido no se entrega";
 }
 
@@ -127,13 +134,21 @@ export function copiaDeNivel(
     `<h2>Qué recibes con el nivel ${level.label.toLowerCase()}</h2>\n` +
     `<p>${level.pitch} En concreto: ${rasgos.join(", ")}.</p>`;
 
+  // Decirlo en la ficha, no solo en la tarjeta: el nivel barato sin reposición
+  // se cae en buena parte y esa es la única sorpresa que genera reclamos.
+  const aviso = avisoSinReposicion(level.id, service.refill_days);
+  const advertencia = aviso ? `<p><strong>${aviso}</strong></p>` : "";
+
   return {
     name: `${base.name} — ${level.label}`,
     slug: `${base.slug}-${level.slug}`,
     shortDescription: `${level.pitch}`,
-    descriptionHtml: [base.descriptionHtml, ficha, comparativa].filter(Boolean).join("\n"),
+    descriptionHtml: [base.descriptionHtml, ficha, advertencia, comparativa].filter(Boolean).join("\n"),
     bullets: [...rasgos.map(capitalizar), ...base.bullets].slice(0, 6),
     faq: [
+      ...(aviso
+        ? [{ q: `¿El nivel ${level.label.toLowerCase()} tiene garantía?`, a: aviso }]
+        : []),
       {
         q: `¿Cuál es la diferencia entre el ${level.label.toLowerCase()} y los otros niveles?`,
         a: diferencias.length
@@ -291,7 +306,7 @@ export function publicarNiveles({
           delivery_label: etiquetaEntrega(elegido.service),
           quality_label: etiquetaCalidad(elegido.level, elegido.service),
           refill_days: elegido.service.refill_days,
-          guarantee_text: garantia(elegido.service),
+          guarantee_text: garantia(elegido.service, elegido.level),
           sort_order: baseOrden + LEVELS.findIndex((l) => l.id === elegido.level.id),
         };
 
