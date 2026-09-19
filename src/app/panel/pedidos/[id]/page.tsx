@@ -80,11 +80,13 @@ export default async function PanelPedidoDetalle({
           <h2 className="font-bold">{order.product_name}</h2>
           <dl className="mt-4 space-y-3 text-sm">
             {[
-              ["Servicio", `#${order.provider_service_id}`],
               ["Cantidad", formatNumber(order.quantity)],
               ["Cobrado de tu saldo", formatClp(order.amount_clp)],
               ["Creado", formatDateCl(order.created_at)],
-              ["Estado de la entrega", order.provider_status ?? "—"],
+              // Ni el número de servicio ni el estado crudo: ambos son
+              // internos y delatan de dónde sale la entrega. El revendedor ve
+              // nuestro estado, igual que su propio cliente.
+              ["Estado", ORDER_STATUS_LABEL[order.status] ?? order.status],
               [
                 // El proveedor informa lo que falta, no lo que lleva: se
                 // muestra su número, sin traducirlo a un avance inventado.

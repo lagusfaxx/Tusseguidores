@@ -126,9 +126,10 @@ export default async function OrderPage({ params, searchParams }: Params) {
 
             {order.payment_status === "paid" ? (
               <div className="border-t border-white/8 p-5 sm:p-6">
-                {/* El proveedor solo informa cuántas faltan: eso es lo que se
-                    muestra. Sin ese dato no hay barra ni porcentaje, porque
-                    cualquier número sería inventado. */}
+                {/* Lo que se sabe del avance es cuántas faltan: eso es lo que
+                    se muestra. Sin ese dato no hay barra ni porcentaje, porque
+                    cualquier número sería inventado. Nada de esto nombra a
+                    nadie más: el pedido es nuestro y se cuenta como nuestro. */}
                 {avance ? (
                   <>
                     <div className="flex items-end justify-between gap-3">
@@ -154,8 +155,8 @@ export default async function OrderPage({ params, searchParams }: Params) {
                   </>
                 ) : (
                   <p className="text-xs text-ink-400">
-                    Pedimos {formatNumber(order.quantity)}. En cuanto la entrega informe
-                    su avance, aquí vas a ver cuántas faltan.
+                    Tu pedido de {formatNumber(order.quantity)} ya está en marcha.
+                    Aquí vas a ver cuántas faltan a medida que avanza.
                   </p>
                 )}
                 {enCurso ? (
