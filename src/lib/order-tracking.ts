@@ -34,8 +34,7 @@ export function pasosDelPedido(order: Order): Paso[] {
   const cancelado = ["canceled", "refunded"].includes(order.status);
   const falló = order.status === "failed";
 
-  const entregadas =
-    order.remains != null ? Math.max(0, order.quantity - order.remains) : null;
+  const avance = avanceDelPedido(order);
 
   return [
     {
@@ -60,8 +59,10 @@ export function pasosDelPedido(order: Order): Paso[] {
       id: "entrega",
       titulo: entregando ? "En entrega" : "En la fila de entrega",
       detalle: entregando
-        ? entregadas != null
-          ? `Van ${entregadas.toLocaleString("es-CL")} de ${order.quantity.toLocaleString("es-CL")}.`
+        ? avance != null
+          ? avance.restante > 0
+            ? `Faltan ${avance.restante.toLocaleString("es-CL")} de ${avance.cantidad.toLocaleString("es-CL")}.`
+            : "No queda nada pendiente."
           : "La entrega ya empezó."
         : pagado
           ? "Empieza en unos minutos."
@@ -121,14 +122,43 @@ export function resumenDeEstado(order: Order): { titulo: string; detalle: string
   return { titulo: "En la fila de entrega", detalle: "Empieza en unos minutos." };
 }
 
-/** Porcentaje entregado, para la barra. */
-export function avanceDelPedido(order: Order): number {
-  if (order.status === "completed") return 100;
-  if (order.remains != null && order.quantity > 0) {
-    return Math.max(0, Math.min(100, Math.round(((order.quantity - order.remains) / order.quantity) * 100)));
-  }
-  if (order.status === "processing") return 15;
-  return 0;
+/**
+ * Lo que el proveedor dice que falta, tal cual.
+ *
+ * La API solo devuelve `remains`: cuántas unidades quedan por entregar. No hay
+ * porcentaje ni entregadas, así que eso es lo que se muestra. Mientras no haya
+ * respuesta del proveedor no se inventa nada: sin dato, no hay número.
+ */
+export type Avance = {
+  /** Unidades que faltan según el proveedor. */
+  restante: number;
+  /** Las que ya entró, deducidas de la cantidad pedida. */
+  entregadas: number;
+  cantidad: number;
+  /** Solo para la barra; nunca es una estimación. */
+  porcentaje: number;
+};
+
+export function avanceDelPedido(order: Order): Avance | null {
+  if (order.quantity <= 0) return null;
+
+  // Un pedido completo no necesita que el proveedor lo confirme dos veces:
+  // «Completed» ya significa que no queda nada.
+  const restante =
+    order.status === "completed"
+      ? 0
+      : order.remains != null
+        ? Math.max(0, Math.min(order.quantity, order.remains))
+        : null;
+  if (restante == null) return null;
+
+  const entregadas = order.quantity - restante;
+  return {
+    restante,
+    entregadas,
+    cantidad: order.quantity,
+    porcentaje: Math.max(0, Math.min(100, Math.round((entregadas / order.quantity) * 100))),
+  };
 }
 
 /**

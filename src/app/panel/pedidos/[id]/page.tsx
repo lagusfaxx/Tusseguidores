@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { panelUser } from "@/lib/reseller-auth";
 import { pedidoDelCliente, tieneReposicion, yaReembolsado } from "@/lib/reseller-orders";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
+import { avanceDelPedido } from "@/lib/order-tracking";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { get } from "@/lib/db";
@@ -26,6 +27,8 @@ export default async function PanelPedidoDetalle({
   const { nuevo, error } = await searchParams;
   const order = pedidoDelCliente(user.id, Number(id));
   if (!order) notFound();
+
+  const avance = avanceDelPedido(order);
 
   const ticketAbierto = get<{ code: string; status: string }>(
     "SELECT code, status FROM tickets WHERE order_id = ? AND kind = 'reposicion' ORDER BY id DESC LIMIT 1",
@@ -83,10 +86,10 @@ export default async function PanelPedidoDetalle({
               ["Creado", formatDateCl(order.created_at)],
               ["Estado de la entrega", order.provider_status ?? "—"],
               [
-                "Avance",
-                order.remains != null
-                  ? `${formatNumber(Math.max(0, order.quantity - order.remains))} de ${formatNumber(order.quantity)}`
-                  : "—",
+                // El proveedor informa lo que falta, no lo que lleva: se
+                // muestra su número, sin traducirlo a un avance inventado.
+                "Faltan por entregar",
+                avance ? `${formatNumber(avance.restante)} de ${formatNumber(avance.cantidad)}` : "—",
               ],
               ["Conteo inicial", order.start_count != null ? formatNumber(order.start_count) : "—"],
             ].map(([etiqueta, valor]) => (
