@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { panelUser } from "@/lib/reseller-auth";
-import { pedidoDelCliente, tieneReposicion, yaReembolsado } from "@/lib/reseller-orders";
+import { pedidoDelCliente, yaReembolsado } from "@/lib/reseller-orders";
+import { reposicionDelPedido, textoDeGarantia } from "@/lib/refill";
 import { ORDER_STATUS_LABEL, ORDER_STATUS_TONE } from "@/lib/orders";
 import { avanceDelPedido } from "@/lib/order-tracking";
 import { formatClp, formatNumber } from "@/lib/pricing";
@@ -34,10 +35,12 @@ export default async function PanelPedidoDetalle({
     "SELECT code, status FROM tickets WHERE order_id = ? AND kind = 'reposicion' ORDER BY id DESC LIMIT 1",
     [order.id],
   );
+  // La garantía tiene fecha de término: pasado el plazo del servicio, el
+  // formulario no se muestra. Ofrecerlo vencido solo genera un ticket que hay
+  // que rechazar.
+  const reposicion = reposicionDelPedido(order);
   const puedeReposicion =
-    tieneReposicion(order) &&
-    ["completed", "partial", "processing"].includes(order.status) &&
-    (!ticketAbierto || ticketAbierto.status === "cerrado");
+    reposicion.disponible && (!ticketAbierto || ticketAbierto.status === "cerrado");
 
   // "En cola" es el estado real de un pedido pagado que todavía no entró a
   // entrega: decirlo así evita el ticket de "no pasa nada con mi pedido".
@@ -87,6 +90,7 @@ export default async function PanelPedidoDetalle({
               // internos y delatan de dónde sale la entrega. El revendedor ve
               // nuestro estado, igual que su propio cliente.
               ["Estado", ORDER_STATUS_LABEL[order.status] ?? order.status],
+              ["Reposición", textoDeGarantia(reposicion)],
               [
                 // El proveedor informa lo que falta, no lo que lleva: se
                 // muestra su número, sin traducirlo a un avance inventado.
@@ -131,6 +135,9 @@ export default async function PanelPedidoDetalle({
               <input type="hidden" name="order_id" value={order.id} />
               <h2 className="font-bold">Pedir reposición</h2>
               <p className="mt-1.5 text-sm text-ink-400">
+                {reposicion.disponible && !reposicion.dePorVida
+                  ? `Te quedan ${reposicion.diasRestantes} día${reposicion.diasRestantes === 1 ? "" : "s"} de garantía. `
+                  : "Este pedido tiene reposición sin vencimiento. "}
                 Cuéntanos qué pasó y te respondemos en el ticket.
               </p>
               <textarea

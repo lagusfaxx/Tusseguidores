@@ -420,6 +420,26 @@ de **devolver el saldo** lo acredita de vuelta con su línea en el libro.
 6. Sale el correo de «pago confirmado» y el cron consulta el avance, que el
    cliente también sigue en `/pedido/<código>`. Al terminar la entrega se manda
    el último correo.
+7. Si el servicio incluye reposición, el cliente la pide desde esa misma
+   página con un botón, **mientras el plazo siga vigente**.
+
+### Garantía de reposición
+
+Los servicios con reposición la dan por una cantidad de días contados desde
+que la entrega terminó (`orders.completed_at`, que se sella una sola vez). El
+botón de «Pedir la reposición» aparece solo dentro de ese plazo: una garantía
+de 30 días ya no lo muestra el día 31. La ventana la marca el servicio con el
+que se entregó el pedido, no el producto, porque el producto pudo cambiar de
+nivel después de la compra y lo que se repone es lo que se entregó.
+
+- `refill_days` mayor que cero: esa es la ventana.
+- `refill` sin días declarados: se asumen 30.
+- `refill_days` en 9999: reposición sin vencimiento.
+- Sin ninguna de las dos: no hay botón, y la ficha lo dice.
+
+El plazo se revisa otra vez al enviar el formulario, no solo al dibujarlo: un
+formulario viejo reenviado al día siguiente no estira la garantía. Un pedido
+solo puede tener una solicitud viva a la vez.
 
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
 y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rota.

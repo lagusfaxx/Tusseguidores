@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { entrar, registrar, salir, panelUser, cambiarPassword } from "@/lib/reseller-auth";
-import { crearPedidoDePanel, pedidoDelCliente, tieneReposicion } from "@/lib/reseller-orders";
+import { crearPedidoDePanel, pedidoDelCliente } from "@/lib/reseller-orders";
+import { reposicionDelPedido } from "@/lib/refill";
 import { crearRecarga, avisarTransferencia, guardarTokenFlow, recargaPorId } from "@/lib/topups";
 import { crearTicket, agregarMensaje, ticketDelCliente } from "@/lib/tickets";
 import { createPayment, checkoutUrl, flowConfigured } from "@/lib/flow";
@@ -113,8 +114,17 @@ export async function accionPedirReposicion(formData: FormData) {
   const order = pedidoDelCliente(user.id, orderId);
   if (!order) redirect("/panel/pedidos");
 
-  if (!tieneReposicion(order)) {
-    redirect(`/panel/pedidos/${orderId}?error=${encodeURIComponent("Este servicio no incluye reposición.")}`);
+  // Se comprueba aquí y no solo en la página: el formulario puede reenviarse
+  // cuando el plazo ya venció, y la garantía no se estira por eso.
+  const reposicion = reposicionDelPedido(order);
+  if (!reposicion.disponible) {
+    const motivo =
+      reposicion.motivo === "vencida"
+        ? "El plazo de reposición de este pedido ya terminó."
+        : reposicion.motivo === "no-entregado"
+          ? "Todavía estamos entregando este pedido."
+          : "Este servicio no incluye reposición.";
+    redirect(`/panel/pedidos/${orderId}?error=${encodeURIComponent(motivo)}`);
   }
 
   const result = crearTicket({

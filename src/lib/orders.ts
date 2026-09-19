@@ -274,7 +274,19 @@ function uniqueCode(): string {
 }
 
 export function setStatus(orderId: number, status: OrderStatus, message?: string) {
-  run("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?", [status, orderId]);
+  // Igual que en la sincronización: marcar el pedido como entregado a mano
+  // también arranca el reloj de la garantía, y solo la primera vez.
+  run(
+    `UPDATE orders
+        SET status = ?, updated_at = datetime('now'),
+            completed_at = CASE
+              WHEN completed_at IS NOT NULL THEN completed_at
+              WHEN ? IN ('completed', 'partial') THEN datetime('now')
+              ELSE NULL
+            END
+      WHERE id = ?`,
+    [status, status, orderId],
+  );
   if (message) logEvent(orderId, status, message);
 }
 
@@ -610,10 +622,18 @@ export function refrescarDesdeDestinos(orderId: number): Order | undefined {
     } else status = "processing";
   }
 
+  // La garantía de reposición corre desde que la entrega terminó, así que la
+  // fecha se sella la primera vez y no se vuelve a tocar: si un pedido pasa a
+  // parcial y después a completo, el plazo no se reinicia a favor nuestro.
   run(
     `UPDATE orders
         SET provider_order_id = ?, provider_status = ?, provider_error = ?,
-            start_count = ?, remains = ?, status = ?, updated_at = datetime('now')
+            start_count = ?, remains = ?, status = ?, updated_at = datetime('now'),
+            completed_at = CASE
+              WHEN completed_at IS NOT NULL THEN completed_at
+              WHEN ? IN ('completed', 'partial') THEN datetime('now')
+              ELSE NULL
+            END
       WHERE id = ?`,
     [
       enviados[0]?.provider_order_id ?? null,
@@ -621,6 +641,7 @@ export function refrescarDesdeDestinos(orderId: number): Order | undefined {
       errores.length ? errores.join(" · ") : null,
       startCount,
       remains,
+      status,
       status,
       orderId,
     ],

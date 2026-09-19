@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import {
   corregirDestino,
   abrirTicketDePedido,
+  pedirReposicion,
   type PedidoState,
 } from "@/app/pedido/actions";
 
@@ -103,6 +104,59 @@ export function AbrirTicket({ code }: { code: string }) {
       <textarea id="body" name="body" rows={4} required className="field" maxLength={4000} />
       <div className="mt-4">
         <Boton pendiente="Enviando…">Enviar</Boton>
+      </div>
+      <Aviso state={state} />
+    </form>
+  );
+}
+
+/**
+ * Pedir la reposición de lo que se cayó.
+ *
+ * Solo se monta cuando la garantía está viva: la página decide, aquí no hay
+ * ninguna condición de plazo que pueda quedar desincronizada. El detalle es
+ * opcional a propósito —pedir reposición tiene que costar un clic— pero deja
+ * escribir qué pasó, que es lo que hace útil el ticket.
+ */
+export function PedirReposicion({
+  code,
+  vigencia,
+}: {
+  code: string;
+  /** Hasta cuándo alcanza la garantía, ya escrito por la página. */
+  vigencia: string;
+}) {
+  const [state, action] = useActionState<PedidoState, FormData>(pedirReposicion, {});
+
+  if (state.ok) {
+    return (
+      <div className="card p-5">
+        <h2 className="font-bold">Reposición pedida</h2>
+        <p className="mt-1 text-sm text-ink-400">{state.ok}</p>
+      </div>
+    );
+  }
+
+  return (
+    <form action={action} className="card p-5">
+      <input type="hidden" name="code" value={code} />
+      <h2 className="font-bold">¿Se cayó parte de lo que entregamos?</h2>
+      <p className="mt-1 text-sm text-ink-400">
+        Lo reponemos sin costo. {vigencia}.
+      </p>
+      <label className="field-label mt-4" htmlFor="detalle">
+        Cuéntanos qué pasó <span className="font-normal text-ink-600">(opcional)</span>
+      </label>
+      <textarea
+        id="detalle"
+        name="detalle"
+        rows={3}
+        className="field"
+        maxLength={4000}
+        placeholder="Por ejemplo: quedaron 320 de los 500 que llegaron."
+      />
+      <div className="mt-4">
+        <Boton pendiente="Pidiendo…">Pedir la reposición</Boton>
       </div>
       <Aviso state={state} />
     </form>

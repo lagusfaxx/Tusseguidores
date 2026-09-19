@@ -68,13 +68,23 @@ function migrate(database: Database.Database) {
     ["orders", "reseller_user_id", "INTEGER"],
     ["products", "rating_value", "REAL NOT NULL DEFAULT 0"],
     ["products", "rating_count", "INTEGER NOT NULL DEFAULT 0"],
+    // Cuándo terminó la entrega. Es el día desde el que corre la garantía de
+    // reposición, así que no sirve `updated_at`: ese se mueve con cualquier
+    // cambio posterior y le regalaría días a un pedido viejo.
+    ["orders", "completed_at", "TEXT"],
   ];
 
   const added: string[] = [];
   for (const [table, column, definition] of additions) {
-    if (!columns(table).has(column)) {
+    if (columns(table).has(column)) continue;
+    try {
       database.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
       added.push(`${table}.${column}`);
+    } catch (error) {
+      // Durante el build, Next abre la base desde varios procesos a la vez:
+      // dos pueden leer la tabla sin la columna y los dos intentar agregarla.
+      // El segundo pierde, y eso está bien: la columna quedó puesta igual.
+      if (!/duplicate column name/i.test(String(error))) throw error;
     }
   }
 
@@ -125,6 +135,26 @@ function migrate(database: Database.Database) {
   database.exec(
     "CREATE INDEX IF NOT EXISTS idx_orders_reseller ON orders(reseller_user_id, id DESC)",
   );
+
+  // La fecha de término no existía: para los pedidos que ya estaban
+  // entregados se recupera del historial, que es donde quedó anotado el
+  // cambio de estado. Sin esto, un pedido viejo entraría con la garantía
+  // corriendo desde cero.
+  if (columns("orders").has("completed_at")) {
+    database.exec(`
+      UPDATE orders SET completed_at = (
+        SELECT MIN(e.created_at) FROM order_events e
+         WHERE e.order_id = orders.id AND e.type IN ('completed', 'partial')
+      )
+      WHERE status IN ('completed', 'partial') AND completed_at IS NULL
+    `);
+    // Los que no dejaron rastro en el historial se anclan a su última
+    // actualización: es lo más cercano que hay, y no inventa días de más.
+    database.exec(`
+      UPDATE orders SET completed_at = updated_at
+       WHERE status IN ('completed', 'partial') AND completed_at IS NULL
+    `);
+  }
 
   // Las columnas nuevas quedan con su valor por defecto, que para los puntajes
   // de calidad sería mentira (todo 50/50, todo "default"). Las recalculamos a

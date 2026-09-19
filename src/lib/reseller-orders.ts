@@ -221,15 +221,6 @@ export function pedidoDelCliente(userId: number, orderId: number): Order | undef
   return get<Order>("SELECT * FROM orders WHERE id = ? AND reseller_user_id = ?", [orderId, userId]);
 }
 
-/** ¿Este pedido salió de un servicio con reposición? Habilita pedirla. */
-export function tieneReposicion(order: Order): boolean {
-  const service = get<{ refill: number; refill_days: number }>(
-    "SELECT refill, refill_days FROM provider_services WHERE service_id = ?",
-    [order.provider_service_id],
-  );
-  return Boolean(service && (service.refill === 1 || service.refill_days > 0));
-}
-
 export function estadisticasCliente(userId: number) {
   return {
     pedidos: contarPedidosDelCliente(userId),

@@ -169,7 +169,8 @@ CREATE TABLE IF NOT EXISTS orders (
   ip                  TEXT,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT    NOT NULL DEFAULT (datetime('now')),
-  paid_at             TEXT
+  paid_at             TEXT,
+  completed_at        TEXT                                -- desde aquí corre la garantía de reposición
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status  ON orders(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);

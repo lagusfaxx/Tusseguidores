@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ensureTargets, getOrderByCode, logEvent } from "@/lib/orders";
 import { puedeCorregirDestino } from "@/lib/order-tracking";
+import { reposicionDelPedido, reposicionYaPedida } from "@/lib/refill";
 import { crearTicket, agregarMensaje, ticketDePedido } from "@/lib/tickets";
 import { avisarAdmin } from "@/lib/notify";
 import { revisarDestinos, separarDestinos } from "@/lib/targets";
@@ -146,4 +147,57 @@ export async function responderTicketDePedido(formData: FormData) {
   }
   revalidatePath(`/pedido/${order.code}`);
   redirect(`/pedido/${order.code}#soporte`);
+}
+
+/**
+ * Pedir la reposición de un pedido entregado.
+ *
+ * El botón solo aparece dentro del plazo, pero la comprobación se repite aquí:
+ * el formulario se puede reenviar al día siguiente y la garantía no se estira
+ * por eso.
+ */
+export async function pedirReposicion(
+  _prev: PedidoState,
+  formData: FormData,
+): Promise<PedidoState> {
+  const order = await pedidoDe(formData);
+  const estado = reposicionDelPedido(order);
+
+  if (!estado.disponible) {
+    if (estado.motivo === "vencida") {
+      return { error: "El plazo de reposición de este pedido ya terminó." };
+    }
+    if (estado.motivo === "no-entregado") {
+      return { error: "Todavía estamos entregando este pedido. Espera a que termine." };
+    }
+    return { error: "Este pedido no incluye reposición." };
+  }
+
+  const abierto = reposicionYaPedida(order.id);
+  if (abierto) {
+    return { error: `Ya pediste la reposición de este pedido (ticket ${abierto.code}).` };
+  }
+
+  const detalle = String(formData.get("detalle") ?? "").trim();
+  const result = crearTicket({
+    guestEmail: order.email,
+    orderId: order.id,
+    kind: "reposicion",
+    subject: `Reposición del pedido ${order.code}`,
+    body:
+      detalle ||
+      `Pido la reposición del pedido ${order.code} (${order.product_name}, ${order.quantity} u.).`,
+  });
+  if (!result.ok) return { error: result.error };
+
+  await avisarAdmin(
+    `Reposición pedida · ${order.code}`,
+    `<p><strong>${order.email}</strong> pidió la reposición de su pedido ${order.code}.</p>` +
+      `<p>${order.product_name} · ${order.quantity} u. · destino ${order.link}</p>` +
+      `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Abrir el ticket ${result.ticket.code}</a></p>`,
+    `${order.email} pidió la reposición de ${order.code}. Ticket ${result.ticket.code}: ${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}`,
+  );
+
+  revalidatePath(`/pedido/${order.code}`);
+  return { ok: `Listo, la pedimos. Seguimos por el ticket ${result.ticket.code}.` };
 }

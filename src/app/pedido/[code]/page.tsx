@@ -11,13 +11,16 @@ import {
   pasosDelPedido, resumenDeEstado, avanceDelPedido, puedeCorregirDestino,
 } from "@/lib/order-tracking";
 import { ticketsDePedido, mensajesDeTicket, ETIQUETA_TICKET } from "@/lib/tickets";
+import { reposicionDelPedido, reposicionYaPedida, textoDeGarantia } from "@/lib/refill";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { getSettings } from "@/lib/settings";
 import { Copiar } from "@/components/copiar";
 import { datosTransferencia } from "@/lib/transfer";
 import { TransferPanel } from "@/components/transfer-panel";
-import { CorregirDestino, AbrirTicket } from "@/components/order-tracking-ui";
+import {
+  CorregirDestino, AbrirTicket, PedirReposicion,
+} from "@/components/order-tracking-ui";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { responderTicketDePedido } from "../actions";
 import { get } from "@/lib/db";
@@ -59,6 +62,11 @@ export default async function OrderPage({ params, searchParams }: Params) {
   const enCurso = order.payment_status === "paid" &&
     ["paid", "processing", "partial"].includes(order.status);
   const tickets = ticketsDePedido(order.id);
+
+  // La reposición se ofrece solo dentro del plazo del servicio con el que se
+  // entregó: el día siguiente al vencimiento el formulario ya no está.
+  const reposicion = reposicionDelPedido(order);
+  const reposicionAbierta = reposicionYaPedida(order.id);
   const destinos = orderTargets(order.id);
   const producto = order.product_id
     ? get<{ link_label: string; image_url: string | null; slug: string }>(
@@ -222,6 +230,10 @@ export default async function OrderPage({ params, searchParams }: Params) {
                 <dd>{formatDateCl(order.created_at)}</dd>
               </div>
               <div>
+                <dt className="text-ink-400">Reposición</dt>
+                <dd>{textoDeGarantia(reposicion)}</dd>
+              </div>
+              <div>
                 <dt className="text-ink-400">Última actualización</dt>
                 <dd>{formatDateCl(order.updated_at)}</dd>
               </div>
@@ -272,6 +284,17 @@ export default async function OrderPage({ params, searchParams }: Params) {
                 </p>
               </div>
             )}
+
+            {reposicion.disponible && !reposicionAbierta ? (
+              <PedirReposicion
+                code={order.code}
+                vigencia={
+                  reposicion.dePorVida
+                    ? "Este pedido tiene reposición sin vencimiento"
+                    : `Te quedan ${reposicion.diasRestantes} día${reposicion.diasRestantes === 1 ? "" : "s"} de garantía`
+                }
+              />
+            ) : null}
 
             <AbrirTicket code={order.code} />
           </div>
