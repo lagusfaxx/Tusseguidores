@@ -8,6 +8,10 @@ import type { Order, OrderStatus } from "./types";
  * servicio #3626 (pedido 91422)" y "Servicio reasignado al #1772". Al cliente
  * eso no le dice nada bueno —le dice que compró un intermediario— y encima
  * suena a error. Aquí se traduce a cuatro pasos y una frase.
+ *
+ * Regla de esta pantalla: todo lo que el cliente lee está en primera persona
+ * nuestra. El pedido es nuestro, la entrega es nuestra y el avance es nuestro.
+ * Ningún texto de aquí puede dejar entrever que lo entrega otro.
  */
 
 export type PasoEstado = "hecho" | "actual" | "pendiente" | "problema";
@@ -20,7 +24,7 @@ export type Paso = {
   fecha?: string | null;
 };
 
-/** ¿El pedido ya está en manos de la entrega? */
+/** ¿El pedido ya salió a entregarse? */
 function enEntrega(order: Order): boolean {
   return Boolean(order.provider_order_id || order.manual_dispatch_at) ||
     ["processing", "partial", "completed"].includes(order.status);
@@ -34,8 +38,7 @@ export function pasosDelPedido(order: Order): Paso[] {
   const cancelado = ["canceled", "refunded"].includes(order.status);
   const falló = order.status === "failed";
 
-  const entregadas =
-    order.remains != null ? Math.max(0, order.quantity - order.remains) : null;
+  const avance = avanceDelPedido(order);
 
   return [
     {
@@ -60,9 +63,11 @@ export function pasosDelPedido(order: Order): Paso[] {
       id: "entrega",
       titulo: entregando ? "En entrega" : "En la fila de entrega",
       detalle: entregando
-        ? entregadas != null
-          ? `Van ${entregadas.toLocaleString("es-CL")} de ${order.quantity.toLocaleString("es-CL")}.`
-          : "La entrega ya empezó."
+        ? avance != null
+          ? avance.restante > 0
+            ? `Faltan ${avance.restante.toLocaleString("es-CL")} de ${avance.cantidad.toLocaleString("es-CL")}.`
+            : "No queda nada pendiente."
+          : "Tu pedido ya está en marcha."
         : pagado
           ? "Empieza en unos minutos."
           : "Empieza cuando se confirme el pago.",
@@ -121,21 +126,50 @@ export function resumenDeEstado(order: Order): { titulo: string; detalle: string
   return { titulo: "En la fila de entrega", detalle: "Empieza en unos minutos." };
 }
 
-/** Porcentaje entregado, para la barra. */
-export function avanceDelPedido(order: Order): number {
-  if (order.status === "completed") return 100;
-  if (order.remains != null && order.quantity > 0) {
-    return Math.max(0, Math.min(100, Math.round(((order.quantity - order.remains) / order.quantity) * 100)));
-  }
-  if (order.status === "processing") return 15;
-  return 0;
+/**
+ * Lo que falta por entregar, tal cual se sabe.
+ *
+ * El único número de avance que llega es cuántas unidades quedan: no hay
+ * porcentaje ni entregadas, así que eso es lo que se muestra. Mientras no haya
+ * un número real no se inventa ninguno: sin dato, no hay número.
+ */
+export type Avance = {
+  /** Unidades que todavía faltan por entregar. */
+  restante: number;
+  /** Las que ya entró, deducidas de la cantidad pedida. */
+  entregadas: number;
+  cantidad: number;
+  /** Solo para la barra; nunca es una estimación. */
+  porcentaje: number;
+};
+
+export function avanceDelPedido(order: Order): Avance | null {
+  if (order.quantity <= 0) return null;
+
+  // Un pedido completo no necesita que se lo confirme dos veces: si está
+  // completado, no queda nada pendiente.
+  const restante =
+    order.status === "completed"
+      ? 0
+      : order.remains != null
+        ? Math.max(0, Math.min(order.quantity, order.remains))
+        : null;
+  if (restante == null) return null;
+
+  const entregadas = order.quantity - restante;
+  return {
+    restante,
+    entregadas,
+    cantidad: order.quantity,
+    porcentaje: Math.max(0, Math.min(100, Math.round((entregadas / order.quantity) * 100))),
+  };
 }
 
 /**
  * ¿Se puede todavía corregir el destino?
  *
- * Solo mientras el pedido no haya salido. Después el destino ya está en manos
- * de la entrega y cambiarlo en la base sería mentirle al cliente.
+ * Solo mientras el pedido no haya salido. Después la entrega ya va en camino
+ * y cambiar el destino en la base sería mentirle al cliente.
  */
 export function puedeCorregirDestino(order: Order): boolean {
   return (

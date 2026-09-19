@@ -44,6 +44,12 @@ Ese cron hace dos cosas: reintenta los pedidos pagados que no alcanzaron a
 salir al proveedor y actualiza el avance de los que ya están en curso. **No es
 opcional**: es lo que rescata los pedidos que quedaron atascados.
 
+Aparte del cron, la página de seguimiento le pregunta al proveedor por ese
+pedido cuando alguien la abre, y se refresca sola cada 20 segundos mientras la
+entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
+había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se
+consulta más de una vez cada 45 segundos.
+
 ### Si el proveedor se queda sin saldo
 
 El cobro y la entrega son dos cosas separadas: Flow cobra, y recién después la

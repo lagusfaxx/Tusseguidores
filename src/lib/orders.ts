@@ -676,22 +676,15 @@ export async function retryUndispatched(limit = 25): Promise<{ intentados: numbe
   return { intentados: pending.length, enviados };
 }
 
-/** Consulta al proveedor el estado de los pedidos en curso y los actualiza. */
-export async function syncOpenOrders(limit = 100): Promise<{ checked: number; updated: number }> {
-  // Se consulta por destino, no por pedido: un pedido repartido entre tres
-  // publicaciones son tres pedidos del proveedor, cada uno con su avance.
-  const open = all<{ id: number; order_id: number; provider_order_id: number }>(
-    `SELECT t.id, t.order_id, t.provider_order_id
-       FROM order_targets t
-       JOIN orders o ON o.id = t.order_id
-      WHERE t.provider_order_id IS NOT NULL
-        AND t.status IN ('processing', 'paid', 'partial', 'pending')
-        AND o.status IN ('processing', 'paid', 'partial')
-      ORDER BY t.updated_at ASC LIMIT ?`,
-    [limit],
-  );
-  if (!open.length || !providerConfigured()) return { checked: 0, updated: 0 };
+type DestinoAbierto = { id: number; order_id: number; provider_order_id: number };
 
+/**
+ * Pregunta al proveedor por un grupo de destinos y guarda lo que responde.
+ *
+ * `remains` es el único número de avance que devuelve la API: cuántas unidades
+ * faltan. No hay porcentaje ni entregadas; lo demás se deduce de ahí.
+ */
+async function actualizarDestinos(open: DestinoAbierto[]): Promise<number> {
   const byProviderId = new Map(open.map((t) => [String(t.provider_order_id), t]));
   const pedidos = new Set(open.map((t) => t.order_id));
   let updated = 0;
@@ -734,7 +727,55 @@ export async function syncOpenOrders(limit = 100): Promise<{ checked: number; up
       await notificarPedidoCompletado(despues, despues.status === "partial");
     }
   }
+  return updated;
+}
+
+/** Consulta al proveedor el estado de los pedidos en curso y los actualiza. */
+export async function syncOpenOrders(limit = 100): Promise<{ checked: number; updated: number }> {
+  // Se consulta por destino, no por pedido: un pedido repartido entre tres
+  // publicaciones son tres pedidos del proveedor, cada uno con su avance.
+  const open = all<DestinoAbierto>(
+    `SELECT t.id, t.order_id, t.provider_order_id
+       FROM order_targets t
+       JOIN orders o ON o.id = t.order_id
+      WHERE t.provider_order_id IS NOT NULL
+        AND t.status IN ('processing', 'paid', 'partial', 'pending')
+        AND o.status IN ('processing', 'paid', 'partial')
+      ORDER BY t.updated_at ASC LIMIT ?`,
+    [limit],
+  );
+  if (!open.length || !providerConfigured()) return { checked: 0, updated: 0 };
+  const updated = await actualizarDestinos(open);
   return { checked: open.length, updated };
+}
+
+/**
+ * Refresca un solo pedido, para cuando el cliente abre su página de
+ * seguimiento. El cron pasa cada diez minutos; quien está mirando la pantalla
+ * quiere el número de ahora, no el de hace nueve.
+ *
+ * `frescoPorSegundos` evita castigar al proveedor cuando la página se recarga
+ * sola: si el destino se consultó hace menos que eso, no se vuelve a preguntar.
+ */
+export async function sincronizarPedido(
+  orderId: number,
+  frescoPorSegundos = 45,
+): Promise<boolean> {
+  if (!providerConfigured()) return false;
+  const open = all<DestinoAbierto>(
+    `SELECT t.id, t.order_id, t.provider_order_id
+       FROM order_targets t
+       JOIN orders o ON o.id = t.order_id
+      WHERE t.order_id = ?
+        AND t.provider_order_id IS NOT NULL
+        AND t.status IN ('processing', 'paid', 'partial', 'pending')
+        AND o.status IN ('processing', 'paid', 'partial')
+        AND t.updated_at <= datetime('now', ?)`,
+    [orderId, `-${Math.max(0, Math.floor(frescoPorSegundos))} seconds`],
+  );
+  if (!open.length) return false;
+  await actualizarDestinos(open);
+  return true;
 }
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {

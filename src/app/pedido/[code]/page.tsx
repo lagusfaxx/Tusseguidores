@@ -4,7 +4,9 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusBadge } from "@/components/order-status";
-import { getOrderByCode, orderTargets, ORDER_STATUS_LABEL } from "@/lib/orders";
+import {
+  getOrderByCode, orderTargets, sincronizarPedido, ORDER_STATUS_LABEL,
+} from "@/lib/orders";
 import {
   pasosDelPedido, resumenDeEstado, avanceDelPedido, puedeCorregirDestino,
 } from "@/lib/order-tracking";
@@ -16,6 +18,7 @@ import { Copiar } from "@/components/copiar";
 import { datosTransferencia } from "@/lib/transfer";
 import { TransferPanel } from "@/components/transfer-panel";
 import { CorregirDestino, AbrirTicket } from "@/components/order-tracking-ui";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { responderTicketDePedido } from "../actions";
 import { get } from "@/lib/db";
 
@@ -40,13 +43,21 @@ const TONO: Record<string, string> = {
 export default async function OrderPage({ params, searchParams }: Params) {
   const { code } = await params;
   const { estado, aviso } = await searchParams;
-  const order = getOrderByCode(decodeURIComponent(code));
+  let order = getOrderByCode(decodeURIComponent(code));
   if (!order) notFound();
+
+  // El cron pasa cada diez minutos; quien abrió esta página quiere el número
+  // de ahora. Se le pregunta al proveedor y, si algo cambió, se relee.
+  if (await sincronizarPedido(order.id)) {
+    order = getOrderByCode(order.code) ?? order;
+  }
 
   const settings = getSettings();
   const pasos = pasosDelPedido(order);
   const resumen = resumenDeEstado(order);
   const avance = avanceDelPedido(order);
+  const enCurso = order.payment_status === "paid" &&
+    ["paid", "processing", "partial"].includes(order.status);
   const tickets = ticketsDePedido(order.id);
   const destinos = orderTargets(order.id);
   const producto = order.product_id
@@ -58,6 +69,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
 
   return (
     <>
+      <AutoRefresh activo={enCurso} />
       <SiteHeader />
       <main className="bg-halo">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:py-12">
@@ -114,20 +126,42 @@ export default async function OrderPage({ params, searchParams }: Params) {
 
             {order.payment_status === "paid" ? (
               <div className="border-t border-white/8 p-5 sm:p-6">
-                <div className="flex items-center justify-between text-xs text-ink-400">
-                  <span>Avance de la entrega</span>
-                  <span className="font-semibold text-ink-200">{avance}%</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-brand-500 to-accent-500 transition-[width]"
-                    style={{ width: `${avance}%` }}
-                  />
-                </div>
-                {order.remains != null ? (
-                  <p className="mt-2 text-xs text-ink-400">
-                    {formatNumber(Math.max(0, order.quantity - order.remains))} de{" "}
-                    {formatNumber(order.quantity)} entregadas
+                {/* Lo que se sabe del avance es cuántas faltan: eso es lo que
+                    se muestra. Sin ese dato no hay barra ni porcentaje, porque
+                    cualquier número sería inventado. Nada de esto nombra a
+                    nadie más: el pedido es nuestro y se cuenta como nuestro. */}
+                {avance ? (
+                  <>
+                    <div className="flex items-end justify-between gap-3">
+                      <div>
+                        <p className="text-xs text-ink-400">
+                          {avance.restante > 0 ? "Faltan por entregar" : "Entrega completa"}
+                        </p>
+                        <p className="text-2xl font-bold text-ink-100">
+                          {formatNumber(avance.restante)}
+                          <span className="ml-1 text-sm font-normal text-ink-400">
+                            de {formatNumber(avance.cantidad)}
+                          </span>
+                        </p>
+                      </div>
+                      <span className="text-xs font-semibold text-ink-300">{avance.porcentaje}%</span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-brand-500 to-accent-500 transition-[width]"
+                        style={{ width: `${avance.porcentaje}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-ink-400">
+                    Tu pedido de {formatNumber(order.quantity)} ya está en marcha.
+                    Aquí vas a ver cuántas faltan a medida que avanza.
+                  </p>
+                )}
+                {enCurso ? (
+                  <p className="mt-2 text-[11px] text-ink-600">
+                    Esta página se actualiza sola mientras la tengas abierta.
                   </p>
                 ) : null}
               </div>
