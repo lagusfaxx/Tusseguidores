@@ -367,6 +367,16 @@ export function SettingsForm({
             <code className="text-brand-300">{settings.site_url}/api/cron/sincronizar?key=TU_CLAVE</code>{" "}
             para que los pedidos se actualicen solos.
           </p>
+
+          <Field label="Token del asistente (MCP)" name="mcp_token" type="password" value={settings.mcp_token}
+            hint="Deja que un asistente lea la tienda y haga el trabajo repetitivo. En blanco, el acceso queda cerrado." />
+          <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
+            Con un token puesto, conecta el asistente a{" "}
+            <code className="text-brand-300">{settings.site_url}/api/mcp</code>. Puede consultar
+            ventas, pedidos y catálogo, y hacer lo repetitivo: sincronizar, republicar niveles y
+            rescatar pedidos atascados. No puede reembolsar, mover saldo ni borrar nada, y todo lo
+            que hace queda anotado. Cámbialo cuando quieras para cortarle el acceso.
+          </p>
         </Section>
 
         <div className="sticky bottom-0 flex flex-wrap items-center gap-4 border-t border-white/10 bg-ink-950/95 px-1 py-4 backdrop-blur lg:col-span-2">

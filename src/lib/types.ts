@@ -144,6 +144,8 @@ export type Order = {
   created_at: string;
   updated_at: string;
   paid_at: string | null;
+  /** Cuándo terminó la entrega: es el día desde el que corre la garantía. */
+  completed_at: string | null;
 };
 
 export type OrderStatus =

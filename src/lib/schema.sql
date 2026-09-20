@@ -169,7 +169,8 @@ CREATE TABLE IF NOT EXISTS orders (
   ip                  TEXT,
   created_at          TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at          TEXT    NOT NULL DEFAULT (datetime('now')),
-  paid_at             TEXT
+  paid_at             TEXT,
+  completed_at        TEXT                                -- desde aquí corre la garantía de reposición
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status  ON orders(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at DESC);
@@ -222,6 +223,18 @@ CREATE TABLE IF NOT EXISTS order_events (
   created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_events_order ON order_events(order_id, id DESC);
+
+-- Todo lo que cambió el MCP, para poder revisarlo después. Es la contraparte
+-- de darle operaciones a un agente: si nadie estaba mirando, al menos queda
+-- escrito qué hizo y cuándo.
+CREATE TABLE IF NOT EXISTS mcp_log (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  accion     TEXT    NOT NULL,
+  detalle    TEXT    NOT NULL,
+  order_id   INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_mcp_log ON mcp_log(id DESC);
 
 CREATE TABLE IF NOT EXISTS coupons (
   code        TEXT PRIMARY KEY,

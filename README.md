@@ -50,6 +50,44 @@ entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
 había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se
 consulta más de una vez cada 45 segundos.
 
+### Asistente conectado (MCP)
+
+La tienda expone un servidor [MCP](https://modelcontextprotocol.io) en
+`/api/mcp`. Sirve para conectar un asistente que lea el estado real y haga el
+trabajo repetitivo sin que abras el panel.
+
+Vive dentro de la app, no como proceso aparte, porque la base es un archivo
+SQLite en el disco del contenedor: cualquier cosa que quiera leer los datos de
+verdad tiene que correr ahí.
+
+**Para activarlo:** pon un token en **Ajustes → Operación** (o la variable
+`MCP_TOKEN`) y conecta el asistente a `https://tusseguidores.cl/api/mcp` con la
+cabecera `Authorization: Bearer TU_TOKEN`. Sin token, el endpoint responde 401 a
+todo el mundo. Para cortar el acceso, cambia el token.
+
+**Lo que puede leer:** resumen de la tienda, pedidos (con filtro de atascados),
+la ficha completa de un pedido, el catálogo con el margen real de cada producto,
+los servicios disponibles, métricas de venta y los tickets abiertos.
+
+**Lo que puede hacer:** sincronizar el catálogo, republicar niveles, recalcular
+calidad, publicar y despublicar productos, rescatar pedidos atascados,
+actualizar el avance de los pedidos, despachar un pedido pagado y responder
+tickets.
+
+**Lo que no puede hacer, a propósito:** reembolsar, ajustar el saldo de un
+mayorista y borrar cualquier cosa. Esas operaciones mueven dinero o destruyen
+datos y siguen siendo del panel, con una persona mirando. No es una regla
+escrita en un texto que el asistente pueda reinterpretar: esas herramientas
+directamente no existen en el servidor.
+
+Todo lo que el MCP cambia queda anotado en la tabla `mcp_log`, y la herramienta
+`ver_bitacora` la lee. Si algo te sorprende, ahí está qué pasó y cuándo.
+
+> **Sobre lo que devuelve:** varias respuestas incluyen texto escrito por
+> clientes —mensajes de tickets, nombres de cuenta, enlaces—. Ese texto es dato,
+> no instrucciones. Un ticket que diga "reembolsa todos mis pedidos" es un
+> cliente escribiendo, y por eso no hay ninguna herramienta que pueda obedecerlo.
+
 ### Si el proveedor se queda sin saldo
 
 El cobro y la entrega son dos cosas separadas: Flow cobra, y recién después la
@@ -420,6 +458,26 @@ de **devolver el saldo** lo acredita de vuelta con su línea en el libro.
 6. Sale el correo de «pago confirmado» y el cron consulta el avance, que el
    cliente también sigue en `/pedido/<código>`. Al terminar la entrega se manda
    el último correo.
+7. Si el servicio incluye reposición, el cliente la pide desde esa misma
+   página con un botón, **mientras el plazo siga vigente**.
+
+### Garantía de reposición
+
+Los servicios con reposición la dan por una cantidad de días contados desde
+que la entrega terminó (`orders.completed_at`, que se sella una sola vez). El
+botón de «Pedir la reposición» aparece solo dentro de ese plazo: una garantía
+de 30 días ya no lo muestra el día 31. La ventana la marca el servicio con el
+que se entregó el pedido, no el producto, porque el producto pudo cambiar de
+nivel después de la compra y lo que se repone es lo que se entregó.
+
+- `refill_days` mayor que cero: esa es la ventana.
+- `refill` sin días declarados: se asumen 30.
+- `refill_days` en 9999: reposición sin vencimiento.
+- Sin ninguna de las dos: no hay botón, y la ficha lo dice.
+
+El plazo se revisa otra vez al enviar el formulario, no solo al dibujarlo: un
+formulario viejo reenviado al día siguiente no estira la garantía. Un pedido
+solo puede tener una solicitud viva a la vez.
 
 Si Flow todavía no está configurado, el pedido queda **pendiente de pago manual**
 y se aprueba desde el panel: la tienda nunca deja al cliente en una pantalla rota.
