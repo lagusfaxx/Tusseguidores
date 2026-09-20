@@ -98,6 +98,8 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // Operación
   cron_secret: "",
   orders_enabled: "1",
+  // Llave del servidor MCP. En blanco, /api/mcp no responde a nadie.
+  mcp_token: "",
 };
 
 let cache: { data: SettingsMap; at: number } | null = null;

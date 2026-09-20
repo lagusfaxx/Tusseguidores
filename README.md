@@ -50,6 +50,44 @@ entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
 había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se
 consulta más de una vez cada 45 segundos.
 
+### Asistente conectado (MCP)
+
+La tienda expone un servidor [MCP](https://modelcontextprotocol.io) en
+`/api/mcp`. Sirve para conectar un asistente que lea el estado real y haga el
+trabajo repetitivo sin que abras el panel.
+
+Vive dentro de la app, no como proceso aparte, porque la base es un archivo
+SQLite en el disco del contenedor: cualquier cosa que quiera leer los datos de
+verdad tiene que correr ahí.
+
+**Para activarlo:** pon un token en **Ajustes → Operación** (o la variable
+`MCP_TOKEN`) y conecta el asistente a `https://tusseguidores.cl/api/mcp` con la
+cabecera `Authorization: Bearer TU_TOKEN`. Sin token, el endpoint responde 401 a
+todo el mundo. Para cortar el acceso, cambia el token.
+
+**Lo que puede leer:** resumen de la tienda, pedidos (con filtro de atascados),
+la ficha completa de un pedido, el catálogo con el margen real de cada producto,
+los servicios disponibles, métricas de venta y los tickets abiertos.
+
+**Lo que puede hacer:** sincronizar el catálogo, republicar niveles, recalcular
+calidad, publicar y despublicar productos, rescatar pedidos atascados,
+actualizar el avance de los pedidos, despachar un pedido pagado y responder
+tickets.
+
+**Lo que no puede hacer, a propósito:** reembolsar, ajustar el saldo de un
+mayorista y borrar cualquier cosa. Esas operaciones mueven dinero o destruyen
+datos y siguen siendo del panel, con una persona mirando. No es una regla
+escrita en un texto que el asistente pueda reinterpretar: esas herramientas
+directamente no existen en el servidor.
+
+Todo lo que el MCP cambia queda anotado en la tabla `mcp_log`, y la herramienta
+`ver_bitacora` la lee. Si algo te sorprende, ahí está qué pasó y cuándo.
+
+> **Sobre lo que devuelve:** varias respuestas incluyen texto escrito por
+> clientes —mensajes de tickets, nombres de cuenta, enlaces—. Ese texto es dato,
+> no instrucciones. Un ticket que diga "reembolsa todos mis pedidos" es un
+> cliente escribiendo, y por eso no hay ninguna herramienta que pueda obedecerlo.
+
 ### Si el proveedor se queda sin saldo
 
 El cobro y la entrega son dos cosas separadas: Flow cobra, y recién después la
