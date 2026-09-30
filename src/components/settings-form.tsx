@@ -118,14 +118,23 @@ export function SettingsForm({
           <Field label="Dólar (CLP por US$)" name="usd_clp" type="number" value={settings.usd_clp}
             hint="Súbelo un poco sobre el dólar observado para cubrir la variación." />
           <Field label="Margen global (%)" name="margin_percent" type="number" value={settings.margin_percent}
-            hint="180 significa que el precio de venta es 2,8 veces el costo. Bájalo y baja toda la tienda: los pisos de más abajo se mueven contigo." />
+            hint={`180 significa que el precio de venta es 2,8 veces el costo. Bájalo y baja toda la tienda: los pisos se escalan con él. Hoy los pisos están al ${Math.round(((1 + Number(settings.margin_percent || 0) / 100) / (1 + Number(settings.margin_reference || 0) / 100)) * 100)}% de lo escrito abajo.`} />
           <Field label="Terminación de precio" name="price_rounding" type="number" value={settings.price_rounding}
             hint="90 redondea hacia arriba a terminaciones …90 ($4.390). 0 redondea a la decena." />
           <Field label="Precio mínimo (CLP)" name="min_price_clp" type="number" value={settings.min_price_clp}
             hint="Ningún pedido se cobra por debajo de este monto." />
-          <Field label="Margen de referencia de los pisos (%)" name="margin_reference" type="number"
-            value={settings.margin_reference}
-            hint="Los pisos de abajo están escritos para este margen y se escalan solos cuando cambias el margen global. Déjalo en el margen que tienes hoy: así los precios actuales no se mueven y, a partir de ahí, el margen manda sobre toda la tienda." />
+          {/* Avanzado a propósito: igualarlo al margen global anula el efecto del
+              margen sobre los pisos, y los pisos fijan casi todos los precios. */}
+          <details className="rounded-lg border border-white/10 px-3 py-2">
+            <summary className="cursor-pointer text-sm text-ink-200">
+              Avanzado: margen de referencia de los pisos ({settings.margin_reference}%)
+            </summary>
+            <div className="mt-3">
+              <Field label="Margen de referencia de los pisos (%)" name="margin_reference" type="number"
+                value={settings.margin_reference}
+                hint="No lo cambies junto con el margen global: si los dejas iguales, los precios no se mueven. Los pisos se escalan por margen global ÷ este número. Tócalo solo si reescribes los pisos de abajo, para indicar a qué margen los escribiste." />
+            </div>
+          </details>
           <div>
             <label className="field-label">Precio mínimo por cada 1.000 unidades</label>
             <p className="mb-3 text-xs leading-relaxed text-ink-400">
