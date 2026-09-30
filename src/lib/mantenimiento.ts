@@ -5,6 +5,7 @@ import { retryUndispatched, syncOpenOrders } from "./orders";
 import { publicarNiveles, refrescarEtiquetasDeEntrega } from "./autolevels";
 import { resumirSincronizacion, sincronizarProveedores } from "./catalog-sync";
 import { algunProveedorConfigurado, refreshBalances } from "./provider";
+import { alinearConProveedorActivo, type ResultadoAlineacion } from "./cambio-proveedor";
 
 /**
  * El trabajo de fondo de la tienda, en un solo lugar.
@@ -19,8 +20,11 @@ import { algunProveedorConfigurado, refreshBalances } from "./provider";
  * 2. Actualiza el estado de los pedidos en curso con cada proveedor.
  * 3. Refresca el saldo de los proveedores.
  * 4. Cada tantas horas (6 por defecto): baja el catálogo de todos los
- *    proveedores, recalcula la calidad de cada servicio y, con los niveles
- *    automáticos activos, vuelve a armar económico / estándar / premium.
+ *    proveedores y recalcula la calidad de cada servicio.
+ * 5. Deja cada producto con el proveedor que atiende su red y oculta los
+ *    niveles repetidos.
+ * 6. Con los niveles automáticos activos, vuelve a armar económico /
+ *    estándar / premium.
  */
 
 export type ResultadoMantenimiento = {
@@ -28,6 +32,7 @@ export type ResultadoMantenimiento = {
   estados: { checked: number; updated: number };
   catalogo: string | null;
   calidad: { servicios: number; etiquetas: number } | null;
+  alineacion: ResultadoAlineacion | null;
   niveles: ReturnType<typeof publicarNiveles> | null;
   error?: string;
 };
@@ -69,6 +74,7 @@ async function pasada(forzarCatalogo: boolean): Promise<ResultadoMantenimiento> 
     estados: { checked: 0, updated: 0 },
     catalogo: null,
     calidad: null,
+    alineacion: null,
     niveles: null,
   };
   if (!algunProveedorConfigurado()) return resultado;
@@ -87,6 +93,9 @@ async function pasada(forzarCatalogo: boolean): Promise<ResultadoMantenimiento> 
       resultado.calidad = { servicios: rescoreServices(), etiquetas: refrescarEtiquetasDeEntrega() };
     }
   }
+
+  // Antes que los niveles: así se rearman sobre el proveedor correcto.
+  resultado.alineacion = alinearConProveedorActivo();
 
   // Los niveles se reacomodan en cada pasada, como hacía el cron: si un
   // servicio se dio de baja, entra el mejor que quede sin esperar seis horas.
@@ -111,6 +120,7 @@ export function correrMantenimiento(forzarCatalogo = false): Promise<ResultadoMa
       estados: { checked: 0, updated: 0 },
       catalogo: null,
       calidad: null,
+      alineacion: null,
       niveles: null,
       error: error instanceof Error ? error.message : String(error),
     }))

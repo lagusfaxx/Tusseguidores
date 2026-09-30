@@ -5,6 +5,8 @@ import { platformLabel } from "./labels";
 import { esProveedor, providerConfigured, PROVEEDORES, type ProveedorId } from "./provider";
 import { guardarProveedorDeRed, proveedorDeRed } from "./proveedor-por-red";
 import { ROUTABLE_GEOS } from "./quality.mjs";
+import { nivelesDeOferta } from "./levels";
+import { cantidadDeReferencia } from "./offers";
 import type { ProviderService } from "./types";
 
 /**
@@ -90,6 +92,18 @@ export function servicioEquivalente(
   proveedor: ProveedorId,
   cantidadMinima: number,
 ): ProviderService | undefined {
+  // El que tuvo con este proveedor manda, aunque se parezca poco en papel:
+  // cada proveedor clasifica sus servicios a su manera (subtipo, forma de
+  // pedido), y exigir que coincidan dejaba al producto sin poder volver.
+  const guardado = get<ProviderService>(
+    `SELECT s.* FROM product_provider_refs r
+       JOIN provider_services s ON s.service_id = r.service_id
+      WHERE r.product_id = ? AND r.provider = ? AND s.provider = ?
+        AND s.provider_enabled = 1 AND s.platform = ?`,
+    [productId, proveedor, proveedor, referencia.platform],
+  );
+  if (guardado) return guardado;
+
   const candidatos = all<ProviderService>(
     `SELECT * FROM provider_services
       WHERE provider = ? AND provider_enabled = 1 AND rate_usd_per_1000 > 0
@@ -101,13 +115,6 @@ export function servicioEquivalente(
     ],
   );
   if (!candidatos.length) return undefined;
-
-  const guardado = get<{ service_id: number }>(
-    "SELECT service_id FROM product_provider_refs WHERE product_id = ? AND provider = ?",
-    [productId, proveedor],
-  );
-  const previo = candidatos.find((c) => c.service_id === guardado?.service_id);
-  if (previo) return previo;
 
   const distancia = (c: ProviderService) =>
     Math.abs(c.drop_score - referencia.drop_score) +
@@ -189,24 +196,9 @@ export function cambiarProveedorDeRed(
       resultado.nuevosBorrador = niveles.creados;
     }
 
-    // 4. El resto, al servicio más parecido. Los niveles no: si el nuevo
-    //    proveedor no tiene ese escalón, repartirlo a mano duplicaría otro.
-    const actualizar = db.prepare(
-      "UPDATE products SET provider_service_id = ?, updated_at = datetime('now') WHERE id = ?",
-    );
-    for (const p of productosDeRed(platform)) {
-      if (p.provider === proveedor || (p.auto_managed === 1 && p.level)) continue;
-      const referencia = get<ProviderService>("SELECT * FROM provider_services WHERE service_id = ?", [
-        p.provider_service_id,
-      ]);
-      if (!referencia) continue;
-      const minTier =
-        get<{ q: number | null }>("SELECT MIN(quantity) AS q FROM product_tiers WHERE product_id = ?", [
-          p.id,
-        ])?.q ?? p.min_qty;
-      const equivalente = servicioEquivalente(p.id, referencia, proveedor, minTier);
-      if (equivalente) actualizar.run(equivalente.service_id, p.id);
-    }
+    // 4. Lo que quedó con el proveedor anterior pasa al nuevo: al servicio
+    //    que tuvo con él, al mismo nivel, o al más parecido.
+    alinearConProveedorActivo(platform);
 
     // 5. Lo que estaba publicado la última vez que la red fue de este
     //    proveedor y se ocultó al irse, vuelve.
@@ -319,5 +311,132 @@ export function repararProductosDadosDeBaja(): { reparados: { id: number; name: 
 
   if (reparados.length) refrescarEtiquetasDeEntrega();
   return { reparados };
+}
+
+export type ResultadoAlineacion = {
+  /** Productos que volvieron al proveedor que atiende su red. */
+  movidos: number;
+  /** Niveles repetidos (dos "Estándar" de lo mismo) que se ocultaron. */
+  duplicadosOcultos: number;
+};
+
+/**
+ * Deja cada producto con el proveedor que atiende su red.
+ *
+ * Es la regla de fondo del interruptor: si Instagram es de honestsmm, los
+ * productos de Instagram cobran y despachan con servicios de honestsmm. Un
+ * cambio de proveedor que se cortó a medias, o uno de ida y vuelta en que el
+ * otro catálogo clasificaba distinto, podía dejar productos con el proveedor
+ * equivocado: precios de otra lista y pedidos al proveedor que no toca. Esto
+ * lo corrige, y lo corre el mantenimiento en cada pasada.
+ *
+ * Para cada producto que no calza, en orden:
+ * 1. el servicio que tuvo con ese proveedor, si sigue activo;
+ * 2. si es un nivel automático, el servicio de su nivel en ese catálogo;
+ * 3. el servicio más parecido.
+ * Si no hay nada, se queda donde está: mejor entregar con el otro que no vender.
+ *
+ * @param platform  limita el trabajo a una red.
+ */
+export function alinearConProveedorActivo(platform?: string): ResultadoAlineacion {
+  const resultado: ResultadoAlineacion = { movidos: 0, duplicadosOcultos: 0 };
+  const productos = all<ProductoDeRed & { platform: string; service_type: string }>(
+    `SELECT p.id, p.name, p.published, p.auto_managed, p.level, p.min_qty, p.platform,
+            p.service_type, p.provider_service_id, s.provider
+       FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id
+      ${platform ? "WHERE p.platform = ?" : ""}`,
+    platform ? [platform] : [],
+  );
+
+  const anotar = db.prepare(
+    `INSERT INTO product_provider_refs (product_id, provider, service_id, published, updated_at)
+     VALUES (?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(product_id, provider) DO UPDATE SET
+       service_id = excluded.service_id, published = excluded.published,
+       updated_at = excluded.updated_at`,
+  );
+  const actualizar = db.prepare(
+    "UPDATE products SET provider_service_id = ?, updated_at = datetime('now') WHERE id = ?",
+  );
+  // Los niveles de cada combinación se calculan una vez, no una por producto.
+  const nivelesCache = new Map<string, ReturnType<typeof nivelesDeOferta>>();
+
+  const alinear = db.transaction(() => {
+    for (const p of productos) {
+      const activo = proveedorDeRed(p.platform);
+      if (p.provider === activo) continue;
+      const referencia = get<ProviderService>("SELECT * FROM provider_services WHERE service_id = ?", [
+        p.provider_service_id,
+      ]);
+      if (!referencia) continue;
+
+      let nuevo: ProviderService | undefined = get<ProviderService>(
+        `SELECT s.* FROM product_provider_refs r
+           JOIN provider_services s ON s.service_id = r.service_id
+          WHERE r.product_id = ? AND r.provider = ? AND s.provider = ?
+            AND s.provider_enabled = 1 AND s.platform = ?`,
+        [p.id, activo, activo, p.platform],
+      );
+
+      if (!nuevo && p.auto_managed === 1 && p.level) {
+        const clave = `${p.platform}|${p.service_type}|${referencia.order_kind}`;
+        if (!nivelesCache.has(clave)) {
+          nivelesCache.set(
+            clave,
+            nivelesDeOferta(
+              p.platform, p.service_type, referencia.order_kind,
+              cantidadDeReferencia(p.service_type, referencia.order_kind),
+            ),
+          );
+        }
+        nuevo = nivelesCache.get(clave)!.find((n) => n.level.id === p.level)?.service;
+      } else if (!nuevo) {
+        const minTier =
+          get<{ q: number | null }>("SELECT MIN(quantity) AS q FROM product_tiers WHERE product_id = ?", [
+            p.id,
+          ])?.q ?? p.min_qty;
+        nuevo = servicioEquivalente(p.id, referencia, activo, minTier);
+      }
+      if (!nuevo) continue;
+
+      // Se anota lo que tenía con el otro, por si la red vuelve a él.
+      anotar.run(p.id, p.provider, p.provider_service_id, p.published);
+      actualizar.run(nuevo.service_id, p.id);
+      resultado.movidos++;
+    }
+
+    // Niveles repetidos: dos productos automáticos para el mismo nivel de la
+    // misma combinación. Queda uno visible —el publicado con más ventas, y a
+    // igualdad el más antiguo— y los demás se ocultan (no se borran: pueden
+    // tener pedidos).
+    const repetidos = all<{ ids: string }>(
+      `SELECT GROUP_CONCAT(p.id) AS ids
+         FROM products p
+         JOIN provider_services s ON s.service_id = p.provider_service_id
+        WHERE p.auto_managed = 1 AND p.level != '' AND p.published = 1
+          ${platform ? "AND p.platform = ?" : ""}
+        GROUP BY p.platform, p.service_type, p.level, s.order_kind
+       HAVING COUNT(*) > 1`,
+      platform ? [platform] : [],
+    );
+    for (const grupo of repetidos) {
+      const ids = grupo.ids.split(",").map(Number);
+      const ordenados = all<{ id: number; ventas: number }>(
+        `SELECT p.id, (SELECT COUNT(*) FROM orders o WHERE o.product_id = p.id AND o.payment_status = 'paid') AS ventas
+           FROM products p WHERE p.id IN (${ids.map(() => "?").join(",")})
+          ORDER BY ventas DESC, p.id ASC`,
+        ids,
+      );
+      for (const sobra of ordenados.slice(1)) {
+        run("UPDATE products SET published = 0, updated_at = datetime('now') WHERE id = ?", [sobra.id]);
+        resultado.duplicadosOcultos++;
+      }
+    }
+  });
+  alinear();
+
+  if (resultado.movidos) refrescarEtiquetasDeEntrega();
+  return resultado;
 }
 
