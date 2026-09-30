@@ -31,20 +31,32 @@ Tienda de servicios para redes sociales conectada a la API del proveedor
    crea tu usuario de administrador.
 5. Entra a `https://tusseguidores.cl/admin` y **cambia la contraseña**.
 
-### Cron de seguimiento de pedidos
+### Mantenimiento automático (sin cron)
 
-Define una clave en **Ajustes → Operación** (o la variable `CRON_SECRET`) y
-programa en Coolify una tarea cada 10 minutos:
+El servidor trae su propio reloj (`src/instrumentation.ts`): arranca con la
+tienda y cada 10 minutos, sin configurar nada:
+
+- reintenta los pedidos pagados que no alcanzaron a salir al proveedor (al
+  recargar saldo, salen solos);
+- actualiza el estado de los pedidos en curso con cada proveedor;
+- consulta el saldo de los proveedores;
+- cada 6 horas baja el catálogo de todos los proveedores, **recalcula la
+  calidad** de cada servicio y reacomoda los niveles.
+
+Se ajusta en **Ajustes → Operación**: la casilla lo apaga y el campo de horas
+cambia cada cuánto se baja el catálogo (0 = solo a mano).
+
+El cron externo ya no hace falta, pero sigue funcionando si lo tienes: define
+una clave en **Ajustes → Operación** (o `CRON_SECRET`) y llama a
 
 ```
 curl -fsS "https://tusseguidores.cl/api/cron/sincronizar?key=TU_CLAVE"
 ```
 
-Ese cron hace dos cosas: reintenta los pedidos pagados que no alcanzaron a
-salir al proveedor y actualiza el avance de los que ya están en curso. **No es
-opcional**: es lo que rescata los pedidos que quedaron atascados.
+Agrega `&catalogo=1` para forzar también la bajada del catálogo. El reloj y el
+cron comparten un candado, así que no se pisan.
 
-Aparte del cron, la página de seguimiento le pregunta al proveedor por ese
+Aparte de eso, la página de seguimiento le pregunta al proveedor por ese
 pedido cuando alguien la abre, y se refresca sola cada 20 segundos mientras la
 entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
 había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se

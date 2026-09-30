@@ -105,6 +105,13 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   rating_count: "0",
 
   // Operación
+  // Reloj interno: cada 10 minutos reenvía pedidos atascados, actualiza
+  // estados y saldos. Ver lib/mantenimiento.ts.
+  auto_mantenimiento: "1",
+  // Cada cuántas horas baja el catálogo de los proveedores y recalcula la
+  // calidad. 0 = solo a mano.
+  auto_sync_catalog_hours: "6",
+  mantenimiento_at: "",
   cron_secret: "",
   orders_enabled: "1",
   // Llave del servidor MCP. En blanco, /api/mcp no responde a nadie.

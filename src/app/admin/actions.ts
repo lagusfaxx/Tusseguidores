@@ -109,7 +109,7 @@ const SETTING_KEYS = [
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",
   "rating_enabled", "rating_value", "rating_count",
-  "cron_secret", "orders_enabled", "mcp_token",
+  "cron_secret", "orders_enabled", "mcp_token", "auto_mantenimiento", "auto_sync_catalog_hours",
 ];
 
 export async function saveSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -135,7 +135,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
     "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
-    "reseller_enabled", "rating_enabled",
+    "reseller_enabled", "rating_enabled", "auto_mantenimiento",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }

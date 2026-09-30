@@ -381,12 +381,27 @@ export function SettingsForm({
         </Section>
 
         <Section title="Operación">
-          <Field label="Clave del cron" name="cron_secret" type="password" value={settings.cron_secret}
-            hint="Necesaria para llamar a /api/cron/sincronizar y actualizar los estados de los pedidos." />
+          <Check
+            label="Mantenimiento automático"
+            name="auto_mantenimiento"
+            checked={settings.auto_mantenimiento === "1"}
+            hint="Cada 10 minutos la tienda reenvía los pedidos pagados que no salieron, actualiza el estado de los que van en curso y consulta el saldo de los proveedores. No hace falta configurar ningún cron."
+          />
+          <Field label="Sincronizar el catálogo y recalcular la calidad cada (horas)" name="auto_sync_catalog_hours"
+            type="number" value={settings.auto_sync_catalog_hours}
+            hint="Baja el catálogo de todos los proveedores, recalcula la calidad de cada servicio y reacomoda los niveles. En 0 solo se sincroniza a mano." />
+          {settings.mantenimiento_at ? (
+            <p className="text-xs text-ink-400">
+              Última pasada: {new Date(settings.mantenimiento_at).toLocaleString("es-CL", { timeZone: "America/Santiago" })}.
+            </p>
+          ) : null}
+
+          <Field label="Clave del cron (opcional)" name="cron_secret" type="password" value={settings.cron_secret}
+            hint="Solo si además quieres llamar al mantenimiento desde afuera. No es necesario: el servidor ya lo corre solo." />
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
-            Programa una llamada cada 10 minutos a{" "}
+            Para forzar una pasada:{" "}
             <code className="text-brand-300">{settings.site_url}/api/cron/sincronizar?key=TU_CLAVE</code>{" "}
-            para que los pedidos se actualicen solos.
+            (agrega <code className="text-brand-300">&amp;catalogo=1</code> para bajar también el catálogo).
           </p>
 
           <Field label="Token del asistente (MCP)" name="mcp_token" type="password" value={settings.mcp_token}

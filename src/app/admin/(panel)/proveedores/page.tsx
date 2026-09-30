@@ -8,7 +8,8 @@ import {
   cachedBalance, LISTA_PROVEEDORES, providerConfigured, PROVEEDOR_PRINCIPAL,
 } from "@/lib/provider";
 import { mapaProveedorPorRed } from "@/lib/proveedor-por-red";
-import { invalidateSettings } from "@/lib/settings";
+import { getBoolSetting, invalidateSettings } from "@/lib/settings";
+import { horasEntreSincronizaciones, ultimaSincronizacion } from "@/lib/mantenimiento";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,11 @@ export default async function AdminProvidersPage() {
   // después de cambiar una red se vería todavía el proveedor anterior.
   invalidateSettings();
   const mapa = mapaProveedorPorRed();
+
+  const horas = horasEntreSincronizaciones();
+  const ultima = ultimaSincronizacion();
+  const automatico = getBoolSetting("auto_mantenimiento", true) && horas > 0;
+  const proxima = ultima ? new Date(ultima.getTime() + horas * 60 * 60 * 1000) : null;
 
   // Servicios activos por proveedor y red: dice si un proveedor puede atender
   // una red antes de pasarla a él.
@@ -64,6 +70,14 @@ export default async function AdminProvidersPage() {
             Elige qué proveedor atiende cada red. Al cambiarla, sus productos pasan a los servicios
             equivalentes del otro proveedor y los precios se recalculan con lo que cobra. Los pedidos
             que ya salieron siguen con el proveedor al que se mandaron.
+          </p>
+          <p className="mt-2 text-xs text-ink-400">
+            {automatico
+              ? `Los catálogos se sincronizan y la calidad se recalcula sola cada ${horas} h` +
+                (proxima && proxima > new Date()
+                  ? ` (la próxima, cerca del ${formatDateCl(proxima.toISOString())}).`
+                  : " (la próxima, en los próximos 10 minutos).")
+              : "La sincronización automática está apagada: se hace con el botón. Actívala en Ajustes → Operación."}
           </p>
         </div>
         <SyncCatalogButton />
