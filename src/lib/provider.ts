@@ -243,20 +243,64 @@ export function servicioRemoto(serviceId: number): { proveedor: ProveedorId; rem
 }
 
 /**
+ * Lee el saldo de la respuesta de `balance`, venga como venga.
+ *
+ * El protocolo dice {"balance": "100.84292"}, pero hay paneles que lo mandan
+ * como número, con separador de miles ("1,234.56") o con coma decimal
+ * ("12,50"). Un Number() directo convertía cualquiera de esos en NaN y el
+ * saldo desaparecía del panel sin ningún error a la vista.
+ */
+export function leerSaldo(respuesta: unknown): number | null {
+  const bruto =
+    respuesta && typeof respuesta === "object"
+      ? (respuesta as Record<string, unknown>).balance ?? (respuesta as Record<string, unknown>).funds
+      : respuesta;
+  if (typeof bruto === "number") return Number.isFinite(bruto) ? bruto : null;
+  if (typeof bruto !== "string") return null;
+
+  let limpio = bruto.replace(/[^\d.,-]/g, "");
+  if (limpio.includes(",") && limpio.includes(".")) {
+    // El que va al final es el decimal; el otro separa miles.
+    limpio = limpio.lastIndexOf(",") > limpio.lastIndexOf(".")
+      ? limpio.replace(/\./g, "").replace(",", ".")
+      : limpio.replace(/,/g, "");
+  } else if (limpio.includes(",")) {
+    limpio = limpio.replace(",", ".");
+  }
+  const valor = Number(limpio);
+  return limpio !== "" && Number.isFinite(valor) ? valor : null;
+}
+
+/**
  * Saldo del proveedor, guardado para no llamar a su API en cada pantalla.
- * Lo refresca el cron y la página de ajustes.
+ * Lo refrescan el mantenimiento, el resumen y la página de proveedores.
+ *
+ * Si la consulta falla, el motivo queda guardado junto al saldo: sin eso, un
+ * saldo que no llega se ve igual que uno que nunca se pidió.
  */
 export async function refreshBalance(id: ProveedorId = PROVEEDOR_PRINCIPAL): Promise<number | null> {
   if (!providerConfigured(id)) return null;
+  const clave = PROVEEDORES[id].ajusteSaldo;
+  const { setSettings } = await import("./settings");
   try {
     const result = await clienteProveedor(id).balance();
-    const value = Number(result.balance);
-    if (!Number.isFinite(value)) return null;
-    const { setSettings } = await import("./settings");
-    const clave = PROVEEDORES[id].ajusteSaldo;
-    setSettings({ [clave]: String(value), [`${clave}_at`]: new Date().toISOString() });
+    const value = leerSaldo(result);
+    if (value == null) {
+      setSettings({
+        [`${clave}_error`]: `Respuesta de saldo que no se entiende: ${JSON.stringify(result).slice(0, 120)}`,
+      });
+      return null;
+    }
+    setSettings({
+      [clave]: String(value),
+      [`${clave}_at`]: new Date().toISOString(),
+      [`${clave}_error`]: "",
+    });
     return value;
-  } catch {
+  } catch (error) {
+    setSettings({
+      [`${clave}_error`]: error instanceof Error ? error.message : "No se pudo consultar el saldo.",
+    });
     return null;
   }
 }
@@ -266,13 +310,19 @@ export async function refreshBalances(): Promise<void> {
   await Promise.all(proveedoresConfigurados().map((id) => refreshBalance(id)));
 }
 
-export function cachedBalance(id: ProveedorId = PROVEEDOR_PRINCIPAL): { usd: number | null; at: string | null } {
+export function cachedBalance(id: ProveedorId = PROVEEDOR_PRINCIPAL): {
+  usd: number | null;
+  at: string | null;
+  /** Por qué falló la última consulta. Vacío si salió bien. */
+  error: string | null;
+} {
   const clave = PROVEEDORES[id].ajusteSaldo;
   const raw = getSetting(clave, "");
   const value = Number(raw);
   return {
     usd: raw !== "" && Number.isFinite(value) ? value : null,
     at: getSetting(`${clave}_at`, "") || null,
+    error: getSetting(`${clave}_error`, "") || null,
   };
 }
 

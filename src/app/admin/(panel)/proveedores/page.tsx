@@ -5,7 +5,7 @@ import { ProviderSwitch } from "@/components/provider-switch";
 import { platformLabel, PLATFORM_PRIORITY } from "@/lib/labels";
 import { formatDateCl } from "@/lib/utils";
 import {
-  cachedBalance, LISTA_PROVEEDORES, providerConfigured, PROVEEDOR_PRINCIPAL,
+  cachedBalance, LISTA_PROVEEDORES, providerConfigured, PROVEEDOR_PRINCIPAL, refreshBalances,
 } from "@/lib/provider";
 import { mapaProveedorPorRed } from "@/lib/proveedor-por-red";
 import { getBoolSetting, invalidateSettings } from "@/lib/settings";
@@ -20,6 +20,8 @@ export default async function AdminProvidersPage() {
   // comparte módulo con la acción que mueve el interruptor: sin esto, justo
   // después de cambiar una red se vería todavía el proveedor anterior.
   invalidateSettings();
+  // El saldo se consulta al abrir la página: es lo primero que se mira aquí.
+  await refreshBalances();
   const mapa = mapaProveedorPorRed();
 
   const horas = horasEntreSincronizaciones();
@@ -109,6 +111,9 @@ export default async function AdminProvidersPage() {
                 <div>
                   <dt className="text-xs text-ink-400">Saldo</dt>
                   <dd className="font-semibold">{saldo.usd != null ? `US$${saldo.usd.toFixed(2)}` : "—"}</dd>
+                  {configurado && saldo.error ? (
+                    <dd className="mt-1 text-xs text-red-300">{saldo.error}</dd>
+                  ) : null}
                 </div>
                 <div>
                   <dt className="text-xs text-ink-400">Redes que atiende</dt>
