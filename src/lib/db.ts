@@ -72,6 +72,9 @@ function migrate(database: Database.Database) {
     // reposición, así que no sirve `updated_at`: ese se mueve con cualquier
     // cambio posterior y le regalaría días a un pedido viejo.
     ["orders", "completed_at", "TEXT"],
+    // Segundo proveedor: de quién es cada servicio y su número en esa API.
+    ["provider_services", "provider", "TEXT NOT NULL DEFAULT 'honestsmm'"],
+    ["provider_services", "remote_id", "INTEGER"],
   ];
 
   const added: string[] = [];
@@ -134,6 +137,9 @@ function migrate(database: Database.Database) {
   );
   database.exec(
     "CREATE INDEX IF NOT EXISTS idx_orders_reseller ON orders(reseller_user_id, id DESC)",
+  );
+  database.exec(
+    "CREATE INDEX IF NOT EXISTS idx_ps_provider ON provider_services(provider, platform, provider_enabled)",
   );
 
   // La fecha de término no existía: para los pedidos que ya estaban

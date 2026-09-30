@@ -7,9 +7,17 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
--- Espejo del catálogo del proveedor (honestsmm). Se refresca con "Sincronizar".
+-- Espejo del catálogo de los proveedores. Se refresca con "Sincronizar".
+--
+-- Hay más de un proveedor y sus números de servicio chocan entre sí (los dos
+-- tienen un servicio 1). Por eso service_id es un número propio de la tienda:
+-- el del proveedor principal queda igual y el de los demás se corre por un
+-- desplazamiento fijo (ver PROVEEDORES en provider.ts). Lo que se le manda a
+-- cada API es remote_id.
 CREATE TABLE IF NOT EXISTS provider_services (
   service_id           INTEGER PRIMARY KEY,
+  provider             TEXT    NOT NULL DEFAULT 'honestsmm',
+  remote_id            INTEGER,
   name                 TEXT    NOT NULL,
   clean_name           TEXT    NOT NULL,
   category             TEXT    NOT NULL,
@@ -118,6 +126,22 @@ CREATE INDEX IF NOT EXISTS idx_products_type ON products(platform, service_type,
 -- El índice por nivel (idx_products_level) se crea en db.ts, después de las
 -- migraciones: este archivo se ejecuta también sobre bases que ya existen, y
 -- ahí la tabla todavía no tiene la columna `level`. Ver migrate().
+
+-- El servicio de referencia que tuvo cada producto con cada proveedor.
+--
+-- Al cambiar una red de proveedor, cada producto pasa a un servicio
+-- equivalente del nuevo. Esto guarda el que tenía antes, para que al volver
+-- recupere exactamente el mismo y no uno "parecido". También si estaba
+-- publicado: un nivel que el nuevo proveedor no tiene se oculta, y al volver
+-- tiene que reaparecer.
+CREATE TABLE IF NOT EXISTS product_provider_refs (
+  product_id  INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  provider    TEXT    NOT NULL,
+  service_id  INTEGER NOT NULL,
+  published   INTEGER NOT NULL DEFAULT 1,
+  updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (product_id, provider)
+);
 
 -- Packs de cantidad que ve el cliente (100, 250, 500, 1000...).
 CREATE TABLE IF NOT EXISTS product_tiers (

@@ -7,6 +7,7 @@ import { platformLabel, serviceTypeLabel, PLATFORM_PRIORITY } from "./labels";
 import { formatDuration, minutosDeEntrega } from "./pricing";
 import { SUPPORTED_ORDER_KINDS, ROUTABLE_GEOS } from "./quality.mjs";
 import { slugify } from "./utils";
+import { sqlProveedorActivo } from "./proveedor-por-red";
 
 /**
  * Publicación automática del catálogo por niveles.
@@ -37,12 +38,16 @@ type Combinacion = { platform: string; service_type: string; order_kind: string 
 const geoMarks = ROUTABLE_GEOS.map(() => "?").join(",");
 const kindMarks = SUPPORTED_ORDER_KINDS.map(() => "?").join(",");
 
-/** Todo lo que el proveedor permite vender hoy, agrupado como se publica. */
+/**
+ * Todo lo que el proveedor permite vender hoy, agrupado como se publica.
+ * Cada red se mira en el catálogo del proveedor que la atiende.
+ */
 export function combinacionesVendibles(platform?: string): Combinacion[] {
   return all<Combinacion>(
     `SELECT platform, service_type, order_kind
        FROM provider_services
       WHERE provider_enabled = 1 AND variant = '' AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND geo IN (${geoMarks}) AND order_kind IN (${kindMarks})
         ${platform ? "AND platform = ?" : ""}
       GROUP BY platform, service_type, order_kind

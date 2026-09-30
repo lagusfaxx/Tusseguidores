@@ -2,7 +2,7 @@ import { getSettings } from "@/lib/settings";
 import { DEFAULT_MIN_RATES, parseMinRates } from "@/lib/pricing";
 import { SERVICE_TYPE_OPTIONS } from "@/lib/labels";
 import { SettingsForm } from "@/components/settings-form";
-import { providerConfigured, provider } from "@/lib/provider";
+import { clienteProveedor, providerConfigured, type ProveedorId } from "@/lib/provider";
 import { config as flowConfig } from "@/lib/flow";
 import { emailConfig } from "@/lib/email";
 
@@ -11,17 +11,17 @@ export const dynamic = "force-dynamic";
 export default async function AdminSettingsPage() {
   const settings = getSettings();
 
-  // Mostramos el saldo del proveedor si la key ya está configurada.
-  let balance: string | null = null;
-  let balanceError: string | null = null;
-  if (providerConfigured()) {
+  // Mostramos el saldo de cada proveedor que ya tiene su key configurada.
+  const saldo = async (id: ProveedorId): Promise<{ balance: string | null; error: string | null }> => {
+    if (!providerConfigured(id)) return { balance: null, error: null };
     try {
-      const result = await provider.balance();
-      balance = `US$${Number(result.balance).toFixed(2)}`;
+      const result = await clienteProveedor(id).balance();
+      return { balance: `US$${Number(result.balance).toFixed(2)}`, error: null };
     } catch (error) {
-      balanceError = error instanceof Error ? error.message : "No se pudo consultar el saldo.";
+      return { balance: null, error: error instanceof Error ? error.message : "No se pudo consultar el saldo." };
     }
-  }
+  };
+  const [principal, jap] = await Promise.all([saldo("honestsmm"), saldo("jap")]);
 
   const flow = flowConfig();
   const email = emailConfig();
@@ -48,11 +48,14 @@ export default async function AdminSettingsPage() {
         <SettingsForm
           settings={settings}
           minRates={minRates}
-          providerBalance={balance}
-          providerBalanceError={balanceError}
+          providerBalance={principal.balance}
+          providerBalanceError={principal.error}
+          japBalance={jap.balance}
+          japBalanceError={jap.error}
           flowSandbox={flow.sandbox}
           flowForcedByEnv={flow.forcedByEnv}
           providerKeyFromEnv={Boolean((process.env.PROVIDER_API_KEY ?? "").trim())}
+          japKeyFromEnv={Boolean((process.env.JAP_API_KEY ?? "").trim())}
           resendKeyFromEnv={email.keyFromEnv}
         />
       </div>

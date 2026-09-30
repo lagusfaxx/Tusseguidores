@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser, hashPassword } from "@/lib/auth";
 import { all, db, get, run, rescoreServices } from "@/lib/db";
 import { setSettings, invalidateSettings, getBoolSetting } from "@/lib/settings";
-import { provider, providerConfigured, ProviderError } from "@/lib/provider";
+import { algunProveedorConfigurado } from "@/lib/provider";
 import { testCredentials } from "@/lib/flow";
 import { testEmail } from "@/lib/email";
 import { detectPlatform, detectServiceType, normalizeText } from "@/lib/taxonomy.mjs";
@@ -15,14 +15,15 @@ import {
 } from "@/lib/quality.mjs";
 import {
   sendToProvider, setStatus, setStatusManual, markDispatchedManually, syncOpenOrders, logEvent,
-  markPaid, retryUndispatched, ensureTargets, getOrderById,
+  markPaid, retryUndispatched, ensureTargets, getOrderById, pedidoEnProveedor,
 } from "@/lib/orders";
 import { separarDestinos } from "@/lib/targets";
 import { sanitizeHtml, slugify } from "@/lib/utils";
 import { buildCopy } from "@/lib/copy.mjs";
 import { findOffer, ladderFor } from "@/lib/offers";
 import { publicarNiveles, refrescarEtiquetasDeEntrega } from "@/lib/autolevels";
-import { guardarCatalogo } from "@/lib/catalog-sync";
+import { resumirSincronizacion, sincronizarProveedores } from "@/lib/catalog-sync";
+import { cambiarProveedorDeRed, describirCambio } from "@/lib/cambio-proveedor";
 import { movimiento } from "@/lib/wallet";
 import { acreditar, rechazar } from "@/lib/topups";
 import { reembolsar } from "@/lib/reseller-orders";
@@ -96,6 +97,7 @@ const SETTING_KEYS = [
   "usd_clp", "margin_percent", "price_rounding", "min_price_clp", "margin_reference",
   "auto_levels",
   "provider_url", "provider_key", "auto_send_to_provider", "low_balance_usd",
+  "jap_url", "jap_key",
   "email_enabled", "resend_api_key", "email_from", "email_reply_to", "email_admin",
   "email_admin_alerts", "email_admin_new_orders",
   "reseller_enabled", "reseller_margin_percent", "reseller_min_topup_clp",
@@ -107,7 +109,7 @@ const SETTING_KEYS = [
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",
   "rating_enabled", "rating_value", "rating_count",
-  "cron_secret", "orders_enabled", "mcp_token",
+  "cron_secret", "orders_enabled", "mcp_token", "auto_mantenimiento", "auto_sync_catalog_hours",
 ];
 
 export async function saveSettings(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -133,7 +135,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
     "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
-    "reseller_enabled", "rating_enabled",
+    "reseller_enabled", "rating_enabled", "auto_mantenimiento",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -544,25 +546,21 @@ export async function orderAction(formData: FormData) {
       const sent = await setStatusManual(id, status);
       if (sent && !sent.ok) throw new Error(sent.error);
     } else if (action === "refill") {
-      const order = get<{ provider_order_id: number | null }>(
-        "SELECT provider_order_id FROM orders WHERE id = ?", [id],
-      );
-      if (order?.provider_order_id) {
+      const enviado = pedidoEnProveedor(id);
+      if (enviado) {
         try {
-          const result = await provider.refill(order.provider_order_id);
-          logEvent(id, "refill", `Reposición solicitada al proveedor (ID ${result.refill}).`);
+          const result = await enviado.cliente.refill(enviado.providerOrderId);
+          logEvent(id, "refill", `Reposición solicitada a ${enviado.cliente.nombre} (ID ${result.refill}).`);
         } catch (error) {
           logEvent(id, "error", `No se pudo pedir la reposición: ${(error as Error).message}`);
         }
       }
     } else if (action === "cancel") {
-      const order = get<{ provider_order_id: number | null }>(
-        "SELECT provider_order_id FROM orders WHERE id = ?", [id],
-      );
-      if (order?.provider_order_id) {
+      const enviado = pedidoEnProveedor(id);
+      if (enviado) {
         try {
-          await provider.cancel([order.provider_order_id]);
-          logEvent(id, "cancel", "Cancelación solicitada al proveedor.");
+          await enviado.cliente.cancel([enviado.providerOrderId]);
+          logEvent(id, "cancel", `Cancelación solicitada a ${enviado.cliente.nombre}.`);
         } catch (error) {
           logEvent(id, "error", `No se pudo cancelar: ${(error as Error).message}`);
         }
@@ -760,15 +758,12 @@ export async function reposicionDesdeTicket(formData: FormData) {
   await withErrorRedirect(`/admin/tickets/${id}`, async () => {
     await guard();
     const orderId = Number(formData.get("order_id"));
-    const order = get<{ provider_order_id: number | null; code: string }>(
-      "SELECT provider_order_id, code FROM orders WHERE id = ?",
-      [orderId],
-    );
-    if (!order?.provider_order_id) throw new Error("Ese pedido nunca salió al proveedor.");
+    const enviado = pedidoEnProveedor(orderId);
+    if (!enviado) throw new Error("Ese pedido nunca salió al proveedor.");
 
     try {
-      const result = await provider.refill(order.provider_order_id);
-      logEvent(orderId, "refill", `Reposición solicitada al proveedor (ID ${result.refill}).`);
+      const result = await enviado.cliente.refill(enviado.providerOrderId);
+      logEvent(orderId, "refill", `Reposición solicitada a ${enviado.cliente.nombre} (ID ${result.refill}).`);
       agregarMensaje(id, "admin", `Pedimos la reposición al proveedor (referencia ${result.refill}).`);
     } catch (error) {
       const mensaje = (error as Error).message;
@@ -782,24 +777,14 @@ export async function reposicionDesdeTicket(formData: FormData) {
 // -------------------------------------------------- catálogo del proveedor
 export async function syncProviderCatalog(_prev: ActionState): Promise<ActionState> {
   await guard();
-  if (!providerConfigured()) {
+  if (!algunProveedorConfigurado()) {
     return { error: "Primero guarda la API key del proveedor en Ajustes." };
   }
 
-  let rows: Awaited<ReturnType<typeof provider.services>>;
-  try {
-    rows = await provider.services();
-  } catch (error) {
-    return {
-      error: error instanceof ProviderError
-        ? `El proveedor respondió: ${error.message}`
-        : "No se pudo conectar con el proveedor.",
-    };
-  }
-  if (!Array.isArray(rows)) return { error: "El proveedor devolvió una respuesta inesperada." };
-
-  // Guardar lo que llegó es trabajo compartido con el MCP: una sola copia.
-  const { activos, bajas, productosRotos } = guardarCatalogo(rows);
+  // Pedir y guardar el catálogo es trabajo compartido con el MCP: una sola
+  // copia, que recorre todos los proveedores con clave.
+  const resultados = await sincronizarProveedores();
+  if (!resultados.some((r) => r.ok)) return { error: resumirSincronizacion(resultados) };
 
   invalidateSettings();
 
@@ -815,12 +800,27 @@ export async function syncProviderCatalog(_prev: ActionState): Promise<ActionSta
   refreshStore();
   revalidatePath("/admin/catalogo");
   revalidatePath("/admin/productos");
+  revalidatePath("/admin/proveedores");
 
-  return {
-    ok: `Catálogo sincronizado: ${activos} servicios activos, ${bajas} dados de baja.` +
-      niveles +
-      (productosRotos ? ` Atención: ${productosRotos} producto(s) publicado(s) apuntan a servicios que el proveedor desactivó.` : ""),
-  };
+  return { ok: `Catálogo sincronizado. ${resumirSincronizacion(resultados)}.${niveles}` };
+}
+
+/**
+ * El interruptor de /admin/proveedores: pasa una red a otro proveedor.
+ * Los productos de esa red se reasignan y sus precios se recalculan solos.
+ */
+export async function cambiarProveedor(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await guard();
+  const platform = String(formData.get("platform") ?? "").trim();
+  const proveedor = String(formData.get("proveedor") ?? "").trim();
+  const cambio = cambiarProveedorDeRed(platform, proveedor);
+  if (!cambio.ok) return { error: cambio.error };
+
+  refreshStore();
+  revalidatePath("/admin/proveedores");
+  revalidatePath("/admin/productos");
+  revalidatePath("/admin/catalogo");
+  return { ok: describirCambio(cambio.resultado) };
 }
 
 /**

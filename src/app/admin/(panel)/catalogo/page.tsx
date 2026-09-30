@@ -6,6 +6,7 @@ import { serviceTypeLabel, PLATFORM_OPTIONS, SERVICE_TYPE_OPTIONS } from "@/lib/
 import { formatClp, formatNumber, pricingContext, priceBreakdown } from "@/lib/pricing";
 import { cantidadDeReferencia } from "@/lib/offers";
 import { formatDateCl } from "@/lib/utils";
+import { LISTA_PROVEEDORES, nombreProveedor } from "@/lib/provider";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ const PAGE_SIZE = 50;
 
 type Row = {
   service_id: number;
+  provider: string;
+  remote_id: number | null;
   clean_name: string;
   category: string;
   platform: string;
@@ -47,17 +50,22 @@ function ScoreBar({ value }: { value: number }) {
 export default async function AdminCatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; red?: string; tipo?: string; estado?: string; p?: string; error?: string }>;
+  searchParams: Promise<{
+    q?: string; red?: string; tipo?: string; estado?: string; prov?: string; p?: string; error?: string;
+  }>;
 }) {
-  const { q, red, tipo, estado, p, error } = await searchParams;
+  const { q, red, tipo, estado, prov, p, error } = await searchParams;
   const page = Math.max(1, Number(p) || 1);
 
   const where: string[] = [];
   const params: unknown[] = [];
   if (q?.trim()) {
-    where.push("(s.clean_name LIKE ? OR s.name LIKE ? OR CAST(s.service_id AS TEXT) = ?)");
-    params.push(`%${q.trim()}%`, `%${q.trim()}%`, q.trim());
+    where.push(
+      "(s.clean_name LIKE ? OR s.name LIKE ? OR CAST(s.service_id AS TEXT) = ? OR CAST(s.remote_id AS TEXT) = ?)",
+    );
+    params.push(`%${q.trim()}%`, `%${q.trim()}%`, q.trim(), q.trim());
   }
+  if (prov) { where.push("s.provider = ?"); params.push(prov); }
   if (red) { where.push("s.platform = ?"); params.push(red); }
   if (tipo) { where.push("s.service_type = ?"); params.push(tipo); }
   if (estado === "baja") where.push("s.provider_enabled = 0");
@@ -99,6 +107,7 @@ export default async function AdminCatalogPage({
     if (red) sp.set("red", red);
     if (tipo) sp.set("tipo", tipo);
     if (estado) sp.set("estado", estado);
+    if (prov) sp.set("prov", prov);
     for (const [key, value] of Object.entries(extra)) sp.set(key, String(value));
     return `/admin/catalogo?${sp}`;
   };
@@ -136,6 +145,12 @@ export default async function AdminCatalogPage({
             <option key={option.slug} value={option.slug}>{option.label}</option>
           ))}
         </select>
+        <select name="prov" defaultValue={prov ?? ""} className="field max-w-[170px]">
+          <option value="">Todos los proveedores</option>
+          {LISTA_PROVEEDORES.map((def) => (
+            <option key={def.id} value={def.id}>{def.nombre}</option>
+          ))}
+        </select>
         <select name="estado" defaultValue={estado ?? ""} className="field max-w-[150px]">
           <option value="">Activos</option>
           <option value="enrutables">Solo enrutables</option>
@@ -158,7 +173,10 @@ export default async function AdminCatalogPage({
           <tbody>
             {rows.map((row) => (
               <tr key={row.service_id} className={row.provider_enabled ? "" : "opacity-50"}>
-                <td className="font-mono text-xs">{row.service_id}</td>
+                <td className="font-mono text-xs">
+                  {row.remote_id ?? row.service_id}
+                  <div className="font-sans text-[10px] text-ink-400">{nombreProveedor(row.provider)}</div>
+                </td>
                 <td className="max-w-[300px] min-w-[200px]">
                   <div className="truncate">{row.clean_name}</div>
                   <div className="truncate text-[11px] text-ink-400">{row.category}</div>

@@ -1,6 +1,7 @@
 import "server-only";
 import { all, get } from "../db";
-import { cachedBalance } from "../provider";
+import { cachedBalance, proveedoresConfigurados, PROVEEDORES } from "../provider";
+import { mapaProveedorPorRed } from "../proveedor-por-red";
 import { getSettings } from "../settings";
 import { formatClp } from "../pricing";
 import { reposicionDelPedido, textoDeGarantia } from "../refill";
@@ -77,6 +78,15 @@ export function resumenDeTienda() {
     soporte,
     saldo_proveedor_usd: saldo.usd,
     saldo_consultado: saldo.at,
+    // Uno por proveedor con clave, y qué redes atiende cada uno fuera del principal.
+    saldos_por_proveedor: proveedoresConfigurados().map((id) => ({
+      proveedor: PROVEEDORES[id].nombre,
+      saldo_usd: cachedBalance(id).usd,
+      consultado: cachedBalance(id).at,
+    })),
+    redes_con_otro_proveedor: Object.fromEntries(
+      Object.entries(mapaProveedorPorRed()).map(([red, id]) => [red, PROVEEDORES[id].nombre]),
+    ),
     tienda_abierta: settings.orders_enabled === "1",
     productos_sin_servicio: rotos,
   };

@@ -31,20 +31,32 @@ Tienda de servicios para redes sociales conectada a la API del proveedor
    crea tu usuario de administrador.
 5. Entra a `https://tusseguidores.cl/admin` y **cambia la contraseña**.
 
-### Cron de seguimiento de pedidos
+### Mantenimiento automático (sin cron)
 
-Define una clave en **Ajustes → Operación** (o la variable `CRON_SECRET`) y
-programa en Coolify una tarea cada 10 minutos:
+El servidor trae su propio reloj (`src/instrumentation.ts`): arranca con la
+tienda y cada 10 minutos, sin configurar nada:
+
+- reintenta los pedidos pagados que no alcanzaron a salir al proveedor (al
+  recargar saldo, salen solos);
+- actualiza el estado de los pedidos en curso con cada proveedor;
+- consulta el saldo de los proveedores;
+- cada 6 horas baja el catálogo de todos los proveedores, **recalcula la
+  calidad** de cada servicio y reacomoda los niveles.
+
+Se ajusta en **Ajustes → Operación**: la casilla lo apaga y el campo de horas
+cambia cada cuánto se baja el catálogo (0 = solo a mano).
+
+El cron externo ya no hace falta, pero sigue funcionando si lo tienes: define
+una clave en **Ajustes → Operación** (o `CRON_SECRET`) y llama a
 
 ```
 curl -fsS "https://tusseguidores.cl/api/cron/sincronizar?key=TU_CLAVE"
 ```
 
-Ese cron hace dos cosas: reintenta los pedidos pagados que no alcanzaron a
-salir al proveedor y actualiza el avance de los que ya están en curso. **No es
-opcional**: es lo que rescata los pedidos que quedaron atascados.
+Agrega `&catalogo=1` para forzar también la bajada del catálogo. El reloj y el
+cron comparten un candado, así que no se pisan.
 
-Aparte del cron, la página de seguimiento le pregunta al proveedor por ese
+Aparte de eso, la página de seguimiento le pregunta al proveedor por ese
 pedido cuando alguien la abre, y se refresca sola cada 20 segundos mientras la
 entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
 había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se
@@ -320,6 +332,42 @@ servicio que realmente se va a usar, no las del de referencia.
 Todo esto se ve y se ajusta por producto en **Panel → Productos → Elección del
 servicio**, que muestra a qué servicio se enviaría un pedido hecho ahora mismo y
 las alternativas que se consideraron.
+
+### Dos proveedores: honestsmm y JustAnotherPanel
+
+La tienda puede trabajar con dos proveedores a la vez. Los dos hablan el mismo
+protocolo (API v2), así que es el mismo cliente con otra URL y otra clave.
+
+1. Guarda la API key de JustAnotherPanel en **Ajustes → Proveedor 2** (o en la
+   variable `JAP_API_KEY`).
+2. En **Panel → Proveedores**, pulsa **Sincronizar con los proveedores**: baja
+   los dos catálogos. Uno que falla no frena al otro.
+3. En la misma pantalla, cada red tiene un interruptor. Al pasar Instagram a
+   JustAnotherPanel:
+   - los productos por niveles se rearman con su catálogo (el económico pasa a
+     ser su servicio más barato, el premium el mejor);
+   - los productos hechos a mano pasan a su servicio más parecido (mismo tipo,
+     subtipo y forma de pedido; retención, velocidad y reposición más
+     cercanas);
+   - los precios se recalculan solos, porque salen del costo del servicio de
+     referencia. Ojo: donde manda el piso por cada 1.000 (casi todo lo barato)
+     el precio no se mueve aunque el costo cambie. Los productos con precio
+     manual tampoco;
+   - los pedidos nuevos de Instagram salen a JustAnotherPanel, y el panel
+     mayorista pasa a mostrar sus servicios de Instagram;
+   - lo que JustAnotherPanel no tiene se queda con honestsmm y la pantalla lo
+     avisa.
+4. Los pedidos que ya salieron siguen con el proveedor al que se mandaron: el
+   seguimiento, las reposiciones y las cancelaciones le preguntan a ese.
+
+Volver al proveedor anterior deja cada producto exactamente como estaba: la
+tienda anota el servicio que tenía y si estaba publicado antes de moverlo.
+
+Los números de servicio de los dos proveedores se repiten (los dos tienen un
+servicio 1), así que la tienda guarda los de JustAnotherPanel corridos en
+10.000.000 (`provider_services.service_id`) y a su API le manda el número
+original (`remote_id`). El catálogo del panel muestra el número original y de
+qué proveedor es.
 
 ### Dos formas de pagar
 

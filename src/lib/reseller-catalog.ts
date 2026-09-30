@@ -3,6 +3,7 @@ import { all, get } from "./db";
 import { resellerContext, resellerPriceClp, resellerRatePer1000 } from "./pricing";
 import { SUPPORTED_ORDER_KINDS } from "./quality.mjs";
 import { PLATFORM_PRIORITY, serviceTypeOrder } from "./labels";
+import { sqlProveedorActivo } from "./proveedor-por-red";
 import type { ProviderService } from "./types";
 
 /**
@@ -13,6 +14,10 @@ import type { ProviderService } from "./types";
  * panel SMM. No hay enrutado automático: lo que pide es exactamente lo que se
  * despacha, y por eso puede comparar dos servicios de la misma categoría y
  * quedarse con el que más le sirve.
+ *
+ * Solo se muestran los servicios del proveedor que atiende cada red (ver
+ * /admin/proveedores): si Instagram está con JustAnotherPanel, el mayorista ve
+ * los de JustAnotherPanel, igual que la tienda.
  *
  * Solo se muestran las formas de pedido que sabemos atender de punta a punta:
  * cantidad + enlace, y comentarios personalizados. Ofrecer una encuesta o una
@@ -51,6 +56,7 @@ function condiciones(filtro: FiltroCatalogo): { clause: string; params: unknown[
   const where = [
     "s.provider_enabled = 1",
     "s.rate_usd_per_1000 > 0",
+    sqlProveedorActivo("s"),
     `s.order_kind IN (${MARCAS})`,
   ];
   const params: unknown[] = [...FORMAS_SOPORTADAS];
@@ -102,6 +108,7 @@ export function servicioVendible(serviceId: number): ProviderService | undefined
   return get<ProviderService>(
     `SELECT * FROM provider_services
       WHERE service_id = ? AND provider_enabled = 1 AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND order_kind IN (${MARCAS})`,
     [serviceId, ...FORMAS_SOPORTADAS],
   );
@@ -121,6 +128,7 @@ export function redesDelPanel(): { platform: string; n: number }[] {
   return all<{ platform: string; n: number }>(
     `SELECT platform, COUNT(*) AS n FROM provider_services
       WHERE provider_enabled = 1 AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND order_kind IN (${MARCAS})
       GROUP BY platform ORDER BY ${ORDEN_REDES.replace(/s\./g, "")}, n DESC`,
     [...FORMAS_SOPORTADAS],
@@ -131,6 +139,7 @@ export function tiposDelPanel(): { service_type: string; n: number }[] {
   return all<{ service_type: string; n: number }>(
     `SELECT service_type, COUNT(*) AS n FROM provider_services
       WHERE provider_enabled = 1 AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND order_kind IN (${MARCAS})
       GROUP BY service_type ORDER BY n DESC`,
     [...FORMAS_SOPORTADAS],
@@ -181,6 +190,7 @@ export function resumenDeRedes(discountPercent = 0): ResumenRed[] {
             SUM(CASE WHEN refill = 1 OR refill_days > 0 THEN 1 ELSE 0 END) AS refills
        FROM provider_services
       WHERE provider_enabled = 1 AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND order_kind IN (${MARCAS})
       GROUP BY platform`,
     [...FORMAS_SOPORTADAS],
@@ -230,6 +240,7 @@ export function serviciosPorCategoria(
   const filas = all<ProviderService>(
     `SELECT * FROM provider_services
       WHERE provider_enabled = 1 AND rate_usd_per_1000 > 0
+        AND ${sqlProveedorActivo("")}
         AND order_kind IN (${MARCAS}) AND platform = ?
       ORDER BY service_type,
                (drop_score * 0.55 + speed_score * 0.45) DESC, rate_usd_per_1000`,

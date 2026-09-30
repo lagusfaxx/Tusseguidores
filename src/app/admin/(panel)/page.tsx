@@ -10,7 +10,9 @@ import { flowConfigured } from "@/lib/flow";
 import { emailConfigured } from "@/lib/email";
 import { contarRecargasPorConfirmar } from "@/lib/topups";
 import { contarTicketsAbiertos } from "@/lib/tickets";
-import { providerConfigured, cachedBalance, refreshBalance } from "@/lib/provider";
+import {
+  algunProveedorConfigurado, cachedBalance, proveedoresConfigurados, PROVEEDORES, refreshBalances,
+} from "@/lib/provider";
 import type { Order } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +21,13 @@ export default async function AdminDashboard() {
   const stats = orderStats();
   const ctx = pricingContext();
   // El saldo se refresca aquí y queda guardado para las demás pantallas.
-  await refreshBalance();
-  const balance = cachedBalance();
+  await refreshBalances();
+  const saldos = proveedoresConfigurados().map((id) => ({
+    id,
+    nombre: PROVEEDORES[id].nombre,
+    usd: cachedBalance(id).usd,
+  }));
+  const conSaldo = saldos.filter((s) => s.usd != null);
   const settings = getSettings();
   const recent = all<Order>("SELECT * FROM orders ORDER BY id DESC LIMIT 8");
 
@@ -67,12 +74,15 @@ export default async function AdminDashboard() {
       href: "/admin/pedidos?estado=sin-enviar",
       urgente: true,
     },
-    balance.usd != null && balance.usd <= lowBalance && {
-      text: `Te queda US$${balance.usd.toFixed(2)} de saldo en el proveedor. Recarga antes de que se caigan las entregas.`,
-      href: "/admin/ajustes",
-      urgente: true,
-    },
-    !providerConfigured() && {
+    ...saldos.map(
+      (saldo) =>
+        saldo.usd != null && saldo.usd <= lowBalance && {
+          text: `Te queda US$${saldo.usd.toFixed(2)} de saldo en ${saldo.nombre}. Recarga antes de que se caigan las entregas.`,
+          href: "/admin/proveedores",
+          urgente: true,
+        },
+    ),
+    !algunProveedorConfigurado() && {
       text: "Falta la API key del proveedor: los pedidos pagados no se enviarán solos.",
       href: "/admin/ajustes",
     },
@@ -129,10 +139,13 @@ export default async function AdminDashboard() {
           { label: "Ventas de hoy", value: formatClp(stats.revenueToday), hint: `${stats.today} pedidos hoy` },
           { label: "Margen estimado", value: `${margin}%`, hint: `Costo ${formatClp(costClp)}` },
           {
-            label: "Saldo del proveedor",
-            value: balance.usd != null ? `US$${balance.usd.toFixed(2)}` : "—",
-            hint: balance.usd != null
-              ? `${formatNumber(stats.processing)} pedidos en proceso`
+            label: conSaldo.length > 1 ? "Saldo de los proveedores" : "Saldo del proveedor",
+            value: conSaldo.length
+              ? conSaldo.map((s) => `US$${s.usd!.toFixed(2)}`).join(" · ")
+              : "—",
+            hint: conSaldo.length
+              ? (conSaldo.length > 1 ? `${conSaldo.map((s) => s.nombre).join(" · ")} — ` : "") +
+                `${formatNumber(stats.processing)} pedidos en proceso`
               : "Configura la API key para verlo",
           },
         ].map((card) => (

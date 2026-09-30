@@ -183,7 +183,8 @@ export function crearServidor(): McpServer {
     {
       title: "Sincronizar con el proveedor",
       description:
-        "Baja el catálogo del proveedor y actualiza precios, rangos y bajas. Es lo que hay que " +
+        "Baja el catálogo de cada proveedor configurado (honestsmm y JustAnotherPanel) y actualiza " +
+        "precios, rangos y bajas. Es lo que hay que " +
         "correr cuando los precios están viejos o un servicio dejó de existir. Repetirlo no hace daño.",
       inputSchema: {},
       annotations: { ...OPERACION, idempotentHint: true },

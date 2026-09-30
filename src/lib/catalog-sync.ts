@@ -1,6 +1,9 @@
 import "server-only";
 import { all, db, get, run } from "./db";
-import type { ProviderServiceRow } from "./provider";
+import {
+  clienteProveedor, idInterno, proveedoresConfigurados, ProviderError, PROVEEDORES,
+  type ProveedorId, type ProviderServiceRow,
+} from "./provider";
 import { detectPlatform, detectServiceType, normalizeText } from "./taxonomy.mjs";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant,
@@ -26,7 +29,10 @@ export type ResultadoSincronizacion = {
   productosRotos: number;
 };
 
-export function guardarCatalogo(rows: ProviderServiceRow[]): ResultadoSincronizacion {
+export function guardarCatalogo(
+  proveedor: ProveedorId,
+  rows: ProviderServiceRow[],
+): ResultadoSincronizacion {
   // La API de servicios no devuelve el tiempo promedio, así que conservamos el
   // que ya teníamos: es mejor señal de velocidad que el nombre del servicio.
   const knownAvg = new Map(
@@ -37,13 +43,14 @@ export function guardarCatalogo(rows: ProviderServiceRow[]): ResultadoSincroniza
 
   const upsert = db.prepare(`
     INSERT INTO provider_services
-      (service_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
+      (service_id, provider, remote_id, name, clean_name, category, platform, service_type, rate_usd_per_1000,
        min_qty, max_qty, refill, cancel, refill_days, drop_score, speed_score, geo, variant,
        order_kind, start_minutes, provider_enabled, synced_at)
-    VALUES (@service_id, @name, @clean_name, @category, @platform, @service_type, @rate,
+    VALUES (@service_id, @provider, @remote_id, @name, @clean_name, @category, @platform, @service_type, @rate,
             @min_qty, @max_qty, @refill, @cancel, @refill_days, @drop_score, @speed_score,
             @geo, @variant, @order_kind, @start_minutes, 1, datetime('now'))
     ON CONFLICT(service_id) DO UPDATE SET
+      provider = excluded.provider, remote_id = excluded.remote_id,
       name = excluded.name, clean_name = excluded.clean_name, category = excluded.category,
       platform = excluded.platform, service_type = excluded.service_type,
       rate_usd_per_1000 = excluded.rate_usd_per_1000,
@@ -58,14 +65,17 @@ export function guardarCatalogo(rows: ProviderServiceRow[]): ResultadoSincroniza
   const seen: number[] = [];
   const apply = db.transaction(() => {
     for (const row of rows) {
-      const serviceId = Number(row.service);
-      if (!serviceId) continue;
+      const remoto = Number(row.service);
+      if (!remoto) continue;
+      const serviceId = idInterno(proveedor, remoto);
       seen.push(serviceId);
       const clean = normalizeText(row.name);
       const days = refillDaysFromName(clean);
       const serviceType = detectServiceType(row.name, row.category);
       upsert.run({
         service_id: serviceId,
+        provider: proveedor,
+        remote_id: remoto,
         name: row.name,
         clean_name: clean,
         category: normalizeText(row.category) || String(row.category ?? ""),
@@ -88,23 +98,76 @@ export function guardarCatalogo(rows: ProviderServiceRow[]): ResultadoSincroniza
       });
     }
     // Lo que el proveedor ya no lista queda deshabilitado, no se borra: así los
-    // pedidos históricos conservan su referencia.
+    // pedidos históricos conservan su referencia. Solo se mira su propio
+    // catálogo: sincronizar uno no puede apagar los servicios del otro.
     if (seen.length) {
       const marks = seen.map(() => "?").join(",");
-      run(`UPDATE provider_services SET provider_enabled = 0 WHERE service_id NOT IN (${marks})`, seen);
+      run(
+        `UPDATE provider_services SET provider_enabled = 0
+          WHERE provider = ? AND service_id NOT IN (${marks})`,
+        [proveedor, ...seen],
+      );
     }
   });
   apply();
 
   const disabled = get<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM provider_services WHERE provider_enabled = 0",
+    "SELECT COUNT(*) AS n FROM provider_services WHERE provider = ? AND provider_enabled = 0",
+    [proveedor],
   )?.n ?? 0;
   const affected = get<{ n: number }>(
     `SELECT COUNT(*) AS n FROM products p
        JOIN provider_services s ON s.service_id = p.provider_service_id
-      WHERE p.published = 1 AND s.provider_enabled = 0`,
+      WHERE p.published = 1 AND s.provider_enabled = 0 AND s.provider = ?`,
+    [proveedor],
   )?.n ?? 0;
 
-
   return { activos: seen.length, bajas: disabled, productosRotos: affected };
+}
+
+export type SincronizacionDeProveedor =
+  | ({ proveedor: ProveedorId; nombre: string; ok: true } & ResultadoSincronizacion)
+  | { proveedor: ProveedorId; nombre: string; ok: false; error: string };
+
+/**
+ * Pide el catálogo a cada proveedor configurado y lo guarda.
+ *
+ * Uno que falla no frena al otro: si JustAnotherPanel no responde, el
+ * catálogo de honestsmm se actualiza igual y el error queda en su fila.
+ */
+export async function sincronizarProveedores(): Promise<SincronizacionDeProveedor[]> {
+  const resultados: SincronizacionDeProveedor[] = [];
+  for (const proveedor of proveedoresConfigurados()) {
+    const nombre = PROVEEDORES[proveedor].nombre;
+    try {
+      const rows = await clienteProveedor(proveedor).services();
+      if (!Array.isArray(rows)) {
+        resultados.push({ proveedor, nombre, ok: false, error: "devolvió una respuesta inesperada." });
+        continue;
+      }
+      resultados.push({ proveedor, nombre, ok: true, ...guardarCatalogo(proveedor, rows) });
+    } catch (error) {
+      resultados.push({
+        proveedor,
+        nombre,
+        ok: false,
+        error: error instanceof ProviderError ? error.message : "no se pudo conectar.",
+      });
+    }
+  }
+  return resultados;
+}
+
+/** Una línea por proveedor, para mostrar en el panel. */
+export function resumirSincronizacion(resultados: SincronizacionDeProveedor[]): string {
+  return resultados
+    .map((r) =>
+      r.ok
+        ? `${r.nombre}: ${r.activos} servicios activos, ${r.bajas} dados de baja` +
+          (r.productosRotos
+            ? ` (atención: ${r.productosRotos} producto(s) publicado(s) apuntan a servicios desactivados)`
+            : "")
+        : `${r.nombre}: ${r.error}`,
+    )
+    .join(" · ");
 }

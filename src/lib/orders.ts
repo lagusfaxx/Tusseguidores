@@ -2,7 +2,10 @@ import "server-only";
 import { db, get, run, all } from "./db";
 import { getProductById } from "./catalog";
 import { pricingContext, priceCustomQuantity, costUsd, minutosDeEntrega } from "./pricing";
-import { provider, mapProviderStatus, ProviderError, providerConfigured } from "./provider";
+import {
+  algunProveedorConfigurado, clienteProveedor, mapProviderStatus, nombreProveedor, ProviderError,
+  providerConfigured, servicioRemoto, type ClienteProveedor, type ProveedorId,
+} from "./provider";
 import { getBoolSetting } from "./settings";
 import { orderCode } from "./utils";
 import { pickService } from "./routing";
@@ -493,17 +496,22 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
         "El pedido aún no está pagado. Confirma el pago (o cambia el estado a “Pagado”) y vuelve a intentarlo.",
     };
   }
-  if (!providerConfigured()) {
-    const message = "Falta configurar la API key del proveedor.";
-    run("UPDATE orders SET provider_error = ?, updated_at = datetime('now') WHERE id = ?", [message, orderId]);
-    logEvent(orderId, "error", message);
-    return { ok: false, error: message };
-  }
 
   // Volvemos a elegir el servicio justo antes de enviarlo: entre que el cliente
   // pagó y este momento el proveedor pudo haber desactivado uno o haber
   // habilitado otro mejor.
   const serviceId = resolveDispatchService(order);
+
+  // Cada servicio es de un proveedor, y a ese se le pide, con su número.
+  const { proveedor, remoto } = servicioRemoto(serviceId);
+  const nombre = nombreProveedor(proveedor);
+  if (!providerConfigured(proveedor)) {
+    const message = `Falta configurar la API key de ${nombre}.`;
+    run("UPDATE orders SET provider_error = ?, updated_at = datetime('now') WHERE id = ?", [message, orderId]);
+    logEvent(orderId, "error", message);
+    return { ok: false, error: message };
+  }
+  const cliente = clienteProveedor(proveedor);
 
   // Una publicación, un pedido del proveedor: es la única forma en que sabe
   // entregar. Los que ya salieron no se vuelven a mandar, así que reintentar
@@ -517,13 +525,13 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
     try {
       // Los comentarios personalizados van como texto y sin "quantity": el
       // proveedor cuenta las líneas.
-      const response = await provider.addOrder(
+      const response = await cliente.addOrder(
         destino.comments
-          ? { service: serviceId, link: destino.link, comments: destino.comments }
-          : { service: serviceId, link: destino.link, quantity: destino.quantity },
+          ? { service: remoto, link: destino.link, comments: destino.comments }
+          : { service: remoto, link: destino.link, quantity: destino.quantity },
       );
       const providerOrderId = Number(response.order);
-      if (!providerOrderId) throw new ProviderError("El proveedor no devolvió un número de pedido.");
+      if (!providerOrderId) throw new ProviderError(`${nombre} no devolvió un número de pedido.`);
 
       run(
         `UPDATE order_targets
@@ -537,9 +545,9 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
         orderId,
         "sent",
         total > 1
-          ? `Publicación ${destino.position + 1} de ${total} enviada al proveedor, ` +
-            `servicio #${serviceId} (pedido ${providerOrderId}): ${destino.link}`
-          : `Enviado al proveedor, servicio #${serviceId} (pedido ${providerOrderId}).`,
+          ? `Publicación ${destino.position + 1} de ${total} enviada a ${nombre}, ` +
+            `servicio #${remoto} (pedido ${providerOrderId}): ${destino.link}`
+          : `Enviado a ${nombre}, servicio #${remoto} (pedido ${providerOrderId}).`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Error desconocido del proveedor.";
@@ -553,8 +561,8 @@ export async function sendToProvider(orderId: number): Promise<SendResult> {
         "error",
         (total > 1 ? `Publicación ${destino.position + 1} de ${total}: ` : "") +
           (isFundsError(message)
-            ? `Sin saldo en el proveedor: ${message}. Se reintenta solo al recargar.`
-            : `No se pudo enviar al proveedor: ${message}`),
+            ? `Sin saldo en ${nombre}: ${message}. Se reintenta solo al recargar.`
+            : `No se pudo enviar a ${nombre}: ${message}`),
       );
       // Sin saldo el resto va a fallar igual: no gastamos más llamadas.
       if (isFundsError(message)) break;
@@ -649,6 +657,32 @@ export function refrescarDesdeDestinos(orderId: number): Order | undefined {
   return getOrderById(orderId);
 }
 
+/**
+ * A qué proveedor y con qué número preguntarle por un pedido ya enviado.
+ *
+ * Para reponer o cancelar desde el panel: se usa el primer destino que salió,
+ * que es el que el panel muestra como "pedido del proveedor".
+ */
+export function pedidoEnProveedor(
+  orderId: number,
+): { cliente: ClienteProveedor; providerOrderId: number } | null {
+  const fila = get<{ provider_order_id: number; service_id: number }>(
+    `SELECT t.provider_order_id, COALESCE(t.provider_service_id, o.provider_service_id) AS service_id
+       FROM order_targets t JOIN orders o ON o.id = t.order_id
+      WHERE t.order_id = ? AND t.provider_order_id IS NOT NULL
+      ORDER BY t.position, t.id LIMIT 1`,
+    [orderId],
+  ) ??
+    get<{ provider_order_id: number; service_id: number }>(
+      `SELECT provider_order_id, provider_service_id AS service_id FROM orders
+        WHERE id = ? AND provider_order_id IS NOT NULL`,
+      [orderId],
+    );
+  if (!fila) return null;
+  const { proveedor } = servicioRemoto(fila.service_id);
+  return { cliente: clienteProveedor(proveedor), providerOrderId: fila.provider_order_id };
+}
+
 /** ¿El proveedor rechazó el pedido por falta de saldo? */
 export function isFundsError(message: string): boolean {
   return /not enough funds|insufficient|balance|saldo|fondos/i.test(message);
@@ -681,23 +715,37 @@ export function undispatchedOrders(limit = 100): Order[] {
  * cron, así que en cuanto recargas el saldo salen solos, sin tocar nada.
  */
 export async function retryUndispatched(limit = 25): Promise<{ intentados: number; enviados: number }> {
-  if (!providerConfigured()) return { intentados: 0, enviados: 0 };
+  if (!algunProveedorConfigurado()) return { intentados: 0, enviados: 0 };
   const pending = undispatchedOrders(limit);
   let enviados = 0;
+  // Proveedores que ya dijeron que no tienen saldo en esta pasada. El resto de
+  // sus pedidos va a fallar igual; los del otro proveedor siguen saliendo.
+  const sinSaldo = new Set<ProveedorId>();
 
   for (const order of pending) {
+    const { proveedor } = servicioRemoto(order.provider_service_id);
+    if (sinSaldo.has(proveedor)) continue;
     const result = await sendToProvider(order.id);
     if (result.ok) {
       enviados++;
       continue;
     }
-    // Si es falta de saldo, el resto va a fallar igual: no insistimos.
-    if (isFundsError(result.error)) break;
+    if (isFundsError(result.error)) sinSaldo.add(proveedor);
   }
   return { intentados: pending.length, enviados };
 }
 
-type DestinoAbierto = { id: number; order_id: number; provider_order_id: number };
+type DestinoAbierto = {
+  id: number;
+  order_id: number;
+  provider_order_id: number;
+  /** Servicio con el que salió: dice a qué proveedor preguntarle. */
+  service_id: number;
+};
+
+/** Columnas de DestinoAbierto, para las dos consultas que lo arman. */
+const COLUMNAS_DESTINO = `t.id, t.order_id, t.provider_order_id,
+       COALESCE(t.provider_service_id, o.provider_service_id) AS service_id`;
 
 /**
  * Pregunta al proveedor por un grupo de destinos y guarda lo que responde.
@@ -706,14 +754,44 @@ type DestinoAbierto = { id: number; order_id: number; provider_order_id: number 
  * faltan. No hay porcentaje ni entregadas; lo demás se deduce de ahí.
  */
 async function actualizarDestinos(open: DestinoAbierto[]): Promise<number> {
-  const byProviderId = new Map(open.map((t) => [String(t.provider_order_id), t]));
   const pedidos = new Set(open.map((t) => t.order_id));
   let updated = 0;
 
+  // Los números de pedido son de cada proveedor y pueden repetirse entre
+  // ellos: se pregunta a cada uno por los suyos, por separado.
+  const porProveedor = new Map<ProveedorId, DestinoAbierto[]>();
+  for (const destino of open) {
+    const { proveedor } = servicioRemoto(destino.service_id);
+    porProveedor.set(proveedor, [...(porProveedor.get(proveedor) ?? []), destino]);
+  }
+  for (const [proveedor, destinos] of porProveedor) {
+    if (providerConfigured(proveedor)) {
+      await consultarDestinos(clienteProveedor(proveedor), destinos);
+    }
+  }
+
+  // Recién ahora se resume cada pedido: el cliente ve uno solo, con la suma de
+  // lo entregado en todas sus publicaciones.
+  for (const orderId of pedidos) {
+    const antes = getOrderById(orderId);
+    const despues = refrescarDesdeDestinos(orderId);
+    if (!antes || !despues || antes.status === despues.status) continue;
+    logEvent(orderId, despues.status, `Estado actualizado por el proveedor: ${despues.provider_status ?? despues.status}.`);
+    updated++;
+    if (despues.status === "completed" || despues.status === "partial") {
+      await notificarPedidoCompletado(despues, despues.status === "partial");
+    }
+  }
+  return updated;
+}
+
+/** Pregunta a un proveedor por sus destinos, de a 100, y guarda lo que responde. */
+async function consultarDestinos(cliente: ClienteProveedor, open: DestinoAbierto[]): Promise<void> {
+  const byProviderId = new Map(open.map((t) => [String(t.provider_order_id), t]));
   for (let i = 0; i < open.length; i += 100) {
     const batch = open.slice(i, i + 100).map((t) => t.provider_order_id);
     try {
-      const statuses = await provider.multiStatus(batch);
+      const statuses = await cliente.multiStatus(batch);
       for (const [providerId, info] of Object.entries(statuses)) {
         const destino = byProviderId.get(providerId);
         if (!destino || !info || info.error) continue;
@@ -735,20 +813,6 @@ async function actualizarDestinos(open: DestinoAbierto[]): Promise<number> {
       // Un fallo puntual del proveedor no debe romper la sincronización completa.
     }
   }
-
-  // Recién ahora se resume cada pedido: el cliente ve uno solo, con la suma de
-  // lo entregado en todas sus publicaciones.
-  for (const orderId of pedidos) {
-    const antes = getOrderById(orderId);
-    const despues = refrescarDesdeDestinos(orderId);
-    if (!antes || !despues || antes.status === despues.status) continue;
-    logEvent(orderId, despues.status, `Estado actualizado por el proveedor: ${despues.provider_status ?? despues.status}.`);
-    updated++;
-    if (despues.status === "completed" || despues.status === "partial") {
-      await notificarPedidoCompletado(despues, despues.status === "partial");
-    }
-  }
-  return updated;
 }
 
 /** Consulta al proveedor el estado de los pedidos en curso y los actualiza. */
@@ -756,7 +820,7 @@ export async function syncOpenOrders(limit = 100): Promise<{ checked: number; up
   // Se consulta por destino, no por pedido: un pedido repartido entre tres
   // publicaciones son tres pedidos del proveedor, cada uno con su avance.
   const open = all<DestinoAbierto>(
-    `SELECT t.id, t.order_id, t.provider_order_id
+    `SELECT ${COLUMNAS_DESTINO}
        FROM order_targets t
        JOIN orders o ON o.id = t.order_id
       WHERE t.provider_order_id IS NOT NULL
@@ -765,7 +829,7 @@ export async function syncOpenOrders(limit = 100): Promise<{ checked: number; up
       ORDER BY t.updated_at ASC LIMIT ?`,
     [limit],
   );
-  if (!open.length || !providerConfigured()) return { checked: 0, updated: 0 };
+  if (!open.length || !algunProveedorConfigurado()) return { checked: 0, updated: 0 };
   const updated = await actualizarDestinos(open);
   return { checked: open.length, updated };
 }
@@ -782,9 +846,9 @@ export async function sincronizarPedido(
   orderId: number,
   frescoPorSegundos = 45,
 ): Promise<boolean> {
-  if (!providerConfigured()) return false;
+  if (!algunProveedorConfigurado()) return false;
   const open = all<DestinoAbierto>(
-    `SELECT t.id, t.order_id, t.provider_order_id
+    `SELECT ${COLUMNAS_DESTINO}
        FROM order_targets t
        JOIN orders o ON o.id = t.order_id
       WHERE t.order_id = ?
