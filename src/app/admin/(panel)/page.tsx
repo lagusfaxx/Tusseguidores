@@ -26,6 +26,7 @@ export default async function AdminDashboard() {
     id,
     nombre: PROVEEDORES[id].nombre,
     usd: cachedBalance(id).usd,
+    error: cachedBalance(id).error,
   }));
   const conSaldo = saldos.filter((s) => s.usd != null);
   const settings = getSettings();
@@ -80,6 +81,13 @@ export default async function AdminDashboard() {
           text: `Te queda US$${saldo.usd.toFixed(2)} de saldo en ${saldo.nombre}. Recarga antes de que se caigan las entregas.`,
           href: "/admin/proveedores",
           urgente: true,
+        },
+    ),
+    ...saldos.map(
+      (saldo) =>
+        saldo.error && {
+          text: `No se pudo leer el saldo de ${saldo.nombre}: ${saldo.error}`,
+          href: "/admin/proveedores",
         },
     ),
     !algunProveedorConfigurado() && {

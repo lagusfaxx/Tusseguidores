@@ -2,7 +2,7 @@ import { getSettings } from "@/lib/settings";
 import { DEFAULT_MIN_RATES, parseMinRates } from "@/lib/pricing";
 import { SERVICE_TYPE_OPTIONS } from "@/lib/labels";
 import { SettingsForm } from "@/components/settings-form";
-import { clienteProveedor, providerConfigured, type ProveedorId } from "@/lib/provider";
+import { cachedBalance, providerConfigured, refreshBalance, type ProveedorId } from "@/lib/provider";
 import { config as flowConfig } from "@/lib/flow";
 import { emailConfig } from "@/lib/email";
 
@@ -11,15 +11,13 @@ export const dynamic = "force-dynamic";
 export default async function AdminSettingsPage() {
   const settings = getSettings();
 
-  // Mostramos el saldo de cada proveedor que ya tiene su key configurada.
+  // Consultamos el saldo de cada proveedor que ya tiene su key configurada.
+  // Queda guardado para el resto del panel, con el motivo si falló.
   const saldo = async (id: ProveedorId): Promise<{ balance: string | null; error: string | null }> => {
     if (!providerConfigured(id)) return { balance: null, error: null };
-    try {
-      const result = await clienteProveedor(id).balance();
-      return { balance: `US$${Number(result.balance).toFixed(2)}`, error: null };
-    } catch (error) {
-      return { balance: null, error: error instanceof Error ? error.message : "No se pudo consultar el saldo." };
-    }
+    const valor = await refreshBalance(id);
+    if (valor != null) return { balance: `US$${valor.toFixed(2)}`, error: null };
+    return { balance: null, error: cachedBalance(id).error ?? "No se pudo consultar el saldo." };
   };
   const [principal, jap] = await Promise.all([saldo("honestsmm"), saldo("jap")]);
 

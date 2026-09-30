@@ -5,6 +5,7 @@ import {
   type ProveedorId, type ProviderServiceRow,
 } from "./provider";
 import { detectPlatform, detectServiceType, normalizeText } from "./taxonomy.mjs";
+import { repararProductosDadosDeBaja } from "./cambio-proveedor";
 import {
   dropScore, speedScore, refillDaysFromName, detectGeo, detectVariant,
   orderKindFromApiType, startMinutesFromName,
@@ -23,11 +24,27 @@ import {
 export type ResultadoSincronizacion = {
   /** Servicios que el proveedor sigue ofreciendo. */
   activos: number;
-  /** Los que dejó de listar: se deshabilitan, nunca se borran. */
+  /** Los que dejó de listar en esta sincronización: se deshabilitan, nunca se borran. */
   bajas: number;
+  /**
+   * true si la lista llegó tan corta que no se dio de baja nada: más probable
+   * es una respuesta cortada del proveedor que la mitad de su catálogo
+   * desaparecida de un día para otro.
+   */
+  bajasOmitidas: boolean;
   /** Productos publicados que quedaron apuntando a un servicio dado de baja. */
   productosRotos: number;
 };
+
+/** Cuántos productos publicados apuntan a un servicio dado de baja de este proveedor. */
+function contarRotos(proveedor: ProveedorId): number {
+  return get<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id
+      WHERE p.published = 1 AND s.provider_enabled = 0 AND s.provider = ?`,
+    [proveedor],
+  )?.n ?? 0;
+}
 
 export function guardarCatalogo(
   proveedor: ProveedorId,
@@ -63,6 +80,12 @@ export function guardarCatalogo(
   `);
 
   const seen: number[] = [];
+  const activosAntes = get<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM provider_services WHERE provider = ? AND provider_enabled = 1",
+    [proveedor],
+  )?.n ?? 0;
+  let bajas = 0;
+  let bajasOmitidas = false;
   const apply = db.transaction(() => {
     for (const row of rows) {
       const remoto = Number(row.service);
@@ -100,33 +123,29 @@ export function guardarCatalogo(
     // Lo que el proveedor ya no lista queda deshabilitado, no se borra: así los
     // pedidos históricos conservan su referencia. Solo se mira su propio
     // catálogo: sincronizar uno no puede apagar los servicios del otro.
-    if (seen.length) {
+    //
+    // Si la lista llegó con menos de la mitad de lo que había, no se da de baja
+    // nada: una respuesta cortada apagaría media tienda. Lo que sí llegó se
+    // actualiza igual, y la próxima sincronización completa pone todo al día.
+    const sospechosa = activosAntes >= 50 && seen.length < activosAntes * 0.5;
+    if (seen.length && !sospechosa) {
       const marks = seen.map(() => "?").join(",");
-      run(
+      bajas = run(
         `UPDATE provider_services SET provider_enabled = 0
-          WHERE provider = ? AND service_id NOT IN (${marks})`,
+          WHERE provider = ? AND provider_enabled = 1 AND service_id NOT IN (${marks})`,
         [proveedor, ...seen],
-      );
+      ).changes;
+    } else if (sospechosa) {
+      bajasOmitidas = true;
     }
   });
   apply();
 
-  const disabled = get<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM provider_services WHERE provider = ? AND provider_enabled = 0",
-    [proveedor],
-  )?.n ?? 0;
-  const affected = get<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM products p
-       JOIN provider_services s ON s.service_id = p.provider_service_id
-      WHERE p.published = 1 AND s.provider_enabled = 0 AND s.provider = ?`,
-    [proveedor],
-  )?.n ?? 0;
-
-  return { activos: seen.length, bajas: disabled, productosRotos: affected };
+  return { activos: seen.length, bajas, bajasOmitidas, productosRotos: contarRotos(proveedor) };
 }
 
 export type SincronizacionDeProveedor =
-  | ({ proveedor: ProveedorId; nombre: string; ok: true } & ResultadoSincronizacion)
+  | ({ proveedor: ProveedorId; nombre: string; ok: true; reparados: number } & ResultadoSincronizacion)
   | { proveedor: ProveedorId; nombre: string; ok: false; error: string };
 
 /**
@@ -145,7 +164,7 @@ export async function sincronizarProveedores(): Promise<SincronizacionDeProveedo
         resultados.push({ proveedor, nombre, ok: false, error: "devolvió una respuesta inesperada." });
         continue;
       }
-      resultados.push({ proveedor, nombre, ok: true, ...guardarCatalogo(proveedor, rows) });
+      resultados.push({ proveedor, nombre, ok: true, reparados: 0, ...guardarCatalogo(proveedor, rows) });
     } catch (error) {
       resultados.push({
         proveedor,
@@ -155,19 +174,37 @@ export async function sincronizarProveedores(): Promise<SincronizacionDeProveedo
       });
     }
   }
+
+  // Con los dos catálogos al día, lo que quedó apuntando a un servicio dado
+  // de baja pasa al equivalente más parecido, en vez de desaparecer.
+  if (resultados.some((r) => r.ok)) {
+    const { reparados } = repararProductosDadosDeBaja();
+    for (const r of resultados) {
+      if (!r.ok) continue;
+      r.reparados = reparados.length;
+      r.productosRotos = contarRotos(r.proveedor);
+    }
+  }
   return resultados;
 }
 
 /** Una línea por proveedor, para mostrar en el panel. */
 export function resumirSincronizacion(resultados: SincronizacionDeProveedor[]): string {
+  // La reparación es una sola para todos los proveedores: el número se repite
+  // en cada fila correcta, así que se toma de la primera.
+  const reparados = resultados.flatMap((r) => (r.ok ? [r.reparados] : []))[0] ?? 0;
   return resultados
     .map((r) =>
       r.ok
         ? `${r.nombre}: ${r.activos} servicios activos, ${r.bajas} dados de baja` +
+          (r.bajasOmitidas
+            ? " (llegaron menos de la mitad de los servicios: no se dio de baja nada por precaución)"
+            : "") +
           (r.productosRotos
-            ? ` (atención: ${r.productosRotos} producto(s) publicado(s) apuntan a servicios desactivados)`
+            ? ` (atención: ${r.productosRotos} producto(s) publicado(s) apuntan a servicios desactivados y no tienen equivalente)`
             : "")
         : `${r.nombre}: ${r.error}`,
     )
-    .join(" · ");
+    .join(" · ") +
+    (reparados ? `. ${reparados} producto(s) pasaron a un servicio equivalente porque el suyo se dio de baja` : "");
 }

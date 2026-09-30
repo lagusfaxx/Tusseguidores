@@ -270,3 +270,54 @@ export function describirCambio(r: ResultadoCambio): string {
   }
   return partes.join(" ");
 }
+
+/**
+ * Productos publicados cuyo servicio el proveedor dio de baja.
+ *
+ * Sin esto desaparecían de la tienda hasta que alguien los arreglara a mano
+ * (la tienda no muestra lo que no puede entregar). Se pasan al servicio más
+ * parecido del proveedor que atiende su red; si ese no tiene nada, al más
+ * parecido del mismo proveedor que tenían. Lo corre cada sincronización.
+ *
+ * Los niveles automáticos también entran: si los niveles están activos, la
+ * republicación que viene después los vuelve a elegir con su propio criterio.
+ */
+export function repararProductosDadosDeBaja(): { reparados: { id: number; name: string }[] } {
+  const rotos = all<ProductoDeRed & { platform: string }>(
+    `SELECT p.id, p.name, p.published, p.auto_managed, p.level, p.min_qty, p.platform,
+            p.provider_service_id, s.provider
+       FROM products p
+       JOIN provider_services s ON s.service_id = p.provider_service_id
+      WHERE p.published = 1 AND s.provider_enabled = 0`,
+  );
+  const reparados: { id: number; name: string }[] = [];
+  const actualizar = db.prepare(
+    "UPDATE products SET provider_service_id = ?, updated_at = datetime('now') WHERE id = ?",
+  );
+
+  const reparar = db.transaction(() => {
+    for (const p of rotos) {
+      const referencia = get<ProviderService>("SELECT * FROM provider_services WHERE service_id = ?", [
+        p.provider_service_id,
+      ]);
+      if (!referencia) continue;
+      const minTier =
+        get<{ q: number | null }>("SELECT MIN(quantity) AS q FROM product_tiers WHERE product_id = ?", [
+          p.id,
+        ])?.q ?? p.min_qty;
+      const activo = proveedorDeRed(p.platform);
+      const propio = esProveedor(p.provider) ? p.provider : activo;
+      const nuevo =
+        servicioEquivalente(p.id, referencia, activo, minTier) ??
+        (propio !== activo ? servicioEquivalente(p.id, referencia, propio, minTier) : undefined);
+      if (!nuevo) continue;
+      actualizar.run(nuevo.service_id, p.id);
+      reparados.push({ id: p.id, name: p.name });
+    }
+  });
+  reparar();
+
+  if (reparados.length) refrescarEtiquetasDeEntrega();
+  return { reparados };
+}
+
