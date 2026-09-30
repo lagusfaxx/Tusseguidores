@@ -2,10 +2,10 @@ import "server-only";
 import { all, get, run } from "../db";
 import { logEvent, getOrderByCode, retryUndispatched, syncOpenOrders, sendToProvider } from "../orders";
 import { publicarNiveles } from "../autolevels";
-import { provider, providerConfigured, ProviderError } from "../provider";
+import { algunProveedorConfigurado } from "../provider";
 import { rescoreServices } from "../db";
 import { agregarMensaje } from "../tickets";
-import { guardarCatalogo } from "../catalog-sync";
+import { resumirSincronizacion, sincronizarProveedores } from "../catalog-sync";
 import { revalidatePath } from "next/cache";
 import type { Ticket } from "../types";
 
@@ -45,29 +45,18 @@ export function bitacora(limite = 50) {
 // ------------------------------------------------------------------ catálogo
 
 export async function sincronizarCatalogo() {
-  if (!providerConfigured()) {
+  if (!algunProveedorConfigurado()) {
     return { ok: false as const, error: "Falta la API key del proveedor." };
   }
 
-  let rows;
-  try {
-    rows = await provider.services();
-  } catch (error) {
-    return {
-      ok: false as const,
-      error: error instanceof ProviderError
-        ? `El proveedor respondió: ${error.message}`
-        : "No se pudo conectar con el proveedor.",
-    };
-  }
-  if (!Array.isArray(rows)) {
-    return { ok: false as const, error: "El proveedor devolvió una respuesta inesperada." };
-  }
+  // Todos los proveedores con clave; uno que falla no frena al otro.
+  const proveedores = await sincronizarProveedores();
+  const resumen = resumirSincronizacion(proveedores);
+  if (!proveedores.some((r) => r.ok)) return { ok: false as const, error: resumen };
 
-  const resultado = guardarCatalogo(rows);
-  anotar(null, "sincronizar_catalogo", `${resultado.activos} activos, ${resultado.bajas} de baja`);
+  anotar(null, "sincronizar_catalogo", resumen);
   refrescarTienda();
-  return { ok: true as const, ...resultado };
+  return { ok: true as const, proveedores };
 }
 
 export function republicarNiveles(platform?: string) {

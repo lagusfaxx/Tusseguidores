@@ -1,5 +1,6 @@
 import { all, get } from "./db";
 import { DROP_WEIGHT, SPEED_WEIGHT, ROUTABLE_GEOS, SUPPORTED_ORDER_KINDS } from "./quality.mjs";
+import { PROVEEDOR_PRINCIPAL } from "./provider";
 import type { ProviderService } from "./types";
 
 /**
@@ -41,6 +42,13 @@ export type RoutingInput = {
    * no una cantidad.
    */
   orderKind?: string;
+  /**
+   * Proveedor entre cuyos servicios se elige. Es el del servicio de
+   * referencia: la referencia fija el precio, y enrutar a otro proveedor sería
+   * cobrar con la lista de uno y pagarle con la del otro. Sin él, se deduce
+   * de la referencia.
+   */
+  provider?: string;
 };
 
 const GEO_MARKS = ROUTABLE_GEOS.map(() => "?").join(",");
@@ -65,10 +73,18 @@ export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
       ? Math.max(input.promisedMinutes * 2, 120)
       : null;
 
+  const provider =
+    input.provider ??
+    get<{ provider: string }>("SELECT provider FROM provider_services WHERE service_id = ?", [
+      input.referenceServiceId,
+    ])?.provider ??
+    PROVEEDOR_PRINCIPAL;
+
   return all<Candidate>(
     `SELECT s.*, ${SCORE} AS score
        FROM provider_services s
       WHERE s.provider_enabled = 1
+        AND s.provider = ?
         AND s.platform = ?
         AND s.service_type = ?
         AND s.variant = ?
@@ -82,7 +98,7 @@ export function rankCandidates(input: RoutingInput, limit = 10): Candidate[] {
       ORDER BY score DESC, s.rate_usd_per_1000 ASC
       LIMIT ?`,
     [
-      input.platform, input.serviceType, input.variant ?? "",
+      provider, input.platform, input.serviceType, input.variant ?? "",
       input.orderKind ?? "default", ...ROUTABLE_GEOS,
       input.quantity, input.quantity, budget,
       ...(techo != null ? [techo] : []),
@@ -130,9 +146,10 @@ export function pickService(input: RoutingInput, autoSelect: boolean): Routed | 
 
   // Con el tope de tiempo puede no quedar ninguno: se reintenta sin él, porque
   // es mejor entregar tarde que no entregar.
-  const best = rankCandidates(input, 1)[0] ??
+  const conProveedor = { ...input, provider: input.provider ?? reference?.provider };
+  const best = rankCandidates(conProveedor, 1)[0] ??
     (input.promisedMinutes != null
-      ? rankCandidates({ ...input, promisedMinutes: null }, 1)[0]
+      ? rankCandidates({ ...conProveedor, promisedMinutes: null }, 1)[0]
       : undefined);
   if (!best) {
     if (!referenceUsable) return null;

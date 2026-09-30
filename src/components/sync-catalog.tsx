@@ -11,7 +11,7 @@ export function SyncCatalogButton() {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <form action={syncAction}>
-        <SubmitButton className="btn btn-ghost text-sm">Sincronizar con el proveedor</SubmitButton>
+        <SubmitButton className="btn btn-ghost text-sm">Sincronizar con los proveedores</SubmitButton>
       </form>
       <form action={scoreAction}>
         <SubmitButton className="btn btn-ghost text-sm">Recalcular calidad</SubmitButton>

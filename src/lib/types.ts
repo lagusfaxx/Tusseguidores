@@ -1,5 +1,10 @@
 export type ProviderService = {
+  /** Número de la tienda: el del proveedor más su desplazamiento. */
   service_id: number;
+  /** Proveedor dueño del servicio ("honestsmm", "jap"). */
+  provider: string;
+  /** Número del servicio en la API de su proveedor. Null = igual a service_id. */
+  remote_id: number | null;
   name: string;
   clean_name: string;
   category: string;

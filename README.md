@@ -321,6 +321,42 @@ Todo esto se ve y se ajusta por producto en **Panel → Productos → Elección 
 servicio**, que muestra a qué servicio se enviaría un pedido hecho ahora mismo y
 las alternativas que se consideraron.
 
+### Dos proveedores: honestsmm y JustAnotherPanel
+
+La tienda puede trabajar con dos proveedores a la vez. Los dos hablan el mismo
+protocolo (API v2), así que es el mismo cliente con otra URL y otra clave.
+
+1. Guarda la API key de JustAnotherPanel en **Ajustes → Proveedor 2** (o en la
+   variable `JAP_API_KEY`).
+2. En **Panel → Proveedores**, pulsa **Sincronizar con los proveedores**: baja
+   los dos catálogos. Uno que falla no frena al otro.
+3. En la misma pantalla, cada red tiene un interruptor. Al pasar Instagram a
+   JustAnotherPanel:
+   - los productos por niveles se rearman con su catálogo (el económico pasa a
+     ser su servicio más barato, el premium el mejor);
+   - los productos hechos a mano pasan a su servicio más parecido (mismo tipo,
+     subtipo y forma de pedido; retención, velocidad y reposición más
+     cercanas);
+   - los precios se recalculan solos, porque salen del costo del servicio de
+     referencia. Ojo: donde manda el piso por cada 1.000 (casi todo lo barato)
+     el precio no se mueve aunque el costo cambie. Los productos con precio
+     manual tampoco;
+   - los pedidos nuevos de Instagram salen a JustAnotherPanel, y el panel
+     mayorista pasa a mostrar sus servicios de Instagram;
+   - lo que JustAnotherPanel no tiene se queda con honestsmm y la pantalla lo
+     avisa.
+4. Los pedidos que ya salieron siguen con el proveedor al que se mandaron: el
+   seguimiento, las reposiciones y las cancelaciones le preguntan a ese.
+
+Volver al proveedor anterior deja cada producto exactamente como estaba: la
+tienda anota el servicio que tenía y si estaba publicado antes de moverlo.
+
+Los números de servicio de los dos proveedores se repiten (los dos tienen un
+servicio 1), así que la tienda guarda los de JustAnotherPanel corridos en
+10.000.000 (`provider_services.service_id`) y a su API le manda el número
+original (`remote_id`). El catálogo del panel muestra el número original y de
+qué proveedor es.
+
 ### Dos formas de pagar
 
 En la ficha del producto hay dos botones. El de **Webpay** es el camino

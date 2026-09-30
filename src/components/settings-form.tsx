@@ -11,12 +11,30 @@ type Props = {
   minRates: { slug: string; label: string; value: number }[];
   providerBalance: string | null;
   providerBalanceError: string | null;
+  japBalance: string | null;
+  japBalanceError: string | null;
   /** Entorno de cobro que se está usando de verdad, no el guardado. */
   flowSandbox: boolean;
   flowForcedByEnv: { apiKey: boolean; secretKey: boolean; sandbox: boolean };
   providerKeyFromEnv: boolean;
+  japKeyFromEnv: boolean;
   resendKeyFromEnv: boolean;
 };
+
+/** Saldo consultado en vivo, o el error que dio la consulta. */
+function Saldo({ nombre, saldo, error }: { nombre: string; saldo: string | null; error: string | null }) {
+  if (saldo) {
+    return (
+      <p className="rounded-lg border border-lime-500/30 bg-lime-500/10 px-3 py-2 text-sm text-lime-200">
+        Saldo en {nombre}: <strong>{saldo}</strong>
+      </p>
+    );
+  }
+  if (!error) return null;
+  return (
+    <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>
+  );
+}
 
 /** Marca los campos que una variable de entorno está pisando. */
 function EnvNotice({ name }: { name: string }) {
@@ -66,8 +84,8 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
 }
 
 export function SettingsForm({
-  settings, minRates, providerBalance, providerBalanceError,
-  flowSandbox, flowForcedByEnv, providerKeyFromEnv, resendKeyFromEnv,
+  settings, minRates, providerBalance, providerBalanceError, japBalance, japBalanceError,
+  flowSandbox, flowForcedByEnv, providerKeyFromEnv, japKeyFromEnv, resendKeyFromEnv,
 }: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
   const [passwordState, passwordAction] = useActionState<ActionState, FormData>(changePassword, {});
@@ -149,16 +167,19 @@ export function SettingsForm({
             name="auto_send_to_provider" checked={settings.auto_send_to_provider === "1"} />
           <Field label="Avisar cuando el saldo baje de (US$)" name="low_balance_usd" type="number"
             value={settings.low_balance_usd}
-            hint="Aparece una alerta roja en el resumen. Si el proveedor se queda sin saldo, los pedidos ya pagados quedan en espera y se reenvían solos al recargar." />
-          {providerBalance ? (
-            <p className="rounded-lg border border-lime-500/30 bg-lime-500/10 px-3 py-2 text-sm text-lime-200">
-              Saldo en el proveedor: <strong>{providerBalance}</strong>
-            </p>
-          ) : providerBalanceError ? (
-            <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
-              {providerBalanceError}
-            </p>
-          ) : null}
+            hint="Vale para los dos proveedores. Aparece una alerta roja en el resumen. Si un proveedor se queda sin saldo, los pedidos ya pagados quedan en espera y se reenvían solos al recargar." />
+          <Saldo nombre="honestsmm" saldo={providerBalance} error={providerBalanceError} />
+        </Section>
+
+        <Section
+          title="Proveedor 2 (JustAnotherPanel)"
+          hint="Con la clave guardada, sincroniza el catálogo y elige en Proveedores qué redes atiende. Mientras ninguna red lo use, no recibe pedidos."
+        >
+          <Field label="URL de la API" name="jap_url" value={settings.jap_url} />
+          <Field label="API key" name="jap_key" type="password" value={settings.jap_key}
+            hint="La sacas de justanotherpanel.com/account." />
+          {japKeyFromEnv ? <EnvNotice name="JAP_API_KEY" /> : null}
+          <Saldo nombre="JustAnotherPanel" saldo={japBalance} error={japBalanceError} />
         </Section>
 
         <Section title="Pagos (Flow.cl)">

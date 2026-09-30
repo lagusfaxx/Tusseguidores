@@ -2,6 +2,7 @@ import { all } from "./db";
 import { overallScore, ROUTABLE_GEOS } from "./quality.mjs";
 import { autoPriceClp, formatDuration, pricingContext } from "./pricing";
 import { LEVELS, levelDef, levelOrder, type LevelDef, type LevelId } from "./level-defs";
+import { proveedorDeRed } from "./proveedor-por-red";
 import type { ProviderService } from "./types";
 
 /**
@@ -40,7 +41,8 @@ const geoMarks = ROUTABLE_GEOS.map(() => "?").join(",");
  * Servicios que podrían atender esta combinación, del más barato al más caro.
  *
  * Mismos filtros que usa el enrutado: solo lo que la tienda sabe vender y lo
- * que apunta a un público que no desvirtúa el producto.
+ * que apunta a un público que no desvirtúa el producto. Y solo del proveedor
+ * que atiende esa red: los niveles se arman con su lista de precios.
  */
 export function candidatosDeOferta(
   platform: string,
@@ -49,13 +51,13 @@ export function candidatosDeOferta(
 ): Candidate[] {
   const rows = all<ProviderService>(
     `SELECT * FROM provider_services
-      WHERE provider_enabled = 1
+      WHERE provider_enabled = 1 AND provider = ?
         AND platform = ? AND service_type = ?
         AND order_kind = ? AND variant = ''
         AND geo IN (${geoMarks})
         AND rate_usd_per_1000 > 0
       ORDER BY rate_usd_per_1000 ASC`,
-    [platform, serviceType, orderKind, ...ROUTABLE_GEOS],
+    [proveedorDeRed(platform), platform, serviceType, orderKind, ...ROUTABLE_GEOS],
   );
   return rows.map((row) => ({ ...row, score: overallScore(row.drop_score, row.speed_score) }));
 }

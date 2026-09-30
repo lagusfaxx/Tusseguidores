@@ -36,6 +36,15 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   // Aviso cuando el saldo del proveedor baja de este monto, en dólares.
   low_balance_usd: "10",
 
+  // Segundo proveedor (JustAnotherPanel). Mismo protocolo que el principal.
+  jap_url: "https://justanotherpanel.com/api/v2",
+  jap_key: "",
+  jap_balance: "",
+  jap_balance_at: "",
+  // Qué proveedor atiende cada red, como JSON: {"instagram":"jap"}. Las redes
+  // que no figuran van con el principal. Se cambia en /admin/proveedores.
+  proveedor_por_red: "{}",
+
   // Transferencia bancaria: el pedido queda esperando tu confirmación y no
   // sale al proveedor hasta que la marques como recibida.
   transfer_enabled: "0",
