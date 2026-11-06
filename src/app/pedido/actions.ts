@@ -5,8 +5,12 @@ import { redirect } from "next/navigation";
 import { ensureTargets, getOrderByCode, logEvent } from "@/lib/orders";
 import { puedeCorregirDestino } from "@/lib/order-tracking";
 import { reposicionDelPedido, reposicionYaPedida } from "@/lib/refill";
-import { crearTicket, agregarMensaje, ticketDePedido } from "@/lib/tickets";
-import { avisarAdmin } from "@/lib/notify";
+import { crearTicket, agregarMensaje, ticketDePedido, puedeEscribir } from "@/lib/tickets";
+import { devolucionDisponible, REDES_DEVOLUCION, type RedDevolucion } from "@/lib/devoluciones";
+import type { Ticket } from "@/lib/types";
+import { avisarAdmin, notificarTransferenciaPendiente } from "@/lib/notify";
+import { abrirPagoFlow } from "@/lib/checkout";
+import { transferenciaDisponible } from "@/lib/transfer";
 import { revisarDestinos, separarDestinos } from "@/lib/targets";
 import { absoluteUrl } from "@/lib/seo";
 import { run, get } from "@/lib/db";
@@ -102,7 +106,7 @@ export async function corregirDestino(_prev: PedidoState, formData: FormData): P
   return { ok: links.length > 1 ? "Destinos actualizados." : "Destino actualizado." };
 }
 
-/** Abrir un ticket desde el seguimiento del pedido. */
+/** Abrir el ticket del pedido. Si ya existe, el mensaje se suma a ese. */
 export async function abrirTicketDePedido(
   _prev: PedidoState,
   formData: FormData,
@@ -118,35 +122,81 @@ export async function abrirTicketDePedido(
   });
   if (!result.ok) return { error: result.error };
 
-  await avisarAdmin(
-    `Ticket nuevo · ${result.ticket.code} · pedido ${order.code}`,
-    `<p><strong>${order.email}</strong> abrió un ticket desde el seguimiento de su pedido ${order.code}.</p>` +
-      `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Responder</a></p>`,
-    `${order.email} abrió el ticket ${result.ticket.code} del pedido ${order.code}.`,
-  );
+  await avisoDeTicket(order.code, order.email, result.ticket, result.existente);
 
   revalidatePath(`/pedido/${order.code}`);
-  return { ok: "Listo, te respondemos por aquí y por correo." };
+  return { ok: "Listo, te respondemos por aquí y te avisamos por correo." };
 }
 
-/** Responder en un ticket del propio pedido. */
-export async function responderTicketDePedido(formData: FormData) {
+/** Responder en el ticket del propio pedido. */
+export async function responderTicketDePedido(
+  _prev: PedidoState,
+  formData: FormData,
+): Promise<PedidoState> {
   const order = await pedidoDe(formData);
   const ticket = ticketDePedido(order.id, String(formData.get("ticket") ?? ""));
-  if (!ticket) redirect(`/pedido/${order.code}`);
+  if (!ticket) return { error: "No encontramos la conversación de este pedido." };
 
   const cuerpo = String(formData.get("body") ?? "").trim();
-  if (cuerpo) {
-    agregarMensaje(ticket.id, "cliente", cuerpo);
-    await avisarAdmin(
-      `Respuesta en el ticket ${ticket.code}`,
-      `<p><strong>${order.email}</strong> respondió en el ticket ${ticket.code} (pedido ${order.code}).</p>` +
-        `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Abrir</a></p>`,
-      `${order.email} respondió en el ticket ${ticket.code}.`,
-    );
-  }
+  if (cuerpo.length < 2) return { error: "Escribe tu mensaje." };
+  const permiso = puedeEscribir(ticket.id);
+  if (!permiso.ok) return { error: permiso.error };
+
+  agregarMensaje(ticket.id, "cliente", cuerpo);
+  await avisoDeTicket(order.code, order.email, ticket, true);
   revalidatePath(`/pedido/${order.code}`);
-  redirect(`/pedido/${order.code}#soporte`);
+  return { ok: "Mensaje enviado." };
+}
+
+async function avisoDeTicket(orderCode: string, email: string, ticket: Ticket, existente: boolean) {
+  await avisarAdmin(
+    existente ? `Mensaje nuevo · ${ticket.code} · pedido ${orderCode}` : `Ticket nuevo · ${ticket.code} · pedido ${orderCode}`,
+    `<p><strong>${email}</strong> ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.</p>` +
+      `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Responder</a></p>`,
+    `${email} ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.`,
+  );
+}
+
+/**
+ * Pedir la devolución de un pedido pagado que no se entregó (o se entregó a
+ * medias). Las devoluciones se hacen solo en cripto, así que se pide la red y
+ * la dirección de una vez: es lo que el dueño necesita para pagar, y queda en
+ * el mismo ticket del pedido.
+ */
+export async function pedirDevolucion(
+  _prev: PedidoState,
+  formData: FormData,
+): Promise<PedidoState> {
+  const order = await pedidoDe(formData);
+  if (!devolucionDisponible(order)) {
+    return { error: "Este pedido no tiene una devolución pendiente." };
+  }
+
+  const red = String(formData.get("red") ?? "") as RedDevolucion;
+  const destino = REDES_DEVOLUCION[red];
+  if (!destino) return { error: "Elige en qué quieres recibir la devolución: USDT o BTC." };
+  const direccion = String(formData.get("direccion") ?? "").trim();
+  if (!destino.patron.test(direccion)) {
+    return { error: `Esa dirección no parece de ${destino.etiqueta}. Revísala: si está mala, el dinero se pierde.` };
+  }
+
+  const detalle = String(formData.get("detalle") ?? "").trim().slice(0, 1000);
+  const result = crearTicket({
+    guestEmail: order.email,
+    orderId: order.id,
+    kind: "devolucion",
+    subject: `Devolución del pedido ${order.code}`,
+    body:
+      `Pido la devolución del pedido ${order.code}.\n` +
+      `Recibir en: ${destino.etiqueta}\nDirección: ${direccion}` +
+      (detalle ? `\n\n${detalle}` : ""),
+  });
+  if (!result.ok) return { error: result.error };
+
+  logEvent(order.id, "info", `El cliente pidió la devolución en ${destino.etiqueta}: ${direccion}`);
+  await avisoDeTicket(order.code, order.email, result.ticket, result.existente);
+  revalidatePath(`/pedido/${order.code}`);
+  return { ok: "Recibimos tu solicitud. Te avisamos por el ticket cuando hagamos la transferencia." };
 }
 
 /**
@@ -200,4 +250,38 @@ export async function pedirReposicion(
 
   revalidatePath(`/pedido/${order.code}`);
   return { ok: `Listo, la pedimos. Seguimos por el ticket ${result.ticket.code}.` };
+}
+
+/**
+ * Pagar un pedido que quedó sin pagar, o cambiar de medio de pago.
+ *
+ * Es el mismo pedido: el cliente que dudaba entre Webpay y transferencia
+ * antes volvía al producto y creaba otro pedido por cada intento.
+ */
+export async function pagarPedido(formData: FormData) {
+  const order = await pedidoDe(formData);
+  if (order.payment_status === "paid" || order.status === "refunded") {
+    redirect(`/pedido/${order.code}`);
+  }
+  const metodo = String(formData.get("metodo") ?? "flow") === "transferencia" ? "transferencia" : "flow";
+
+  if (metodo === "transferencia") {
+    if (!transferenciaDisponible()) redirect(`/pedido/${order.code}`);
+    run(
+      `UPDATE orders SET payment_provider = 'transferencia', status = 'pending',
+              updated_at = datetime('now') WHERE id = ?`,
+      [order.id],
+    );
+    logEvent(order.id, "info", "El cliente eligió pagar por transferencia.");
+    const actualizado = getOrderByCode(order.code);
+    if (actualizado) await notificarTransferenciaPendiente(actualizado);
+    revalidatePath(`/pedido/${order.code}`);
+    redirect(`/pedido/${order.code}?estado=transferencia`);
+  }
+
+  const resultado = await abrirPagoFlow(order);
+  if ("error" in resultado) {
+    redirect(`/pedido/${order.code}?pago=error`);
+  }
+  redirect(resultado.url);
 }

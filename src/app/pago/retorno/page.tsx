@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { Copiar } from "@/components/copiar";
 import { getPaymentStatus, FLOW_STATUS } from "@/lib/flow";
-import { getOrderByCode, markPaid, setStatus } from "@/lib/orders";
+import { getOrderByCode, markPaid, pedidoDeOrdenFlow, setStatus } from "@/lib/orders";
 import { get } from "@/lib/db";
 import type { Order } from "@/lib/types";
 
@@ -35,17 +35,21 @@ export default async function PaymentReturnPage({
 
   try {
     const status = await getPaymentStatus(token);
-    order = getOrderByCode(status.commerceOrder);
+    order = pedidoDeOrdenFlow(status.commerceOrder);
     if (order) {
       if (status.status === FLOW_STATUS.PAID) {
         await markPaid(order.id, String(status.flowOrder));
         paid = true;
       } else if (status.status === FLOW_STATUS.REJECTED) {
-        setStatus(order.id, "failed", "El pago fue rechazado por Flow.");
-        message = "El pago fue rechazado. Puedes intentarlo de nuevo con otro medio de pago.";
+        if (order.payment_status !== "paid" && order.payment_token === token) {
+          setStatus(order.id, "failed", "El pago fue rechazado por Flow.");
+        }
+        message = "El pago fue rechazado. Puedes reintentarlo o pagar por transferencia desde tu pedido: es el mismo pedido, no se crea otro.";
       } else if (status.status === FLOW_STATUS.CANCELED) {
-        setStatus(order.id, "canceled", "El pago fue anulado por el comprador.");
-        message = "El pago quedó anulado. Si fue un error, puedes volver a comprar.";
+        if (order.payment_status !== "paid" && order.payment_token === token) {
+          setStatus(order.id, "canceled", "El pago fue anulado por el comprador.");
+        }
+        message = "Cancelaste el pago. Puedes reintentarlo o pagar por transferencia desde tu pedido: es el mismo pedido, no se crea otro.";
       } else {
         message = "El pago está en proceso. Te avisaremos por correo apenas se confirme.";
       }
@@ -86,10 +90,10 @@ export default async function PaymentReturnPage({
               </p>
               <p className="mx-auto mt-3 max-w-sm text-xs leading-relaxed text-ink-400">
                 Anótalo o saca una foto: con este código sigues tu pedido cuando quieras.
-                Si lo pierdes, escríbenos desde el correo que usaste al comprar.
+                Si lo pierdes, lo encuentras en el correo que te enviamos al comprar.
               </p>
               <Link href={`/pedido/${order.code}`} className="btn btn-primary mt-8">
-                Ver mi pedido
+                {paid || order.payment_status === "paid" ? "Ver mi pedido" : "Ir a mi pedido y pagar"}
               </Link>
             </>
           ) : (

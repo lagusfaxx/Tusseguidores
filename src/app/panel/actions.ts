@@ -6,7 +6,7 @@ import { entrar, registrar, salir, panelUser, cambiarPassword } from "@/lib/rese
 import { crearPedidoDePanel, pedidoDelCliente } from "@/lib/reseller-orders";
 import { reposicionDelPedido } from "@/lib/refill";
 import { crearRecarga, avisarTransferencia, guardarTokenFlow, recargaPorId } from "@/lib/topups";
-import { crearTicket, agregarMensaje, ticketDelCliente } from "@/lib/tickets";
+import { crearTicket, agregarMensaje, ticketDelCliente, puedeEscribir } from "@/lib/tickets";
 import { createPayment, checkoutUrl, flowConfigured } from "@/lib/flow";
 import { transferenciaDisponible } from "@/lib/transfer";
 import { avisarAdmin, notificarBienvenidaPanel } from "@/lib/notify";
@@ -226,8 +226,8 @@ export async function accionCrearTicket(_prev: PanelState, formData: FormData): 
   if (!result.ok) return { error: result.error };
 
   await avisarAdmin(
-    `Ticket nuevo · ${result.ticket.code}`,
-    `<p><strong>${user.email}</strong> abrió el ticket ${result.ticket.code}: ${result.ticket.subject}</p>` +
+    `${result.existente ? "Mensaje nuevo" : "Ticket nuevo"} · ${result.ticket.code}`,
+    `<p><strong>${user.email}</strong> ${result.existente ? "escribió en" : "abrió"} el ticket ${result.ticket.code}: ${result.ticket.subject}</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Responder</a></p>`,
     `${user.email} abrió el ticket ${result.ticket.code}: ${result.ticket.subject}`,
   );
@@ -241,6 +241,8 @@ export async function accionResponderTicket(formData: FormData) {
   if (!ticket) redirect("/panel/tickets");
 
   const cuerpo = String(formData.get("body") ?? "").trim();
+  const permiso = puedeEscribir(ticket.id);
+  if (!permiso.ok) redirect(`/panel/tickets/${ticket.code}?error=${encodeURIComponent(permiso.error)}`);
   if (cuerpo) {
     agregarMensaje(ticket.id, "cliente", cuerpo);
     await avisarAdmin(

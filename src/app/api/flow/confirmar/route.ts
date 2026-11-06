@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPaymentStatus, FLOW_STATUS } from "@/lib/flow";
-import { getOrderByCode, logEvent, markPaid, setStatus } from "@/lib/orders";
+import { pedidoDeOrdenFlow, logEvent, markPaid, setStatus } from "@/lib/orders";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   try {
     const status = await getPaymentStatus(token);
-    const order = getOrderByCode(status.commerceOrder);
+    const order = pedidoDeOrdenFlow(status.commerceOrder);
     if (!order) return new NextResponse("unknown order", { status: 404 });
 
     if (status.status === FLOW_STATUS.PAID) {
@@ -37,10 +37,14 @@ export async function POST(request: Request) {
         );
       }
       await markPaid(order.id, String(status.flowOrder));
-    } else if (status.status === FLOW_STATUS.REJECTED) {
-      setStatus(order.id, "failed", "El pago fue rechazado por Flow.");
-    } else if (status.status === FLOW_STATUS.CANCELED) {
-      setStatus(order.id, "canceled", "El pago fue anulado.");
+    } else if (order.payment_status !== "paid" && order.payment_token === token) {
+      // Solo el intento vigente cambia el estado: si el cliente abrió otro
+      // pago (o se pasó a transferencia), el rechazo de uno viejo no cuenta.
+      if (status.status === FLOW_STATUS.REJECTED) {
+        setStatus(order.id, "failed", "El pago fue rechazado por Flow.");
+      } else if (status.status === FLOW_STATUS.CANCELED) {
+        setStatus(order.id, "canceled", "El pago fue anulado.");
+      }
     }
 
     return new NextResponse("OK", { status: 200 });

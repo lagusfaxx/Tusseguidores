@@ -217,8 +217,10 @@ export type Ticket = {
   guest_email: string | null;
   order_id: number | null;
   subject: string;
-  kind: "consulta" | "problema" | "reposicion" | string;
+  kind: "consulta" | "problema" | "reposicion" | "devolucion" | string;
   status: "abierto" | "respondido" | "cerrado" | string;
+  /** Llave del enlace de un ticket sin pedido ni cuenta (ver /soporte). */
+  access_key: string | null;
   created_at: string;
   updated_at: string;
 };

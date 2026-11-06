@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { panelUser } from "@/lib/reseller-auth";
-import { ticketDelCliente, mensajesDeTicket, ETIQUETA_TICKET, TIPO_TICKET } from "@/lib/tickets";
+import {
+  ticketDelCliente, mensajesDeTicket, puedeEscribir, ETIQUETA_TICKET, TIPO_TICKET,
+} from "@/lib/tickets";
 import { getOrderById } from "@/lib/orders";
 import { formatDateCl } from "@/lib/utils";
 import { PanelSubmit } from "@/components/panel-ui";
@@ -9,16 +11,24 @@ import { accionResponderTicket } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function PanelTicketDetalle({ params }: { params: Promise<{ code: string }> }) {
+export default async function PanelTicketDetalle({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const user = await panelUser();
   if (!user) redirect("/panel/entrar");
 
   const { code } = await params;
+  const { error } = await searchParams;
   const ticket = ticketDelCliente(user.id, code);
   if (!ticket) notFound();
 
   const mensajes = mensajesDeTicket(ticket.id);
   const order = ticket.order_id ? getOrderById(ticket.order_id) : undefined;
+  const permiso = puedeEscribir(ticket.id);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -66,10 +76,22 @@ export default async function PanelTicketDetalle({ params }: { params: Promise<{
         ))}
       </div>
 
-      {ticket.status !== "cerrado" ? (
+      {error ? (
+        <p className="mt-6 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+          {error}
+        </p>
+      ) : null}
+
+      {!permiso.ok ? (
+        <p className="mt-6 rounded-lg border border-white/10 bg-white/4 px-4 py-3 text-sm text-ink-400">
+          {permiso.error}
+        </p>
+      ) : ticket.status !== "cerrado" || ticket.order_id ? (
         <form action={accionResponderTicket} className="card mt-6 p-5">
           <input type="hidden" name="code" value={ticket.code} />
-          <label className="field-label" htmlFor="body">Responder</label>
+          <label className="field-label" htmlFor="body">
+            {ticket.status === "cerrado" ? "Escribir de nuevo (reabre el ticket)" : "Responder"}
+          </label>
           <textarea id="body" name="body" rows={4} required className="field" maxLength={4000} />
           <div className="mt-4">
             <PanelSubmit className="btn btn-primary text-sm" pendiente="Enviando…">Enviar</PanelSubmit>

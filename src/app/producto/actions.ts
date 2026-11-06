@@ -3,16 +3,14 @@
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createOrder, logEvent, setStatus } from "@/lib/orders";
+import { createOrder, logEvent } from "@/lib/orders";
 import { notificarPedidoNuevo, notificarTransferenciaPendiente } from "@/lib/notify";
-import { createPayment, checkoutUrl, flowConfigured, FlowError } from "@/lib/flow";
-import { absoluteUrl } from "@/lib/seo";
-import { getSettings, getBoolSetting } from "@/lib/settings";
+import { getBoolSetting } from "@/lib/settings";
 import { getProductById } from "@/lib/catalog";
 import { transferenciaDisponible } from "@/lib/transfer";
 import { isValidEmail } from "@/lib/utils";
 import { separarDestinos } from "@/lib/targets";
-import { run } from "@/lib/db";
+import { abrirPagoFlow } from "@/lib/checkout";
 
 export type CheckoutState = { error?: string };
 
@@ -65,13 +63,15 @@ export async function startCheckout(
   if (!created.ok) return { error: created.error };
 
   const order = created.order;
-  const settings = getSettings();
 
-  // El aviso interno de "entró un pedido" sale después de responder: el
-  // cliente va camino a pagar y no tiene por qué esperar a que salga un correo.
-  after(async () => {
-    await notificarPedidoNuevo(order);
-  });
+  // Solo se avisa de los pedidos por transferencia, que esperan que alguien
+  // revise la cuenta. Los de Webpay avisan cuando se pagan: avisar al abrir el
+  // pago llenaba la bandeja de compras que nunca se concretaron.
+  if (metodo === "transferencia" && !created.reutilizado) {
+    after(async () => {
+      await notificarPedidoNuevo(order);
+    });
+  }
 
   if (metodo === "transferencia") {
     // No se cobra nada acá: el pedido espera a que el dueño vea la plata.
@@ -82,41 +82,7 @@ export async function startCheckout(
     redirect(`/pedido/${order.code}?estado=transferencia`);
   }
 
-  if (!flowConfigured()) {
-    // Sin pasarela configurada el pedido queda pendiente y se aprueba a mano
-    // desde el panel. Así la tienda nunca deja al cliente en una pantalla rota.
-    logEvent(order.id, "info", "Flow no está configurado: el pedido quedó pendiente de pago manual.");
-    redirect(`/pedido/${order.code}?estado=manual`);
-  }
-
-  let url: string;
-  try {
-    const payment = await createPayment({
-      commerceOrder: order.code,
-      subject: `${order.product_name} · ${order.quantity.toLocaleString("es-CL")} unidades`,
-      amount: order.amount_clp,
-      email: order.email,
-      urlConfirmation: absoluteUrl("/api/flow/confirmar"),
-      urlReturn: absoluteUrl("/pago/retorno"),
-    });
-    run("UPDATE orders SET payment_token = ?, updated_at = datetime('now') WHERE id = ?", [
-      payment.token,
-      order.id,
-    ]);
-    logEvent(order.id, "info", "Redirigido a Flow para el pago.");
-    url = checkoutUrl(payment);
-  } catch (error) {
-    // El detalle técnico queda en el historial del pedido y en el registro del
-    // servidor; al comprador no le sirve leer "apiKey not found".
-    const detail = error instanceof FlowError ? (error.detail ?? error.message) : String(error);
-    console.error("[checkout] Flow:", detail);
-    setStatus(order.id, "failed", `No se pudo crear el pago en Flow: ${detail}`);
-    return {
-      error:
-        `No pudimos abrir el pago en este momento. Tu pedido quedó guardado con el código ${order.code}: ` +
-        `escríbenos a ${settings.contact_email} y lo resolvemos, o inténtalo de nuevo en unos minutos.`,
-    };
-  }
-
-  redirect(url);
+  const url = await abrirPagoFlow(order);
+  if ("error" in url) return url;
+  redirect(url.url);
 }

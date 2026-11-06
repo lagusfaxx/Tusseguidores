@@ -127,6 +127,11 @@ function migrate(database: Database.Database) {
   } else if (!ticketsInfo.some((c) => c.name === "guest_email")) {
     database.exec("ALTER TABLE tickets ADD COLUMN guest_email TEXT");
   }
+  // Va después de rehacer la tabla: si se agregara antes, el rehacer la borra.
+  if (!columns("tickets").has("access_key")) {
+    database.exec("ALTER TABLE tickets ADD COLUMN access_key TEXT");
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS idx_tickets_order ON tickets(order_id)");
 
   // Índices que dependen de columnas agregadas por esta misma función. No
   // pueden vivir en schema.sql: ese archivo se ejecuta antes de migrar y sobre

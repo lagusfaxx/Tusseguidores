@@ -53,13 +53,13 @@ export default function PrivacyPage() {
 
       <h2>Tus derechos</h2>
       <p>
-        Puedes pedirnos en cualquier momento acceder, rectificar o eliminar tus datos escribiendo a{" "}
-        {s.contact_email}. Eliminamos los datos de pedidos cerrados que ya no necesitamos conservar
+        Puedes pedirnos en cualquier momento acceder, rectificar o eliminar tus datos abriendo un
+        ticket en la página de soporte. Eliminamos los datos de pedidos cerrados que ya no necesitamos conservar
         por razones contables.
       </p>
 
       <h2>Contacto</h2>
-      <p>Responsable del tratamiento: {s.site_name}, {s.site_domain}. Correo: {s.contact_email}.</p>
+      <p>Responsable del tratamiento: {s.site_name}. Contacto: por ticket en la página de soporte.</p>
     </LegalPage>
   );
 }

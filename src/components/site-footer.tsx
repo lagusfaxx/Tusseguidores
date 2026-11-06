@@ -39,6 +39,7 @@ export function SiteFooter() {
           <h3 className="text-sm font-semibold text-white">Ayuda</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
             <li><Link href="/seguimiento" className="hover:text-white">Seguir mi pedido</Link></li>
+            <li><Link href="/soporte" className="hover:text-white">Soporte</Link></li>
             {getBoolSetting("reseller_enabled", true) ? (
               <li><Link href="/panel" className="hover:text-white">Panel mayorista</Link></li>
             ) : null}
@@ -49,30 +50,21 @@ export function SiteFooter() {
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-white">Contacto</h3>
+          <h3 className="text-sm font-semibold text-white">Soporte</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
             <li>
-              <a href={`mailto:${s.contact_email}`} className="hover:text-white">{s.contact_email}</a>
+              <Link href="/soporte" className="hover:text-white">Abrir un ticket</Link>
             </li>
-            {s.contact_whatsapp ? (
-              <li>
-                <a
-                  href={`https://wa.me/${s.contact_whatsapp.replace(/\D/g, "")}`}
-                  className="hover:text-white"
-                  rel="noopener"
-                  target="_blank"
-                >
-                  WhatsApp {s.contact_whatsapp}
-                </a>
-              </li>
-            ) : null}
-            <li className="pt-2 text-xs">Pagos procesados por Flow: Webpay, transferencia y Mercado Pago.</li>
+            <li className="text-xs leading-relaxed">
+              Toda la atención es por ticket, desde tu pedido o desde la página de soporte.
+            </li>
+            <li className="pt-2 text-xs">Pagos con Webpay o transferencia. Devoluciones solo en USDT o BTC.</li>
           </ul>
         </div>
       </div>
 
       <div className="border-t border-white/6 px-4 py-6 text-center text-xs text-ink-400">
-        © {year} {s.site_name} · {s.site_domain} · Hecho en Chile
+        © {year} {s.site_name} · Hecho en Chile
       </div>
     </footer>
   );

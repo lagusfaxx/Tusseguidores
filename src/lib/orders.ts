@@ -125,7 +125,7 @@ export type CreateOrderInput = {
 };
 
 export type CreateOrderResult =
-  | { ok: true; order: Order }
+  | { ok: true; order: Order; reutilizado: boolean }
   | { ok: false; error: string };
 
 export function createOrder(input: CreateOrderInput): CreateOrderResult {
@@ -227,6 +227,44 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const coupon = input.couponCode ? applyCoupon(input.couponCode, base) : null;
   const amount = base - (coupon?.discountClp ?? 0);
 
+  // Antes de crear otro, se mira si el cliente ya tiene este mismo pedido
+  // esperando pago. Pasa todo el tiempo: abre Webpay, vuelve, prueba con
+  // transferencia, vuelve a Webpay... y cada vuelta creaba un pedido nuevo.
+  // Ahora es el mismo pedido, con el último medio de pago que eligió.
+  const reutilizable = pedidoSinPagarIgual({
+    email: input.email,
+    productId: product.id,
+    quantity,
+    links,
+    comments: commentLines.length ? commentLines.join("\n") : null,
+  });
+  if (reutilizable) {
+    const metodo = input.paymentProvider ?? "flow";
+    run(
+      `UPDATE orders
+          SET amount_clp = ?, discount_clp = ?, coupon_code = ?, cost_usd = ?,
+              provider_service_id = ?, payment_provider = ?, phone = COALESCE(?, phone),
+              status = 'pending', provider_error = NULL, updated_at = datetime('now')
+        WHERE id = ?`,
+      [
+        amount, coupon?.discountClp ?? 0, coupon?.code ?? null,
+        costUsd(routed.service.rate_usd_per_1000, quantity),
+        routed.service.service_id, metodo, input.phone?.trim() || null,
+        reutilizable.id,
+      ],
+    );
+    if (coupon && coupon.code !== reutilizable.coupon_code) {
+      run("UPDATE coupons SET used = used + 1 WHERE code = ?", [coupon.code]);
+    }
+    logEvent(
+      reutilizable.id,
+      "info",
+      `El cliente volvió a la compra y eligió pagar por ${metodo === "transferencia" ? "transferencia" : "Webpay"}` +
+        (reutilizable.amount_clp !== amount ? ` (nuevo total ${amount.toLocaleString("es-CL")} CLP).` : "."),
+    );
+    return { ok: true, order: getOrderById(reutilizable.id)!, reutilizado: true };
+  }
+
   const code = uniqueCode();
   const info = run(
     `INSERT INTO orders
@@ -265,7 +303,77 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
       (order.payment_provider === "transferencia" ? ", a pagar por transferencia." : "."),
   );
   if (coupon) run("UPDATE coupons SET used = used + 1 WHERE code = ?", [coupon.code]);
-  return { ok: true, order };
+  return { ok: true, order, reutilizado: false };
+}
+
+/**
+ * Un pedido de la tienda igual a este (mismo correo, producto, cantidad,
+ * destinos y comentarios) que todavía no se paga. Solo de las últimas horas:
+ * uno de la semana pasada ya es otra compra.
+ */
+function pedidoSinPagarIgual(input: {
+  email: string;
+  productId: number;
+  quantity: number;
+  links: string[];
+  comments: string | null;
+}): Order | undefined {
+  const candidatos = all<Order>(
+    `SELECT * FROM orders
+      WHERE email = ? AND product_id = ? AND quantity = ?
+        AND COALESCE(comments, '') = ?
+        AND payment_status = 'pending' AND reseller_user_id IS NULL
+        AND status IN ('pending', 'failed', 'canceled')
+        AND created_at > datetime('now', ?)
+      ORDER BY id DESC LIMIT 5`,
+    [
+      input.email.trim().toLowerCase(), input.productId, input.quantity,
+      input.comments ?? "", `-${HORAS_PEDIDO_SIN_PAGAR} hours`,
+    ],
+  );
+  const buscados = input.links.join("\n");
+  return candidatos.find(
+    (o) => orderTargets(o.id).map((t) => t.link).join("\n") === buscados,
+  );
+}
+
+/** Horas que un pedido de la tienda puede esperar el pago antes de anularse. */
+export const HORAS_PEDIDO_SIN_PAGAR = 48;
+
+/**
+ * Anula los pedidos de la tienda que nunca se pagaron.
+ *
+ * Son compras abandonadas: el cliente abrió el pago y se fue. No se borran
+ * (sirven para ver cuánto se pierde en el checkout), pero dejan de aparecer
+ * como pendientes. Una transferencia que el cliente avisó que hizo no se toca:
+ * esa la revisa el dueño.
+ */
+export function anularSinPagar(): number {
+  const vencidos = all<{ id: number }>(
+    `SELECT id FROM orders
+      WHERE payment_status = 'pending' AND reseller_user_id IS NULL
+        AND status IN ('pending', 'failed')
+        AND transfer_notified_at IS NULL
+        AND updated_at < datetime('now', ?)
+      LIMIT 500`,
+    [`-${HORAS_PEDIDO_SIN_PAGAR} hours`],
+  );
+  for (const { id } of vencidos) {
+    setStatus(id, "canceled", `Anulado: pasaron ${HORAS_PEDIDO_SIN_PAGAR} horas sin pago.`);
+  }
+  return vencidos.length;
+}
+
+/**
+ * El pedido de un `commerceOrder` de Flow. Normalmente es el código tal cual;
+ * si el cliente volvió a intentar el pago, va con un sufijo ("TS-ABC123-K9")
+ * porque Flow no acepta dos pagos con la misma orden de comercio.
+ */
+export function pedidoDeOrdenFlow(commerceOrder: string): Order | undefined {
+  const exacto = getOrderByCode(commerceOrder);
+  if (exacto) return exacto;
+  const partes = commerceOrder.split("-");
+  return partes.length > 2 ? getOrderByCode(partes.slice(0, -1).join("-")) : undefined;
 }
 
 function uniqueCode(): string {

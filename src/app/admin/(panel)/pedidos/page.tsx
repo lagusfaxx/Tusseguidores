@@ -36,9 +36,15 @@ export default async function AdminOrdersPage({
             OR EXISTS (SELECT 1 FROM order_targets t
                         WHERE t.order_id = orders.id AND t.provider_order_id IS NULL))`,
     );
+  } else if (estado === "sin-pagar") {
+    where.push("payment_status = 'pending' AND payment_provider = 'flow' AND reseller_user_id IS NULL");
   } else if (estado && estado !== "todos") {
     where.push("status = ?");
     params.push(estado);
+  } else if (!estado && !q?.trim()) {
+    // Por defecto no se muestran las compras abandonadas en Webpay: el cliente
+    // abrió el pago y nunca pagó. Siguen en "Sin pagar (Webpay)" y en "Todos".
+    where.push("NOT (payment_status = 'pending' AND payment_provider = 'flow' AND reseller_user_id IS NULL)");
   }
   if (q?.trim()) {
     where.push("(code LIKE ? OR email LIKE ? OR link LIKE ? OR product_name LIKE ?)");
@@ -75,8 +81,10 @@ export default async function AdminOrdersPage({
           className="field max-w-xs"
           placeholder="Buscar por código, correo o enlace"
         />
-        <select name="estado" defaultValue={estado ?? "todos"} className="field max-w-[180px]">
-          <option value="todos">Todos los estados</option>
+        <select name="estado" defaultValue={estado ?? ""} className="field max-w-[220px]">
+          <option value="">Pagados y transferencias</option>
+          <option value="todos">Todos (incluye sin pagar)</option>
+          <option value="sin-pagar">Sin pagar (Webpay abandonado)</option>
           <option value="transferencias">Transferencias por confirmar</option>
           <option value="sin-enviar">Pagados sin enviar</option>
           {statuses.map((status) => (

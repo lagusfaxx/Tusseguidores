@@ -67,7 +67,6 @@ export function organizationLd() {
     name: s.site_name,
     url: siteUrl(),
     logo: absoluteUrl("/icon.svg"),
-    email: s.contact_email,
     areaServed: "CL",
     sameAs: [] as string[],
   };

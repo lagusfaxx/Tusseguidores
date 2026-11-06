@@ -1,7 +1,7 @@
 import "server-only";
 import { get, rescoreServices } from "./db";
 import { getBoolSetting, getNumberSetting, invalidateSettings, setSettings } from "./settings";
-import { retryUndispatched, syncOpenOrders } from "./orders";
+import { anularSinPagar, retryUndispatched, syncOpenOrders } from "./orders";
 import { publicarNiveles, refrescarEtiquetasDeEntrega } from "./autolevels";
 import { resumirSincronizacion, sincronizarProveedores } from "./catalog-sync";
 import { algunProveedorConfigurado, refreshBalances } from "./provider";
@@ -29,6 +29,8 @@ export type ResultadoMantenimiento = {
   catalogo: string | null;
   calidad: { servicios: number; etiquetas: number } | null;
   niveles: ReturnType<typeof publicarNiveles> | null;
+  /** Pedidos de la tienda anulados por no pagarse a tiempo. */
+  sinPagar?: number;
   error?: string;
 };
 
@@ -71,6 +73,8 @@ async function pasada(forzarCatalogo: boolean): Promise<ResultadoMantenimiento> 
     calidad: null,
     niveles: null,
   };
+  // Las compras abandonadas se anulan aunque no haya proveedor: no dependen de él.
+  resultado.sinPagar = anularSinPagar();
   if (!algunProveedorConfigurado()) return resultado;
 
   // Primero lo que toca plata del cliente: pedidos pagados y en curso.
