@@ -68,7 +68,6 @@ export default function HomePage() {
   const prices = all.map((p) => cheapestTier(p)?.priceClp).filter((v): v is number => typeof v === "number");
   const desde = prices.length ? Math.min(...prices) : 1990;
 
-  const whatsapp = settings.contact_whatsapp.replace(/\D/g, "");
   const rating = storeRating();
   // Las combinaciones red + servicio que la gente busca por su nombre
   // ("seguidores instagram"). Cada una tiene su página y desde aquí recibe el
@@ -218,6 +217,46 @@ export default function HomePage() {
           ) : null}
         </section>
 
+        {/* ------------------------------------------------- Panel mayorista */}
+        {getBoolSetting("reseller_enabled", true) ? (
+          <section className="mx-auto max-w-6xl px-4 pb-12 sm:pb-16">
+            <div className="card relative overflow-hidden border-brand-400/30 p-6 sm:p-8">
+              <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
+              <div className="relative grid gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-center">
+                <div>
+                  <span className="rounded-full bg-brand-500/20 px-2.5 py-1 text-xs font-semibold text-brand-300">
+                    Para agencias y revendedores
+                  </span>
+                  <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
+                    Panel mayorista: los mismos servicios, a precio de reventa
+                  </h2>
+                  <p className="mt-3 text-ink-200">
+                    Cargas saldo una vez y pides todo lo que necesites sin pasar por el pago en cada
+                    pedido. Precio por cada 1.000 unidades, historial de pedidos y soporte por ticket.
+                  </p>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link href="/panel/crear-cuenta" className="btn btn-primary">Crear cuenta gratis</Link>
+                    <Link href="/panel/entrar" className="btn btn-ghost">Ya tengo cuenta</Link>
+                  </div>
+                </div>
+                <ul className="grid gap-2 text-sm">
+                  {[
+                    ["Precios mayoristas", "Más bajos que en la tienda, por cada 1.000."],
+                    ["Pago con saldo", "Recargas por Webpay o transferencia."],
+                    ["Todos los servicios", "El catálogo completo, no solo los packs."],
+                    ["Reposición por ticket", "Un ticket por pedido, todo en un lugar."],
+                  ].map(([titulo, texto]) => (
+                    <li key={titulo} className="rounded-xl border border-white/8 bg-white/3 px-4 py-3">
+                      <p className="font-semibold text-white">{titulo}</p>
+                      <p className="mt-0.5 text-ink-400">{texto}</p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         {/* ------------------------------------- Cómo funciona + qué no hacemos */}
         <section className="border-y border-white/8 bg-ink-900/40">
           <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
@@ -260,21 +299,14 @@ export default function HomePage() {
 
               <div className="card flex flex-col justify-center p-6">
                 <h3 className="text-lg font-bold">¿Dudas antes de pagar?</h3>
-                <p className="mt-2 text-sm text-ink-400">Contestamos el mismo día.</p>
+                <p className="mt-2 text-sm text-ink-400">
+                  Abre un ticket y te respondemos el mismo día, en la misma página.
+                </p>
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {whatsapp ? (
-                    <a
-                      href={`https://wa.me/${whatsapp}`}
-                      target="_blank"
-                      rel="noopener"
-                      className="btn btn-ghost text-sm"
-                    >
-                      Escríbenos por WhatsApp
-                    </a>
-                  ) : null}
-                  <a href={`mailto:${settings.contact_email}`} className="btn btn-ghost text-sm">
-                    {settings.contact_email}
-                  </a>
+                  <Link href="/soporte" className="btn btn-ghost text-sm">Abrir un ticket</Link>
+                  <Link href="/preguntas-frecuentes" className="btn btn-ghost text-sm">
+                    Preguntas frecuentes
+                  </Link>
                 </div>
               </div>
             </div>

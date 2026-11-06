@@ -743,7 +743,9 @@ export async function responderTicket(formData: FormData) {
           orderCode: pedido?.code ?? null,
           url: ticket.user_id
             ? absoluteUrl(`/panel/tickets/${ticket.code}`)
-            : absoluteUrl(`/pedido/${pedido?.code ?? ""}#soporte`),
+            : pedido
+              ? absoluteUrl(`/pedido/${pedido.code}#soporte`)
+              : absoluteUrl(`/soporte/${ticket.code}?k=${ticket.access_key ?? ""}`),
         });
       }
     }

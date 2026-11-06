@@ -26,6 +26,7 @@ export default async function PanelTicketsPage({
     <>
       <h1 className="text-2xl font-bold">Soporte</h1>
       <p className="mt-1 text-sm text-ink-400">
+        Un ticket por pedido: si el pedido ya tiene uno, tu mensaje se suma a esa conversación.
         Las reposiciones se piden desde el pedido.
       </p>
 

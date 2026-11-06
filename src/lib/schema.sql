@@ -360,6 +360,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   subject    TEXT    NOT NULL,
   kind       TEXT    NOT NULL DEFAULT 'consulta',  -- consulta | problema | reposicion
   status     TEXT    NOT NULL DEFAULT 'abierto',   -- abierto | respondido | cerrado
+  access_key TEXT,                                 -- llave del enlace de un ticket sin pedido ni cuenta
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );

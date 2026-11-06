@@ -6,7 +6,7 @@ import { PlatformIcon } from "./icons";
 
 export function SiteHeader() {
   const settings = getSettings();
-  const platforms = sortPlatforms(getPlatformsWithProducts()).slice(0, 5);
+  const platforms = sortPlatforms(getPlatformsWithProducts()).slice(0, 4);
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/8 bg-ink-950/85 backdrop-blur-md">
@@ -33,22 +33,28 @@ export function SiteHeader() {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-          {getBoolSetting("reseller_enabled", true) ? (
-            <Link
-              href="/panel"
-              className="hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white lg:block"
-              title="Precios de reventa con saldo"
-            >
-              Mayorista
-            </Link>
-          ) : null}
+        <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
           <Link
             href="/seguimiento"
-            className="hidden whitespace-nowrap rounded-lg px-3 py-2 text-sm text-ink-200 hover:text-white sm:block"
+            className="hidden whitespace-nowrap rounded-lg px-2.5 py-2 text-sm text-ink-200 hover:text-white sm:block"
           >
             Mi pedido
           </Link>
+          <Link
+            href="/soporte"
+            className="hidden whitespace-nowrap rounded-lg px-2.5 py-2 text-sm text-ink-200 hover:text-white xl:block"
+          >
+            Soporte
+          </Link>
+          {getBoolSetting("reseller_enabled", true) ? (
+            <Link
+              href="/panel"
+              className="hidden whitespace-nowrap rounded-lg border border-brand-400/40 bg-brand-500/15 px-3 py-1.5 text-sm font-semibold text-brand-300 transition-colors hover:bg-brand-500/25 hover:text-white sm:block"
+              title="Precios de reventa con saldo"
+            >
+              Panel mayorista
+            </Link>
+          ) : null}
           <Link href="/catalogo" className="btn btn-primary whitespace-nowrap px-4 py-2 text-sm">
             Ver precios
           </Link>
@@ -62,11 +68,23 @@ export function SiteHeader() {
         {getBoolSetting("reseller_enabled", true) ? (
           <Link
             href="/panel"
-            className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1.5 text-xs font-semibold text-brand-300 lg:hidden"
+            className="flex shrink-0 items-center gap-1.5 rounded-full border border-brand-400/40 bg-brand-500/15 px-3 py-1.5 text-xs font-semibold text-brand-300 sm:hidden"
           >
-            Mayorista
+            Panel mayorista
           </Link>
         ) : null}
+        <Link
+          href="/seguimiento"
+          className="flex shrink-0 items-center rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-xs text-ink-200 sm:hidden"
+        >
+          Mi pedido
+        </Link>
+        <Link
+          href="/soporte"
+          className="flex shrink-0 items-center rounded-full border border-white/10 bg-white/4 px-3 py-1.5 text-xs text-ink-200"
+        >
+          Soporte
+        </Link>
         {sortPlatforms(getPlatformsWithProducts()).map((p) => (
           <Link
             key={p.platform}

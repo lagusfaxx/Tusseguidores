@@ -35,7 +35,6 @@ function layout(opciones: {
   cierre?: string;
 }): string {
   const tienda = getSetting("site_name", "TusSeguidores");
-  const contacto = getSetting("contact_email", "");
 
   const filas = (opciones.filas ?? [])
     .filter(([, valor]) => valor)
@@ -74,7 +73,7 @@ function layout(opciones: {
     <tr><td style="padding:24px 28px 28px;">
       ${opciones.cierre ? `<p style="margin:0 0 14px;font-size:14px;line-height:1.6;color:${COLOR.suave};">${opciones.cierre}</p>` : ""}
       <p style="margin:0;padding-top:16px;border-top:1px solid ${COLOR.borde};font-size:13px;line-height:1.6;color:${COLOR.suave};">
-        ${contacto ? `¿Dudas? Respóndenos este correo o escríbenos a ${escape(contacto)}.` : "¿Dudas? Responde este mismo correo."}
+        ¿Dudas? Escríbenos desde la página de tu pedido o en ${escape(absoluteUrl("/soporte"))}. Toda la atención es por ticket.
       </p>
     </td></tr>
   </table>
@@ -118,7 +117,6 @@ export function correoTransferenciaPendiente(order: Order): EmailContent {
     ["Número de cuenta", datos.numero],
     ["Titular", datos.titular],
     ["RUT", datos.rut],
-    ["Correo del comprobante", datos.email],
   ];
 
   return {
@@ -148,7 +146,6 @@ export function correoTransferenciaPendiente(order: Order): EmailContent {
       datos.numero && `Número de cuenta: ${datos.numero}`,
       datos.titular && `Titular: ${datos.titular}`,
       datos.rut && `RUT: ${datos.rut}`,
-      datos.email && `Correo del comprobante: ${datos.email}`,
       "",
       datos.instrucciones,
       "",
@@ -286,6 +283,26 @@ export function correoRespuestaTicket(input: {
       input.mensaje,
       "",
       input.url,
+    ]),
+  };
+}
+
+/** Abrió una consulta en /soporte: el enlace es la única forma de volver. */
+export function correoConsultaAbierta(input: { code: string; subject: string; url: string }): EmailContent {
+  return {
+    subject: `Recibimos tu consulta · ${input.code}`,
+    html: layout({
+      titulo: "Recibimos tu consulta",
+      intro:
+        `Sobre <strong>${escape(input.subject)}</strong>. Te respondemos en la página de tu consulta ` +
+        "y te avisamos por correo cuando lo hagamos.",
+      cta: { texto: "Ver mi consulta", url: input.url },
+      cierre: "Guarda este correo: el enlace es privado y es la forma de volver a tu consulta.",
+    }),
+    text: texto([
+      `Recibimos tu consulta ${input.code}.`,
+      "",
+      `Síguela aquí: ${input.url}`,
     ]),
   };
 }

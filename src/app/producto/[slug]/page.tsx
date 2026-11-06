@@ -83,7 +83,7 @@ export default async function ProductPage({ params }: Params) {
     ? "Reposición de por vida si bajan"
     : refillDays > 0
       ? `Reposición gratis por ${refillDays} días`
-      : product.guarantee_text || "Reembolso si el pedido no se entrega";
+      : product.guarantee_text || "Reembolso en USDT o BTC si no se entrega";
 
   // El aviso sale del servicio al que de verdad se va a enrutar el pedido: si
   // hoy el económico está saliendo por uno que sí repone, no corresponde

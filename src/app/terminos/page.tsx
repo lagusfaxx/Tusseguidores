@@ -14,7 +14,7 @@ export function generateMetadata(): Metadata {
 export default function TermsPage() {
   const s = getSettings();
   return (
-    <LegalPage title="Términos y condiciones" updated="agosto de 2026">
+    <LegalPage title="Términos y condiciones" updated="noviembre de 2026">
       <h2>1. Quiénes somos</h2>
       <p>
         {s.site_name} ({s.site_domain}) es una tienda chilena de servicios de crecimiento para redes
@@ -43,22 +43,31 @@ export default function TermsPage() {
       <h2>4. Datos que entregas al comprar</h2>
       <p>
         Eres responsable de la exactitud del enlace o usuario que ingresas. Una vez enviado el pedido
-        al sistema de entrega no es posible cambiar el destino. Si te equivocaste, escríbenos de
-        inmediato a {s.contact_email}: intentaremos detenerlo, pero no podemos garantizarlo.
+        al sistema de entrega no es posible cambiar el destino. Mientras no haya salido puedes
+        corregirlo tú mismo desde la página de tu pedido; si ya salió, escríbenos de inmediato por el
+        ticket del pedido: intentaremos detenerlo, pero no podemos garantizarlo.
       </p>
 
       <h2>5. Garantía y reposición</h2>
       <p>
         Los productos que indican reposición la incluyen dentro del plazo señalado en su ficha. La
-        reposición cubre la caída de las interacciones entregadas por nosotros y se solicita
-        escribiendo con el código del pedido.
+        reposición cubre la caída de las interacciones entregadas por nosotros y se solicita desde
+        la página del pedido.
       </p>
 
       <h2>6. Devoluciones</h2>
       <p>
         Si un pedido no se entrega, devolvemos el 100% del monto pagado. Si se entrega parcialmente,
-        devolvemos la parte proporcional no entregada. Las devoluciones se realizan por el mismo
-        medio de pago dentro de los 10 días hábiles siguientes a la solicitud.
+        devolvemos la parte proporcional no entregada.
+      </p>
+      <p>
+        <strong>Las devoluciones se realizan únicamente en criptomonedas: USDT (redes TRC20 o
+        BEP20) o BTC</strong>, por el equivalente en pesos chilenos del monto a devolver al tipo de
+        cambio del día del pago de la devolución. No se hacen devoluciones a tarjetas, Webpay ni
+        cuentas bancarias. La devolución se solicita desde la página del pedido indicando la red y la
+        dirección de la billetera, y se paga dentro de los 10 días hábiles siguientes. El comprador
+        es responsable de que la dirección y la red sean correctas: un envío a una dirección o red
+        equivocada no se puede recuperar.
       </p>
       <p>
         No corresponde devolución cuando el pedido no pudo completarse por causas atribuibles al
@@ -67,8 +76,8 @@ export default function TermsPage() {
 
       <h2>7. Pagos</h2>
       <p>
-        Los pagos se procesan a través de Flow, que admite Webpay (crédito y débito), transferencia
-        bancaria y Mercado Pago. Todos los precios están expresados en pesos chilenos e incluyen los
+        Los pagos se procesan con Webpay (crédito y débito) a través de Flow, o por transferencia
+        bancaria. Todos los precios están expresados en pesos chilenos e incluyen los
         impuestos aplicables. No almacenamos datos de tarjetas en nuestros servidores.
       </p>
 
@@ -76,7 +85,7 @@ export default function TermsPage() {
       <p>
         No aceptamos pedidos destinados a cuentas o contenidos que promuevan odio, violencia, abuso
         infantil, estafas o cualquier actividad ilegal. Nos reservamos el derecho de rechazar o
-        anular un pedido, devolviendo el dinero.
+        anular un pedido, devolviendo el dinero en USDT o BTC según el punto 6.
       </p>
 
       <h2>9. Relación con las plataformas</h2>
@@ -87,8 +96,11 @@ export default function TermsPage() {
         responsabilidad de cada usuario evaluarlo.
       </p>
 
-      <h2>10. Contacto</h2>
-      <p>Para cualquier consulta escríbenos a {s.contact_email}.</p>
+      <h2>10. Atención</h2>
+      <p>
+        Toda la atención es por ticket: desde la página de tu pedido o desde la página de soporte.
+        No atendemos por correo, teléfono ni redes sociales.
+      </p>
     </LegalPage>
   );
 }

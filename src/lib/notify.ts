@@ -5,6 +5,7 @@ import { getBoolSetting } from "./settings";
 import {
   correoAdminPedidoNuevo,
   correoRespuestaTicket,
+  correoConsultaAbierta,
   correoBienvenidaPanel,
   correoAdminPedidoPagado,
   correoAdminPedidoTrabado,
@@ -236,6 +237,22 @@ export async function notificarRespuestaTicket(input: {
       html: contenido.html,
       text: contenido.text,
     });
+  } catch (error) {
+    console.error("[email]", error);
+  }
+}
+
+/** Confirma una consulta abierta en /soporte y le deja el enlace al cliente. */
+export async function notificarConsultaAbierta(input: {
+  to: string;
+  code: string;
+  subject: string;
+  url: string;
+}): Promise<void> {
+  if (!emailConfigured() || !input.to.trim()) return;
+  const contenido = correoConsultaAbierta(input);
+  try {
+    await sendEmail({ to: input.to, subject: contenido.subject, html: contenido.html, text: contenido.text });
   } catch (error) {
     console.error("[email]", error);
   }

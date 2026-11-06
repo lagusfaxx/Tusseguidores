@@ -112,7 +112,6 @@ export default async function PanelSaldoPage({
                   ["Número", datos.numero],
                   ["Titular", datos.titular],
                   ["RUT", datos.rut],
-                  ["Correo", datos.email],
                   ["Mensaje", pendiente.code],
                 ]
                   .filter(([, valor]) => valor)

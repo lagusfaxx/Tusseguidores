@@ -1,13 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import {
   corregirDestino,
   abrirTicketDePedido,
+  responderTicketDePedido,
   pedirReposicion,
+  pedirDevolucion,
   type PedidoState,
 } from "@/app/pedido/actions";
+import { REDES_DEVOLUCION, TEXTO_DEVOLUCIONES } from "@/lib/devoluciones";
 
 /**
  * Los dos formularios del seguimiento que necesitan contestar sin recargar:
@@ -52,12 +55,9 @@ export function CorregirDestino({
   const [state, action] = useActionState<PedidoState, FormData>(corregirDestino, {});
   const varios = links.length > 1;
   return (
-    <form action={action} className="card p-5">
+    <form action={action}>
       <input type="hidden" name="code" value={code} />
-      <h2 className="font-bold">
-        {varios ? "¿Te equivocaste de publicación?" : "¿Te equivocaste de cuenta?"}
-      </h2>
-      <p className="mt-1 text-sm text-ink-400">
+      <p className="text-sm text-ink-400">
         {varios
           ? "Puedes corregir los enlaces mientras el pedido no haya salido. Uno por línea, y tienen que seguir siendo los mismos."
           : "Puedes corregir el destino mientras el pedido no haya salido."}
@@ -86,24 +86,115 @@ export function CorregirDestino({
 
 export function AbrirTicket({ code }: { code: string }) {
   const [state, action] = useActionState<PedidoState, FormData>(abrirTicketDePedido, {});
-  if (state.ok) {
-    return (
-      <div className="card p-5">
-        <h2 className="font-bold">Mensaje enviado</h2>
-        <p className="mt-1 text-sm text-ink-400">{state.ok}</p>
+  return (
+    <form action={action}>
+      <input type="hidden" name="code" value={code} />
+      <p className="text-sm text-ink-400">
+        Escríbenos aquí y te respondemos en esta misma página. Te avisamos por correo cuando
+        contestemos.
+      </p>
+      <label className="field-label mt-4" htmlFor="body">Tu mensaje</label>
+      <textarea
+        id="body"
+        name="body"
+        rows={4}
+        required
+        minLength={5}
+        className="field"
+        maxLength={4000}
+        placeholder="Cuéntanos qué pasa con tu pedido"
+      />
+      <div className="mt-3">
+        <Boton pendiente="Enviando…">Enviar mensaje</Boton>
       </div>
+      <Aviso state={state} />
+    </form>
+  );
+}
+
+/** Responder en el ticket del pedido. Limpia el campo cuando el mensaje sale. */
+export function ResponderTicket({
+  code,
+  ticket,
+  bloqueado,
+}: {
+  code: string;
+  ticket: string;
+  /** Mensaje que explica por qué no puede escribir todavía. */
+  bloqueado?: string | null;
+}) {
+  const [state, action] = useActionState<PedidoState, FormData>(responderTicketDePedido, {});
+  const form = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    if (state.ok) form.current?.reset();
+  }, [state]);
+
+  if (bloqueado) {
+    return (
+      <p className="mt-4 rounded-lg border border-white/10 bg-white/4 px-3 py-2.5 text-xs leading-relaxed text-ink-400">
+        {bloqueado}
+      </p>
     );
   }
   return (
-    <form action={action} className="card p-5">
+    <form ref={form} action={action} className="mt-4">
       <input type="hidden" name="code" value={code} />
-      <h2 className="font-bold">¿Necesitas ayuda con este pedido?</h2>
-      <label className="field-label mt-4" htmlFor="subject">Asunto</label>
-      <input id="subject" name="subject" required className="field" maxLength={140} />
-      <label className="field-label mt-4" htmlFor="body">Mensaje</label>
-      <textarea id="body" name="body" rows={4} required className="field" maxLength={4000} />
-      <div className="mt-4">
+      <input type="hidden" name="ticket" value={ticket} />
+      <textarea
+        name="body"
+        rows={3}
+        required
+        className="field text-sm"
+        placeholder="Escribe tu mensaje"
+        maxLength={4000}
+      />
+      <div className="mt-3">
         <Boton pendiente="Enviando…">Enviar</Boton>
+      </div>
+      <Aviso state={state} />
+    </form>
+  );
+}
+
+/**
+ * Pedir la devolución. Solo en cripto: el cliente elige USDT o BTC y deja su
+ * dirección, que es todo lo que hace falta para pagarle.
+ */
+export function PedirDevolucion({ code }: { code: string }) {
+  const [state, action] = useActionState<PedidoState, FormData>(pedirDevolucion, {});
+  if (state.ok) {
+    return <p className="text-sm text-lime-200">{state.ok}</p>;
+  }
+  return (
+    <form action={action}>
+      <input type="hidden" name="code" value={code} />
+      <p className="text-sm text-ink-400">{TEXTO_DEVOLUCIONES}</p>
+      <label className="field-label mt-4" htmlFor="red">Recibir en</label>
+      <select id="red" name="red" required className="field" defaultValue="">
+        <option value="" disabled>Elige moneda y red</option>
+        {Object.entries(REDES_DEVOLUCION).map(([id, red]) => (
+          <option key={id} value={id}>{red.etiqueta}</option>
+        ))}
+      </select>
+      <label className="field-label mt-4" htmlFor="direccion">Dirección de tu billetera</label>
+      <input
+        id="direccion"
+        name="direccion"
+        required
+        autoComplete="off"
+        spellCheck={false}
+        className="field font-mono text-xs"
+        placeholder="Pega la dirección completa"
+      />
+      <p className="mt-1.5 text-xs text-ink-600">
+        Revisa que la red coincida con tu billetera: un envío a la red equivocada no se puede recuperar.
+      </p>
+      <label className="field-label mt-4" htmlFor="detalle-devolucion">
+        Comentario <span className="font-normal text-ink-600">(opcional)</span>
+      </label>
+      <textarea id="detalle-devolucion" name="detalle" rows={2} className="field" maxLength={1000} />
+      <div className="mt-4">
+        <Boton pendiente="Enviando…">Pedir la devolución</Boton>
       </div>
       <Aviso state={state} />
     </form>
@@ -129,19 +220,13 @@ export function PedirReposicion({
   const [state, action] = useActionState<PedidoState, FormData>(pedirReposicion, {});
 
   if (state.ok) {
-    return (
-      <div className="card p-5">
-        <h2 className="font-bold">Reposición pedida</h2>
-        <p className="mt-1 text-sm text-ink-400">{state.ok}</p>
-      </div>
-    );
+    return <p className="text-sm text-lime-200">{state.ok}</p>;
   }
 
   return (
-    <form action={action} className="card p-5">
+    <form action={action}>
       <input type="hidden" name="code" value={code} />
-      <h2 className="font-bold">¿Se cayó parte de lo que entregamos?</h2>
-      <p className="mt-1 text-sm text-ink-400">
+      <p className="text-sm text-ink-400">
         Lo reponemos sin costo. {vigencia}.
       </p>
       <label className="field-label mt-4" htmlFor="detalle">

@@ -72,7 +72,7 @@ export function TransferPanel({
   if (order.payment_status === "paid") return null;
 
   return (
-    <section className="card mt-6 border-amber-500/30 p-6">
+    <section className="card border-amber-500/30 p-5 sm:p-6">
       <h2 className="text-lg font-bold">Transfiere para completar tu pedido</h2>
       <p className="mt-1.5 text-sm leading-relaxed text-ink-200">
         Todavía no recibimos el pago. Transfiere{" "}
@@ -87,7 +87,6 @@ export function TransferPanel({
         <Dato etiqueta="N° de cuenta" valor={datos.numero} copiable />
         <Dato etiqueta="Titular" valor={datos.titular} />
         <Dato etiqueta="RUT" valor={datos.rut} copiable />
-        <Dato etiqueta="Correo" valor={datos.email} copiable />
         <Dato etiqueta="Monto" valor={formatClp(order.amount_clp)} copiable />
         <Dato etiqueta="Mensaje" valor={order.code} copiable />
       </dl>
