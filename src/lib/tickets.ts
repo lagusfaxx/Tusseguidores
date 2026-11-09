@@ -37,6 +37,13 @@ export const TIPO_TICKET: Record<string, string> = {
  */
 export const MAX_MENSAJES_SIN_RESPUESTA = 3;
 
+/**
+ * Mensajes del cliente en un mismo ticket en 24 horas. Con el asistente
+ * contestando cada uno, el tope de arriba nunca se alcanza: esto es lo que
+ * frena al que escribe sin parar.
+ */
+export const MAX_MENSAJES_POR_DIA = 8;
+
 /** Tickets abiertos a la vez que puede tener un mayorista sin pedido enganchado. */
 const MAX_TICKETS_SUELTOS_ABIERTOS = 2;
 
@@ -88,21 +95,44 @@ export function ticketDelPedido(orderId: number): Ticket | undefined {
   return get<Ticket>("SELECT * FROM tickets WHERE order_id = ? ORDER BY id LIMIT 1", [orderId]);
 }
 
-/** Cuántos mensajes seguidos dejó el cliente desde la última respuesta nuestra. */
-export function mensajesSinRespuesta(ticketId: number): number {
+/**
+ * Cuántos mensajes seguidos dejó el cliente desde la última respuesta.
+ *
+ * @param soloHumanas  cuenta desde la última respuesta del dueño, sin contar
+ *                     las del asistente: es la medida de "cuánto insiste".
+ */
+export function mensajesSinRespuesta(ticketId: number, soloHumanas = false): number {
+  const autores = soloHumanas ? "('admin')" : "('admin', 'ia')";
   return (
     get<{ n: number }>(
       `SELECT COUNT(*) AS n FROM ticket_messages
         WHERE ticket_id = ? AND author = 'cliente'
           AND id > COALESCE((SELECT MAX(id) FROM ticket_messages
-                              WHERE ticket_id = ? AND author = 'admin'), 0)`,
+                              WHERE ticket_id = ? AND author IN ${autores}), 0)`,
       [ticketId, ticketId],
+    )?.n ?? 0
+  );
+}
+
+function mensajesDelDia(ticketId: number): number {
+  return (
+    get<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ticket_messages
+        WHERE ticket_id = ? AND author = 'cliente' AND created_at > datetime('now', '-1 day')`,
+      [ticketId],
     )?.n ?? 0
   );
 }
 
 /** Si el cliente todavía puede escribir en el ticket, o por qué no. */
 export function puedeEscribir(ticketId: number): { ok: true } | { ok: false; error: string } {
+  if (mensajesDelDia(ticketId) >= MAX_MENSAJES_POR_DIA) {
+    return {
+      ok: false,
+      error:
+        "Ya nos escribiste mucho hoy sobre este caso. Una persona del equipo lo está revisando y te responde aquí.",
+    };
+  }
   if (mensajesSinRespuesta(ticketId) >= MAX_MENSAJES_SIN_RESPUESTA) {
     return {
       ok: false,
@@ -190,7 +220,13 @@ export function crearTicket(input: CrearTicketInput): CrearTicketResult {
   return { ok: true, ticket, existente: false };
 }
 
-export function agregarMensaje(ticketId: number, author: "cliente" | "admin", body: string) {
+export function agregarMensaje(
+  ticketId: number,
+  author: "cliente" | "admin" | "ia",
+  body: string,
+  /** Solo para "ia": el asistente decide si el ticket queda respondido o sigue abierto. */
+  estado?: "abierto" | "respondido",
+) {
   const texto = body.trim().slice(0, 4000);
   if (!texto) return;
   run("INSERT INTO ticket_messages (ticket_id, author, body) VALUES (?, ?, ?)", [
@@ -201,10 +237,16 @@ export function agregarMensaje(ticketId: number, author: "cliente" | "admin", bo
   // Quien escribe define el estado: si contesta el dueño queda "respondido",
   // si escribe el cliente vuelve a "abierto" y reaparece en la lista de
   // pendientes del administrador.
-  run("UPDATE tickets SET status = ?, updated_at = datetime('now') WHERE id = ?", [
-    author === "admin" ? "respondido" : "abierto",
-    ticketId,
-  ]);
+  run(
+    `UPDATE tickets SET status = ?, updated_at = datetime('now'),
+            escalated_at = CASE WHEN ? = 'admin' THEN NULL ELSE escalated_at END
+      WHERE id = ?`,
+    [
+      author === "admin" ? "respondido" : author === "ia" ? (estado ?? "respondido") : "abierto",
+      author,
+      ticketId,
+    ],
+  );
 }
 
 /** Ticket de /soporte: se busca por código y llave, nunca solo por código. */
@@ -273,7 +315,7 @@ export function ticketsParaAdmin(estado = "abiertos", limit = 100): TicketConCli
        LEFT JOIN reseller_users u ON u.id = t.user_id
        LEFT JOIN orders o ON o.id = t.order_id
        ${where}
-      ORDER BY (t.status = 'abierto') DESC, t.updated_at DESC
+      ORDER BY (t.escalated_at IS NOT NULL AND t.status != 'cerrado') DESC, (t.status = 'abierto') DESC, t.updated_at DESC
       LIMIT ?`,
     [limit],
   );
@@ -312,4 +354,36 @@ export function contactoDeTicket(ticket: Ticket): string {
     return get<{ email: string }>("SELECT email FROM orders WHERE id = ?", [ticket.order_id])?.email ?? "";
   }
   return "";
+}
+
+/**
+ * Borra tickets con sus mensajes. No se puede deshacer.
+ *
+ * @param alcance "todos", "cerrados" o "respondidos" (los que no esperan nada
+ *                de nosotros: respondidos por el dueño o el asistente).
+ */
+export function borrarTickets(alcance: "todos" | "cerrados" | "respondidos"): number {
+  const where =
+    alcance === "cerrados"
+      ? "WHERE status = 'cerrado'"
+      : alcance === "respondidos"
+        ? "WHERE status IN ('cerrado', 'respondido')"
+        : "";
+  const ids = all<{ id: number }>(`SELECT id FROM tickets ${where}`).map((t) => t.id);
+  if (!ids.length) return 0;
+  // Los mensajes se borran a mano: el ON DELETE CASCADE depende de que la
+  // conexión tenga las llaves foráneas encendidas, y aquí no se apuesta.
+  const enLotes = 500;
+  for (let i = 0; i < ids.length; i += enLotes) {
+    const lote = ids.slice(i, i + enLotes);
+    const marcas = lote.map(() => "?").join(",");
+    run(`DELETE FROM ticket_messages WHERE ticket_id IN (${marcas})`, lote);
+    run(`DELETE FROM tickets WHERE id IN (${marcas})`, lote);
+  }
+  return ids.length;
+}
+
+export function borrarTicket(id: number): void {
+  run("DELETE FROM ticket_messages WHERE ticket_id = ?", [id]);
+  run("DELETE FROM tickets WHERE id = ?", [id]);
 }

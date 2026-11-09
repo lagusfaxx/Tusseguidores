@@ -9,6 +9,7 @@ import { crearTicket, agregarMensaje, ticketDePedido, puedeEscribir } from "@/li
 import { devolucionDisponible, REDES_DEVOLUCION, type RedDevolucion } from "@/lib/devoluciones";
 import type { Ticket } from "@/lib/types";
 import { avisarAdmin, notificarTransferenciaPendiente } from "@/lib/notify";
+import { trasMensajeDelCliente } from "@/lib/ia-tickets";
 import { abrirPagoFlow } from "@/lib/checkout";
 import { transferenciaDisponible } from "@/lib/transfer";
 import { revisarDestinos, separarDestinos } from "@/lib/targets";
@@ -149,12 +150,16 @@ export async function responderTicketDePedido(
 }
 
 async function avisoDeTicket(orderCode: string, email: string, ticket: Ticket, existente: boolean) {
-  await avisarAdmin(
-    existente ? `Mensaje nuevo · ${ticket.code} · pedido ${orderCode}` : `Ticket nuevo · ${ticket.code} · pedido ${orderCode}`,
-    `<p><strong>${email}</strong> ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.</p>` +
+  // Con el asistente activo contesta él y al dueño le llega correo solo si el
+  // cliente insiste o hace falta una persona.
+  await trasMensajeDelCliente(ticket.id, {
+    subject:
+      existente ? `Mensaje nuevo · ${ticket.code} · pedido ${orderCode}` : `Ticket nuevo · ${ticket.code} · pedido ${orderCode}`,
+    html:
+      `<p><strong>${email}</strong> ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Responder</a></p>`,
-    `${email} ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.`,
-  );
+    text: `${email} ${existente ? "escribió en" : "abrió"} el ticket ${ticket.code} del pedido ${orderCode}.`,
+  });
 }
 
 /**
@@ -240,13 +245,14 @@ export async function pedirReposicion(
   });
   if (!result.ok) return { error: result.error };
 
-  await avisarAdmin(
-    `Reposición pedida · ${order.code}`,
-    `<p><strong>${order.email}</strong> pidió la reposición de su pedido ${order.code}.</p>` +
+  await trasMensajeDelCliente(result.ticket.id, {
+    subject: `Reposición pedida · ${order.code}`,
+    html:
+      `<p><strong>${order.email}</strong> pidió la reposición de su pedido ${order.code}.</p>` +
       `<p>${order.product_name} · ${order.quantity} u. · destino ${order.link}</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Abrir el ticket ${result.ticket.code}</a></p>`,
-    `${order.email} pidió la reposición de ${order.code}. Ticket ${result.ticket.code}: ${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}`,
-  );
+    text: `${order.email} pidió la reposición de ${order.code}. Ticket ${result.ticket.code}: ${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}`,
+  });
 
   revalidatePath(`/pedido/${order.code}`);
   return { ok: `Listo, la pedimos. Seguimos por el ticket ${result.ticket.code}.` };

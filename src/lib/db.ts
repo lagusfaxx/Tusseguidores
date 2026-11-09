@@ -131,6 +131,9 @@ function migrate(database: Database.Database) {
   if (!columns("tickets").has("access_key")) {
     database.exec("ALTER TABLE tickets ADD COLUMN access_key TEXT");
   }
+  if (!columns("tickets").has("escalated_at")) {
+    database.exec("ALTER TABLE tickets ADD COLUMN escalated_at TEXT");
+  }
   database.exec("CREATE INDEX IF NOT EXISTS idx_tickets_order ON tickets(order_id)");
 
   // Índices que dependen de columnas agregadas por esta misma función. No

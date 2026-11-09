@@ -62,6 +62,22 @@ entrega sigue en curso. Así el cliente ve cuántas faltan ahora y no lo que
 había hace nueve minutos. Para no castigar al proveedor, un mismo pedido no se
 consulta más de una vez cada 45 segundos.
 
+### Asistente de tickets (OpenAI)
+
+En **Ajustes → Asistente de tickets** activa la casilla y pega tu API key de
+OpenAI (o define `OPENAI_API_KEY`). Cada vez que un cliente escribe, el
+asistente contesta en el mismo ticket con el estado real del pedido y las
+reglas de la tienda. No reembolsa, no repone ni cambia nada: explica y guía al
+botón que corresponde.
+
+Te llega un correo solo cuando hace falta una persona: el cliente lleva 3
+mensajes sin respuesta tuya o el asistente decide que no puede resolverlo
+(reclamos, transferencias por confirmar, devoluciones por pagar). Un aviso
+por caso: el siguiente sale después de que respondas. Esos tickets aparecen
+arriba en la lista con la marca **Necesita una persona**.
+
+`OPENAI_BASE_URL` permite apuntar a un proxy o a una API compatible.
+
 ### Asistente conectado (MCP)
 
 La tienda expone un servidor [MCP](https://modelcontextprotocol.io) en

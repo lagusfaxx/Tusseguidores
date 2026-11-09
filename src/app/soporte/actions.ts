@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { crearTicket, agregarMensaje, ticketConLlave, puedeEscribir } from "@/lib/tickets";
-import { avisarAdmin, notificarConsultaAbierta } from "@/lib/notify";
+import { notificarConsultaAbierta } from "@/lib/notify";
+import { avisarTicket } from "@/lib/ia-tickets";
 import { absoluteUrl } from "@/lib/seo";
 import { isValidEmail } from "@/lib/utils";
 
@@ -34,7 +35,7 @@ export async function abrirConsulta(_prev: SoporteState, formData: FormData): Pr
   const ticket = result.ticket;
   const url = absoluteUrl(`/soporte/${ticket.code}?k=${ticket.access_key}`);
   await notificarConsultaAbierta({ to: email, code: ticket.code, subject: ticket.subject, url });
-  await avisarAdmin(
+  await avisarTicket(ticket.id,
     `Consulta nueva · ${ticket.code}`,
     `<p><strong>${email}</strong> abrió la consulta ${ticket.code}: ${ticket.subject}</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Responder</a></p>`,
@@ -55,7 +56,7 @@ export async function responderConsulta(_prev: SoporteState, formData: FormData)
   if (!permiso.ok) return { error: permiso.error };
 
   agregarMensaje(ticket.id, "cliente", cuerpo);
-  await avisarAdmin(
+  await avisarTicket(ticket.id,
     `Mensaje nuevo · ${ticket.code}`,
     `<p><strong>${ticket.guest_email}</strong> escribió en la consulta ${ticket.code}.</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Responder</a></p>`,

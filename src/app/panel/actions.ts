@@ -10,6 +10,7 @@ import { crearTicket, agregarMensaje, ticketDelCliente, puedeEscribir } from "@/
 import { createPayment, checkoutUrl, flowConfigured } from "@/lib/flow";
 import { transferenciaDisponible } from "@/lib/transfer";
 import { avisarAdmin, notificarBienvenidaPanel } from "@/lib/notify";
+import { avisarTicket } from "@/lib/ia-tickets";
 import { absoluteUrl } from "@/lib/seo";
 import { getBoolSetting, getSetting } from "@/lib/settings";
 import { formatClp } from "@/lib/pricing";
@@ -140,7 +141,7 @@ export async function accionPedirReposicion(formData: FormData) {
     redirect(`/panel/pedidos/${orderId}?error=${encodeURIComponent(result.error)}`);
   }
 
-  await avisarAdmin(
+  await avisarTicket(result.ticket.id,
     `Solicitud de reposición · ${order.code}`,
     `<p><strong>${user.email}</strong> pidió la reposición del pedido ${order.code}.</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Abrir el ticket ${result.ticket.code}</a></p>`,
@@ -225,7 +226,7 @@ export async function accionCrearTicket(_prev: PanelState, formData: FormData): 
   });
   if (!result.ok) return { error: result.error };
 
-  await avisarAdmin(
+  await avisarTicket(result.ticket.id,
     `${result.existente ? "Mensaje nuevo" : "Ticket nuevo"} · ${result.ticket.code}`,
     `<p><strong>${user.email}</strong> ${result.existente ? "escribió en" : "abrió"} el ticket ${result.ticket.code}: ${result.ticket.subject}</p>` +
       `<p><a href="${absoluteUrl(`/admin/tickets/${result.ticket.id}`)}">Responder</a></p>`,
@@ -245,7 +246,7 @@ export async function accionResponderTicket(formData: FormData) {
   if (!permiso.ok) redirect(`/panel/tickets/${ticket.code}?error=${encodeURIComponent(permiso.error)}`);
   if (cuerpo) {
     agregarMensaje(ticket.id, "cliente", cuerpo);
-    await avisarAdmin(
+    await avisarTicket(ticket.id,
       `Respuesta en el ticket ${ticket.code}`,
       `<p><strong>${user.email}</strong> respondió en el ticket ${ticket.code}.</p>` +
         `<p><a href="${absoluteUrl(`/admin/tickets/${ticket.id}`)}">Abrir</a></p>`,
