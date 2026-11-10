@@ -86,6 +86,8 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   openai_model: "gpt-4o-mini",
   // Lo que el asistente tiene que saber además de las reglas de la tienda.
   ia_instrucciones: "",
+  // Solo los tickets abiertos desde esta fecha (AAAA-MM-DD). Vacío = todos.
+  ia_desde: "",
 
   // Flow.cl
   flow_api_key: "",

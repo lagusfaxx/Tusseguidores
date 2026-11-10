@@ -53,6 +53,32 @@ export function iaActiva(): boolean {
   return config.enabled && Boolean(config.apiKey);
 }
 
+/**
+ * El asistente contesta solo los tickets abiertos desde la fecha de Ajustes
+ * ("ia_desde", AAAA-MM-DD, medianoche en Chile). Los anteriores siguen como
+ * antes: te llega el aviso y respondes tú. Vacío = todos.
+ *
+ * Se revisa en el código y no en las instrucciones del modelo: así es seguro
+ * y no se gasta una llamada a OpenAI en un ticket que no le toca.
+ */
+function dentroDeLaFecha(ticketId: number): boolean {
+  const desde = (getSettings().ia_desde ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(desde)) return true;
+  const ticket = ticketPorId(ticketId);
+  if (!ticket) return false;
+  const creado = new Date(`${ticket.created_at.replace(" ", "T")}Z`);
+  return creado.getTime() >= medianocheEnChile(desde).getTime();
+}
+
+/** La medianoche de esa fecha en Santiago, como instante UTC. */
+function medianocheEnChile(fecha: string): Date {
+  const utc = new Date(`${fecha}T00:00:00Z`);
+  // Desfase de Chile ese día (-3 o -4 según el horario de verano).
+  const enChile = new Date(utc.toLocaleString("en-US", { timeZone: "America/Santiago" }));
+  const enUtc = new Date(utc.toLocaleString("en-US", { timeZone: "UTC" }));
+  return new Date(utc.getTime() + (enUtc.getTime() - enChile.getTime()));
+}
+
 type Decision = { respuesta: string; escalar: boolean; motivo: string };
 
 /** Aviso que se manda al dueño cuando no hay asistente (o si falla). */
@@ -65,7 +91,7 @@ export type AvisoAdmin = { subject: string; html: string; text: string };
  * al dueño solo le llega correo si el cliente insiste o hace falta una persona.
  */
 export async function trasMensajeDelCliente(ticketId: number, avisoSinIa: AvisoAdmin): Promise<void> {
-  if (!iaActiva()) {
+  if (!iaActiva() || !dentroDeLaFecha(ticketId)) {
     await avisarAdmin(avisoSinIa.subject, avisoSinIa.html, avisoSinIa.text);
     return;
   }

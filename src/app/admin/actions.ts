@@ -107,7 +107,7 @@ const SETTING_KEYS = [
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
-  "ia_tickets_enabled", "openai_api_key", "openai_model", "ia_instrucciones",
+  "ia_tickets_enabled", "openai_api_key", "openai_model", "ia_instrucciones", "ia_desde",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",

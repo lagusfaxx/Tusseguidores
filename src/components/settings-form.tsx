@@ -317,6 +317,9 @@ export function SettingsForm({
           <Field label="Modelo" name="openai_model" value={settings.openai_model}
             placeholder="gpt-4o-mini"
             hint="gpt-4o-mini es barato y alcanza para soporte. Puedes poner cualquier modelo de chat de tu cuenta." />
+          <Field label="Responder solo tickets abiertos desde" name="ia_desde" type="date"
+            value={settings.ia_desde}
+            hint="Los tickets creados antes de esta fecha no los toca: te llega el aviso y respondes tú, como antes. Vacío = responde todos." />
           <div>
             <label className="field-label" htmlFor="ia_instrucciones">Lo que el asistente debe saber</label>
             <textarea id="ia_instrucciones" name="ia_instrucciones" rows={4}
