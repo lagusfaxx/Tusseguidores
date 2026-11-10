@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import {
-  saveSettings, changePassword, testFlow, testResend, type ActionState,
+  saveSettings, changePassword, testFlow, testResend, testOpenAI, type ActionState,
 } from "@/app/admin/actions";
 import { Feedback, SubmitButton } from "./admin-ui";
 
@@ -19,6 +19,7 @@ type Props = {
   providerKeyFromEnv: boolean;
   japKeyFromEnv: boolean;
   resendKeyFromEnv: boolean;
+  openaiKeyFromEnv: boolean;
 };
 
 /** Saldo consultado en vivo, o el error que dio la consulta. */
@@ -85,12 +86,13 @@ function Check({ label, name, checked, hint }: { label: string; name: string; ch
 
 export function SettingsForm({
   settings, minRates, providerBalance, providerBalanceError, japBalance, japBalanceError,
-  flowSandbox, flowForcedByEnv, providerKeyFromEnv, japKeyFromEnv, resendKeyFromEnv,
+  flowSandbox, flowForcedByEnv, providerKeyFromEnv, japKeyFromEnv, resendKeyFromEnv, openaiKeyFromEnv,
 }: Props) {
   const [state, formAction] = useActionState<ActionState, FormData>(saveSettings, {});
   const [passwordState, passwordAction] = useActionState<ActionState, FormData>(changePassword, {});
   const [flowState, flowAction] = useActionState<ActionState>(testFlow, {});
   const [emailState, emailAction] = useActionState<ActionState>(testResend, {});
+  const [iaState, iaAction] = useActionState<ActionState>(testOpenAI, {});
   // El entorno real, no el que dice la casilla: una variable de entorno puede
   // estar pisándola.
   const sandbox = flowSandbox;
@@ -300,6 +302,35 @@ export function SettingsForm({
         </Section>
 
         <Section
+          title="Asistente de tickets (OpenAI)"
+          hint="Responde solo cada mensaje de los clientes con el estado real del pedido y las reglas de la tienda. A ti te llega un correo solo cuando el cliente insiste (3 mensajes sin respuesta tuya) o el caso necesita una persona."
+        >
+          <Check label="Responder los tickets con IA" name="ia_tickets_enabled"
+            checked={settings.ia_tickets_enabled === "1"}
+            hint="Apagado, los tickets funcionan como antes: te llega un aviso por cada mensaje y respondes tú." />
+          <div>
+            <Field label="API key de OpenAI" name="openai_api_key" type="password"
+              value={settings.openai_api_key}
+              hint="La creas en platform.openai.com → API keys. Necesita saldo en la cuenta." />
+            {openaiKeyFromEnv ? <EnvNotice name="OPENAI_API_KEY" /> : null}
+          </div>
+          <Field label="Modelo" name="openai_model" value={settings.openai_model}
+            placeholder="gpt-4o-mini"
+            hint="gpt-4o-mini es barato y alcanza para soporte. Puedes poner cualquier modelo de chat de tu cuenta." />
+          <div>
+            <label className="field-label" htmlFor="ia_instrucciones">Lo que el asistente debe saber</label>
+            <textarea id="ia_instrucciones" name="ia_instrucciones" rows={4}
+              defaultValue={settings.ia_instrucciones} className="field"
+              placeholder="Ej: Las transferencias se revisan de lunes a viernes de 9 a 19 h. Los pedidos de TikTok pueden tardar hasta 24 h en empezar." />
+            <p className="mt-1 text-xs text-ink-400">
+              Se suma a las reglas de la tienda (pagos, reposición, devoluciones en USDT/BTC, atención
+              solo por ticket). El asistente no reembolsa, no repone ni cambia nada: explica y te pasa
+              los casos.
+            </p>
+          </div>
+        </Section>
+
+        <Section
           title="Panel mayorista"
           hint="La sección de reventa: el cliente carga saldo y manda pedidos al costo del proveedor más un margen chico, sin los pisos de precio de la tienda."
         >
@@ -441,6 +472,17 @@ export function SettingsForm({
         <div className="mt-5 flex flex-wrap items-center gap-4">
           <SubmitButton className="btn btn-ghost text-sm">Enviar prueba</SubmitButton>
           <Feedback state={emailState} />
+        </div>
+      </form>
+
+      <form action={iaAction} className="card mt-6 p-6">
+        <h2 className="font-bold">Probar el asistente (OpenAI)</h2>
+        <p className="mt-1 text-sm text-ink-400">
+          Comprueba la API key y el modelo guardados con una pregunta mínima.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-4">
+          <SubmitButton className="btn btn-ghost text-sm">Probar ahora</SubmitButton>
+          <Feedback state={iaState} />
         </div>
       </form>
 

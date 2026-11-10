@@ -5,7 +5,7 @@ import {
   ticketPorId, mensajesDeTicket, contactoDeTicket, ETIQUETA_TICKET, TIPO_TICKET,
 } from "@/lib/tickets";
 import { getOrderById } from "@/lib/orders";
-import { responderTicket, reposicionDesdeTicket } from "@/app/admin/actions";
+import { responderTicket, reposicionDesdeTicket, borrarUnTicket } from "@/app/admin/actions";
 import { formatClp, formatNumber } from "@/lib/pricing";
 import { formatDateCl } from "@/lib/utils";
 import { ORDER_STATUS_LABEL } from "@/lib/orders";
@@ -78,10 +78,10 @@ export default async function AdminTicketDetalle({
             {mensajes.map((m) => (
               <div
                 key={m.id}
-                className={`card p-4 ${m.author === "admin" ? "border-brand-400/30 bg-brand-500/5" : ""}`}
+                className={`card p-4 ${m.author === "admin" ? "border-brand-400/30 bg-brand-500/5" : m.author === "ia" ? "border-sky-400/30 bg-sky-500/5" : ""}`}
               >
                 <p className="text-xs font-semibold text-ink-400">
-                  {m.author === "admin" ? "Tú" : contacto} · {formatDateCl(m.created_at)}
+                  {m.author === "admin" ? "Tú" : m.author === "ia" ? "Asistente IA" : contacto} · {formatDateCl(m.created_at)}
                 </p>
                 <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-200">{m.body}</p>
               </div>
@@ -160,6 +160,12 @@ export default async function AdminTicketDetalle({
               </Link>
             </section>
           ) : null}
+          <form action={borrarUnTicket} className="card p-5">
+            <input type="hidden" name="ticket_id" value={ticket.id} />
+            <button type="submit" className="w-full text-sm text-red-300 hover:text-red-200">
+              Borrar este ticket
+            </button>
+          </form>
         </aside>
       </div>
     </>

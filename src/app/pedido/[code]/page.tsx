@@ -372,13 +372,17 @@ export default async function OrderPage({ params, searchParams }: Params) {
                       <div
                         key={m.id}
                         className={`rounded-xl border p-3 ${
-                          m.author === "admin"
+                          m.author !== "cliente"
                             ? "mr-6 border-brand-400/30 bg-brand-500/10"
                             : "ml-6 border-white/8 bg-white/3"
                         }`}
                       >
                         <p className="text-[11px] font-semibold text-ink-400">
-                          {m.author === "admin" ? `${settings.site_name} · soporte` : "Tú"} ·{" "}
+                          {m.author === "admin"
+                            ? `${settings.site_name} · soporte`
+                            : m.author === "ia"
+                              ? `${settings.site_name} · asistente`
+                              : "Tú"} ·{" "}
                           {formatDateCl(m.created_at)}
                         </p>
                         <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-ink-200">

@@ -66,10 +66,10 @@ export default async function PanelTicketDetalle({
         {mensajes.map((m) => (
           <div
             key={m.id}
-            className={`card p-4 ${m.author === "admin" ? "border-brand-400/30 bg-brand-500/5" : ""}`}
+            className={`card p-4 ${m.author !== "cliente" ? "border-brand-400/30 bg-brand-500/5" : ""}`}
           >
             <p className="text-xs font-semibold text-ink-400">
-              {m.author === "admin" ? "Soporte" : "Tú"} · {formatDateCl(m.created_at)}
+              {m.author === "admin" ? "Soporte" : m.author === "ia" ? "Asistente" : "Tú"} · {formatDateCl(m.created_at)}
             </p>
             <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-200">{m.body}</p>
           </div>

@@ -55,6 +55,7 @@ export default async function AdminSettingsPage() {
           providerKeyFromEnv={Boolean((process.env.PROVIDER_API_KEY ?? "").trim())}
           japKeyFromEnv={Boolean((process.env.JAP_API_KEY ?? "").trim())}
           resendKeyFromEnv={email.keyFromEnv}
+          openaiKeyFromEnv={Boolean((process.env.OPENAI_API_KEY ?? "").trim())}
         />
       </div>
     </>

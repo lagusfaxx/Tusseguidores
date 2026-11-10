@@ -1,24 +1,32 @@
 import Link from "next/link";
 import { ticketsParaAdmin, ETIQUETA_TICKET, TIPO_TICKET } from "@/lib/tickets";
 import { formatDateCl } from "@/lib/utils";
+import { borrarTicketsEnMasa } from "@/app/admin/actions";
+import { iaActiva } from "@/lib/ia-tickets";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTicketsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; error?: string }>;
+  searchParams: Promise<{ estado?: string; error?: string; borrados?: string }>;
 }) {
-  const { estado, error } = await searchParams;
+  const { estado, error, borrados } = await searchParams;
+  const ia = iaActiva();
   const tickets = ticketsParaAdmin(estado ?? "abiertos");
 
   return (
     <>
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Tickets del panel</h1>
+          <h1 className="text-2xl font-bold">Tickets</h1>
           <p className="mt-1 text-sm text-ink-400">
-            Consultas, problemas y solicitudes de reposición de los clientes mayoristas.
+            Consultas, problemas, reposiciones y devoluciones de la tienda y del panel mayorista.{" "}
+            {ia ? (
+              <span className="text-sky-300">El asistente IA está respondiendo.</span>
+            ) : (
+              <span>Asistente IA apagado (se activa en Ajustes).</span>
+            )}
           </p>
         </div>
         <form className="flex gap-2">
@@ -30,6 +38,12 @@ export default async function AdminTicketsPage({
           <button type="submit" className="btn btn-ghost text-sm">Filtrar</button>
         </form>
       </div>
+
+      {borrados ? (
+        <p className="mt-4 rounded-lg border border-lime-500/30 bg-lime-500/10 px-4 py-2.5 text-sm text-lime-200">
+          Se borraron {borrados} ticket{borrados === "1" ? "" : "s"}.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
@@ -53,6 +67,11 @@ export default async function AdminTicketsPage({
                 {t.order_code ? ` · pedido ${t.order_code}` : ""}
               </p>
             </div>
+            {t.escalated_at && t.status !== "cerrado" ? (
+              <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+                Necesita una persona
+              </span>
+            ) : null}
             <span className="text-xs text-ink-400">{t.mensajes} mensajes</span>
             <span className="text-xs text-ink-400">{formatDateCl(t.updated_at)}</span>
             <span
@@ -72,6 +91,31 @@ export default async function AdminTicketsPage({
           <p className="p-10 text-center text-sm text-ink-400">No hay tickets con ese filtro.</p>
         ) : null}
       </div>
+
+      <details className="card mt-8 border-red-500/30 p-5 [&_summary::-webkit-details-marker]:hidden">
+        <summary className="cursor-pointer font-semibold text-red-300">Borrar tickets en masa</summary>
+        <form action={borrarTicketsEnMasa} className="mt-4 grid gap-3 sm:grid-cols-[220px_200px_auto] sm:items-end">
+          <div>
+            <label className="field-label" htmlFor="alcance">Qué borrar</label>
+            <select id="alcance" name="alcance" className="field" defaultValue="todos">
+              <option value="todos">Todos los tickets</option>
+              <option value="respondidos">Respondidos y cerrados</option>
+              <option value="cerrados">Solo los cerrados</option>
+            </select>
+          </div>
+          <div>
+            <label className="field-label" htmlFor="confirmar">Escribe BORRAR</label>
+            <input id="confirmar" name="confirmar" className="field" autoComplete="off" placeholder="BORRAR" />
+          </div>
+          <button type="submit" className="btn border border-red-500/40 bg-red-500/15 text-sm text-red-200 hover:bg-red-500/25">
+            Borrar
+          </button>
+        </form>
+        <p className="mt-3 text-xs text-ink-400">
+          Se borran los tickets con todos sus mensajes y no se puede deshacer. Los pedidos no se tocan:
+          si el cliente vuelve a escribir, se abre un ticket nuevo.
+        </p>
+      </details>
     </>
   );
 }

@@ -221,6 +221,12 @@ export type Ticket = {
   status: "abierto" | "respondido" | "cerrado" | string;
   /** Llave del enlace de un ticket sin pedido ni cuenta (ver /soporte). */
   access_key: string | null;
+  /**
+   * Cuándo se le avisó al dueño que este ticket necesita una persona (el
+   * cliente insiste o la IA no puede resolverlo). Se limpia cuando el dueño
+   * responde, para que el próximo aviso vuelva a salir.
+   */
+  escalated_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -228,7 +234,8 @@ export type Ticket = {
 export type TicketMessage = {
   id: number;
   ticket_id: number;
-  author: "cliente" | "admin" | string;
+  /** "ia" = respuesta automática del asistente. */
+  author: "cliente" | "admin" | "ia" | string;
   body: string;
   created_at: string;
 };

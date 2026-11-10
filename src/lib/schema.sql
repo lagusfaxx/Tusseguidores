@@ -361,6 +361,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   kind       TEXT    NOT NULL DEFAULT 'consulta',  -- consulta | problema | reposicion
   status     TEXT    NOT NULL DEFAULT 'abierto',   -- abierto | respondido | cerrado
   access_key TEXT,                                 -- llave del enlace de un ticket sin pedido ni cuenta
+  escalated_at TEXT,                               -- cuándo se avisó al dueño que el cliente insiste
   created_at TEXT    NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );

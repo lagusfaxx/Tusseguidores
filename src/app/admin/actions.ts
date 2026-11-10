@@ -29,7 +29,9 @@ import { acreditar, rechazar } from "@/lib/topups";
 import { reembolsar } from "@/lib/reseller-orders";
 import {
   agregarMensaje, cerrarTicket, reabrirTicket, ticketPorId, contactoDeTicket,
+  borrarTickets, borrarTicket,
 } from "@/lib/tickets";
+import { probarIa } from "@/lib/ia-tickets";
 import { notificarRespuestaTicket } from "@/lib/notify";
 import { absoluteUrl } from "@/lib/seo";
 import { formatClp } from "@/lib/pricing";
@@ -105,6 +107,7 @@ const SETTING_KEYS = [
   "transfer_enabled", "transfer_bank", "transfer_account_type", "transfer_account_number",
   "transfer_holder", "transfer_rut", "transfer_email", "transfer_instructions",
   "flow_api_key", "flow_secret_key", "flow_sandbox",
+  "ia_tickets_enabled", "openai_api_key", "openai_model", "ia_instrucciones",
   "seo_home_title", "seo_home_description", "seo_home_keywords", "seo_home_text",
   "auto_seo_text",
   "google_site_verification", "google_analytics_id",
@@ -135,7 +138,7 @@ export async function saveSettings(_prev: ActionState, formData: FormData): Prom
   for (const flag of [
     "auto_send_to_provider", "flow_sandbox", "orders_enabled", "auto_seo_text", "transfer_enabled",
     "auto_levels", "email_enabled", "email_admin_alerts", "email_admin_new_orders",
-    "reseller_enabled", "rating_enabled", "auto_mantenimiento",
+    "reseller_enabled", "rating_enabled", "auto_mantenimiento", "ia_tickets_enabled",
   ]) {
     values[flag] = formData.get(flag) ? "1" : "0";
   }
@@ -169,6 +172,12 @@ export async function testFlow(_prev: ActionState): Promise<ActionState> {
 export async function testResend(_prev: ActionState): Promise<ActionState> {
   await guard();
   const result = await testEmail();
+  return result.ok ? { ok: result.message } : { error: result.message };
+}
+
+export async function testOpenAI(_prev: ActionState): Promise<ActionState> {
+  await guard();
+  const result = await probarIa();
   return result.ok ? { ok: result.message } : { error: result.message };
 }
 
@@ -751,6 +760,35 @@ export async function responderTicket(formData: FormData) {
     }
     revalidatePath(`/admin/tickets/${id}`);
     revalidatePath("/admin/tickets");
+  });
+}
+
+/**
+ * Borra tickets en masa. Pide escribir BORRAR: no se puede deshacer y es un
+ * botón al que se llega con un clic de más.
+ */
+export async function borrarTicketsEnMasa(formData: FormData) {
+  await withErrorRedirect("/admin/tickets", async () => {
+    await guard();
+    if (String(formData.get("confirmar") ?? "").trim().toUpperCase() !== "BORRAR") {
+      throw new Error("Para borrar escribe BORRAR en la casilla.");
+    }
+    const alcance = String(formData.get("alcance") ?? "");
+    if (!["todos", "cerrados", "respondidos"].includes(alcance)) throw new Error("Elige qué tickets borrar.");
+    const n = borrarTickets(alcance as "todos" | "cerrados" | "respondidos");
+    revalidatePath("/admin/tickets");
+    revalidatePath("/admin");
+    redirect(`/admin/tickets?borrados=${n}`);
+  });
+}
+
+export async function borrarUnTicket(formData: FormData) {
+  const id = Number(formData.get("ticket_id"));
+  await withErrorRedirect(`/admin/tickets/${id}`, async () => {
+    await guard();
+    borrarTicket(id);
+    revalidatePath("/admin/tickets");
+    redirect("/admin/tickets?borrados=1");
   });
 }
 

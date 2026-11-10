@@ -79,6 +79,14 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   reseller_min_order_clp: "200",
   reseller_welcome: "",
 
+  // Asistente de tickets (OpenAI). Contesta solo y avisa al dueño cuando el
+  // cliente insiste o el caso necesita una persona. Ver lib/ia-tickets.ts.
+  ia_tickets_enabled: "0",
+  openai_api_key: "",
+  openai_model: "gpt-4o-mini",
+  // Lo que el asistente tiene que saber además de las reglas de la tienda.
+  ia_instrucciones: "",
+
   // Flow.cl
   flow_api_key: "",
   flow_secret_key: "",
