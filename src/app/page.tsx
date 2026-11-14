@@ -143,18 +143,22 @@ export default function HomePage() {
                 </ul>
 
                 <div className="mt-7 flex flex-wrap items-center gap-3">
-                  <Link href="/catalogo" className="btn btn-primary hidden text-base lg:inline-flex">
-                    Ver los {all.length} servicios
-                  </Link>
+                  <span className="hidden lg:block">
+                    <Link href="/catalogo" className="btn btn-primary text-base">
+                      Ver los {all.length} servicios
+                    </Link>
+                  </span>
                   {prueba ? (
                     <Link href="/prueba-gratis" className="btn btn-ghost border-lime-400/50 text-base">
                       <span className="rounded bg-lime-400 px-1.5 py-0.5 text-[11px] font-bold uppercase text-ink-950">Gratis</span>
                       Probar con {prueba} seguidores
                     </Link>
                   ) : (
-                    <Link href="/seguimiento" className="btn btn-ghost hidden text-base lg:inline-flex">
-                      Seguir mi pedido
-                    </Link>
+                    <span className="hidden lg:block">
+                      <Link href="/seguimiento" className="btn btn-ghost text-base">
+                        Seguir mi pedido
+                      </Link>
+                    </span>
                   )}
                 </div>
               </div>
