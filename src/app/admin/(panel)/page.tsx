@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { all, get } from "@/lib/db";
-import { orderStats } from "@/lib/orders";
+import { orderStats, recompraStats } from "@/lib/orders";
 import { syncOrders } from "@/app/admin/actions";
 import { StatusBadge } from "@/components/order-status";
 import { formatClp, formatNumber, pricingContext } from "@/lib/pricing";
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const stats = orderStats();
+  const recompra = recompraStats();
   const ctx = pricingContext();
   // El saldo se refresca aquí y queda guardado para las demás pantallas.
   await refreshBalances();
@@ -141,11 +142,16 @@ export default async function AdminDashboard() {
         </div>
       ) : null}
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {[
           { label: "Ventas totales", value: formatClp(stats.revenue), hint: `${stats.paid} pedidos pagados` },
           { label: "Ventas de hoy", value: formatClp(stats.revenueToday), hint: `${stats.today} pedidos hoy` },
           { label: "Margen estimado", value: `${margin}%`, hint: `Costo ${formatClp(costClp)}` },
+          {
+            label: "Clientes que vuelven",
+            value: `${recompra.porcentaje}%`,
+            hint: `${recompra.repiten} de ${recompra.clientes} · ${recompra.porcentajeVenta}% de la venta`,
+          },
           {
             label: conSaldo.length > 1 ? "Saldo de los proveedores" : "Saldo del proveedor",
             value: conSaldo.length

@@ -12,11 +12,11 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-white/8 bg-ink-950/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href="/" className="flex shrink-0 items-center gap-2 font-extrabold tracking-tight">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-500 text-sm">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-lime-400 text-sm text-ink-950">
             TS
           </span>
-          <span className="text-[17px]">
-            Tus<span className="text-brand-300">Seguidores</span>
+          <span className="font-display text-[18px]">
+            Tus<span className="text-lime-400">Seguidores</span>
           </span>
         </Link>
 
@@ -34,6 +34,16 @@ export function SiteHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-1.5 lg:ml-0">
+          <Link
+            href="/buscar"
+            aria-label="Buscar"
+            className="grid h-9 w-9 place-items-center rounded-lg text-ink-200 transition-colors hover:bg-white/6 hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+          </Link>
           <Link
             href="/seguimiento"
             className="hidden whitespace-nowrap rounded-lg px-2.5 py-2 text-sm text-ink-200 hover:text-white sm:block"

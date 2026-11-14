@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
-import { startCheckout, type CheckoutState } from "@/app/producto/actions";
+import { revisarCupon, startCheckout, type CheckoutState, type CuponRevisado } from "@/app/producto/actions";
 import type { PricedTier } from "@/lib/types";
 import { CheckIcon, LockIcon } from "./icons";
 
@@ -116,7 +116,7 @@ function BotonesDePago({
         className="btn btn-primary w-full text-base"
         disabled={pending}
       >
-        {pending ? "Un momento…" : `Pagar ${clp.format(price)} con Webpay`}
+        {pending ? "Un momento…" : `Pagar ${clp.format(price)}`}
       </button>
 
       {transferencia ? (
@@ -243,6 +243,24 @@ export function BuyBox(props: Props) {
   const totalUnidades = quantity * destinos;
   const totalPrecio = price * destinos;
 
+  // Cupón: se revisa contra el total en pantalla y se muestra el descuento
+  // antes de pagar. Si cambia el código o el total, hay que aplicarlo de nuevo.
+  const [cupon, setCupon] = useState<CuponRevisado | null>(null);
+  const [revisando, revisar] = useTransition();
+  useEffect(() => {
+    setCupon(null);
+  }, [coupon, totalPrecio]);
+  const descuento = cupon?.ok ? cupon.discountClp : 0;
+  const aPagar = totalPrecio - descuento;
+
+  function aplicarCupon() {
+    const codigo = coupon.trim();
+    if (!codigo) return;
+    revisar(async () => {
+      setCupon(await revisarCupon(codigo, totalPrecio));
+    });
+  }
+
   return (
     <form action={formAction} onSubmit={recordar} className="card p-5 sm:p-6">
       <input type="hidden" name="productId" value={props.productId} />
@@ -291,7 +309,7 @@ export function BuyBox(props: Props) {
               aria-pressed={active}
               className={`relative rounded-xl border px-3 py-3 text-left transition-colors ${
                 active
-                  ? "border-brand-400 bg-brand-500/15"
+                  ? "border-lime-400 bg-lime-400/10"
                   : "border-white/10 bg-white/4 hover:border-white/25"
               }`}
             >
@@ -300,8 +318,8 @@ export function BuyBox(props: Props) {
                   Popular
                 </span>
               ) : null}
-              <span className="block text-base font-bold">{num.format(tier.quantity)}</span>
-              <span className="block text-sm font-semibold text-brand-300">{clp.format(tier.priceClp)}</span>
+              <span className="font-display block text-lg font-bold leading-tight">{num.format(tier.quantity)}</span>
+              <span className="block text-sm font-semibold text-ink-200">{clp.format(tier.priceClp)}</span>
               <span className="mt-0.5 block text-[11px] leading-tight text-ink-400">
                 {porUnidad(tier.priceClp, tier.quantity)} c/u
                 {tier.id === mejorPrecioId ? (
@@ -318,7 +336,7 @@ export function BuyBox(props: Props) {
           aria-pressed={selected === "custom"}
           className={`rounded-xl border px-3 py-3 text-left transition-colors ${
             selected === "custom"
-              ? "border-brand-400 bg-brand-500/15"
+              ? "border-lime-400 bg-lime-400/10"
               : "border-white/10 bg-white/4 hover:border-white/25"
           }`}
         >
@@ -448,7 +466,7 @@ export function BuyBox(props: Props) {
           <p className="mt-1.5 text-xs text-ink-400">
             {props.transferencia
               ? "Para identificar tu pedido."
-              : "Flow te manda ahí el comprobante del pago. Tu código de seguimiento te lo mostramos apenas termines."}
+              : "Ahí llegan el comprobante y tu código de pedido."}
           </p>
         </div>
 
@@ -458,16 +476,36 @@ export function BuyBox(props: Props) {
           onToggle={(event) => setCuponAbierto(event.currentTarget.open)}
         >
           <summary className="cursor-pointer text-ink-400 hover:text-white">¿Tienes un cupón?</summary>
-          <input
-            name="coupon"
-            type="text"
-            className="field mt-2 uppercase"
-            placeholder="CUPON10"
-            autoComplete="off"
-            value={coupon}
-            onChange={(event) => setCoupon(event.target.value)}
-          />
-          <p className="mt-1.5 text-xs text-ink-400">El descuento se aplica al abrir el pago.</p>
+          <div className="mt-2 flex gap-2">
+            <input
+              name="coupon"
+              type="text"
+              className="field uppercase"
+              placeholder="CUPON10"
+              autoComplete="off"
+              value={coupon}
+              onChange={(event) => setCoupon(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  aplicarCupon();
+                }
+              }}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost shrink-0 px-4 py-2 text-sm"
+              onClick={aplicarCupon}
+              disabled={revisando || !coupon.trim()}
+            >
+              {revisando ? "…" : "Aplicar"}
+            </button>
+          </div>
+          {cupon ? (
+            <p className={`mt-1.5 text-xs ${cupon.ok ? "text-lime-400" : "text-red-300"}`} role="status">
+              {cupon.ok ? `Descuento de ${clp.format(cupon.discountClp)} aplicado.` : cupon.error}
+            </p>
+          ) : null}
         </details>
       </div>
 
@@ -479,7 +517,14 @@ export function BuyBox(props: Props) {
               ? ` · ${num.format(quantity)} en cada una de ${num.format(listaEnlaces.length)}`
               : ""}
           </span>
-          <span className="text-2xl font-extrabold">{clp.format(totalPrecio)}</span>
+          <span className="font-display text-3xl font-extrabold leading-tight">
+            {descuento > 0 ? (
+              <span className="mr-2 text-base font-semibold text-ink-400 line-through">
+                {clp.format(totalPrecio)}
+              </span>
+            ) : null}
+            {clp.format(aPagar)}
+          </span>
         </div>
         <span className="text-right text-xs leading-relaxed text-ink-400">
           {props.deliveryLabel}
@@ -494,7 +539,7 @@ export function BuyBox(props: Props) {
       ) : null}
 
       <BotonesDePago
-        price={totalPrecio}
+        price={aPagar}
         transferencia={props.transferencia}
         disabled={
           (isCustomComments && (commentLines.length < minQty || commentLines.length > maxQty)) ||
@@ -512,7 +557,7 @@ export function BuyBox(props: Props) {
       <ul className="mt-4 space-y-1.5 text-xs text-ink-400">
         <li className="flex items-center gap-1.5">
           <LockIcon className="h-3.5 w-3.5 text-lime-400" />
-          Webpay cobra al instante y el pedido sale solo
+          Pago por Webpay · el pedido sale solo
         </li>
         {props.transferencia ? (
           <li className="flex items-center gap-1.5">

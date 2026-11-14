@@ -3,7 +3,7 @@
 import { after } from "next/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createOrder, logEvent } from "@/lib/orders";
+import { applyCoupon, createOrder, logEvent, motivoCupon } from "@/lib/orders";
 import { notificarPedidoNuevo, notificarTransferenciaPendiente } from "@/lib/notify";
 import { getBoolSetting } from "@/lib/settings";
 import { getProductById } from "@/lib/catalog";
@@ -13,6 +13,20 @@ import { separarDestinos } from "@/lib/targets";
 import { abrirPagoFlow } from "@/lib/checkout";
 
 export type CheckoutState = { error?: string };
+
+export type CuponRevisado = { ok: true; code: string; discountClp: number } | { ok: false; error: string };
+
+/**
+ * Revisa un cupón contra el total que el cliente tiene en pantalla, para
+ * mostrarle el descuento antes de pagar. El pedido lo vuelve a calcular.
+ */
+export async function revisarCupon(code: string, amountClp: number): Promise<CuponRevisado> {
+  const codigo = String(code).slice(0, 40);
+  const monto = Math.max(0, Math.round(Number(amountClp) || 0));
+  const cupon = applyCoupon(codigo, monto);
+  if (!cupon) return { ok: false, error: motivoCupon(codigo, monto) };
+  return { ok: true, code: cupon.code, discountClp: cupon.discountClp };
+}
 
 export async function startCheckout(
   _prev: CheckoutState,

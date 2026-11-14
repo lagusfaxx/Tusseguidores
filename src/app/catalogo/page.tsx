@@ -4,7 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { getPublishedProducts, groupByServiceType } from "@/lib/catalog";
-import { platformLabel, sortPlatforms } from "@/lib/labels";
+import { platformAccent, platformLabel, sortPlatforms } from "@/lib/labels";
+import { PlatformIcon } from "@/components/icons";
 import { buildMetadata } from "@/lib/seo";
 
 export function generateMetadata(): Metadata {
@@ -29,17 +30,31 @@ export default function CatalogPage() {
       <main className="bg-halo">
         <div className="mx-auto max-w-6xl px-4 py-12">
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl lg:text-4xl">Catálogo completo</h1>
-          <p className="mt-2 max-w-2xl text-sm text-ink-200 sm:text-base">
-            {products.length} servicios listos para comprar, todos con entrega automática y precios en pesos chilenos.
+          <p className="mt-2 text-sm text-ink-200 sm:text-base">
+            {products.length} servicios · precios en pesos con IVA
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2">
+          <form action="/buscar" className="mt-6 flex max-w-xl gap-2">
+            <input
+              type="search"
+              name="q"
+              placeholder="seguidores instagram, likes tiktok…"
+              aria-label="Buscar"
+              className="field flex-1"
+            />
+            <button type="submit" className="btn btn-primary shrink-0 px-5">Buscar</button>
+          </form>
+
+          <div className="mt-4 flex flex-wrap gap-2">
             {platforms.map((p) => (
               <a
                 key={p.platform}
                 href={`#${p.platform}`}
-                className="rounded-full border border-white/12 bg-white/5 px-3.5 py-1.5 text-sm text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white"
+                className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3.5 py-1.5 text-sm text-ink-200 transition-colors hover:border-white/30 hover:text-white"
               >
+                <span style={{ color: platformAccent(p.platform) }}>
+                  <PlatformIcon slug={p.platform} className="h-4 w-4" />
+                </span>
                 {platformLabel(p.platform)}
               </a>
             ))}
@@ -48,7 +63,12 @@ export default function CatalogPage() {
           {platforms.map((p) => (
             <section key={p.platform} id={p.platform} className="mt-9 scroll-mt-24 lg:mt-12">
               <div className="flex items-end justify-between gap-4">
-                <h2 className="text-xl font-bold sm:text-2xl">{platformLabel(p.platform)}</h2>
+                <h2 className="flex items-center gap-2.5 text-xl font-bold sm:text-2xl">
+                  <span style={{ color: platformAccent(p.platform) }}>
+                    <PlatformIcon slug={p.platform} className="h-5 w-5" />
+                  </span>
+                  {platformLabel(p.platform)}
+                </h2>
                 <Link href={`/${p.platform}`} className="shrink-0 text-sm text-brand-300 hover:text-white">
                   Ver <span className="hidden sm:inline">página de {platformLabel(p.platform)}</span>
                   <span className="sm:hidden">todo</span>

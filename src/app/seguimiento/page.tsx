@@ -54,7 +54,7 @@ export default async function TrackingPage({
             ) : null}
             <button type="submit" className="btn btn-primary mt-5 w-full">Ver mi pedido</button>
             <p className="mt-3 text-xs leading-relaxed text-ink-400">
-              También viene en el correo que te mandamos al pagar. Si no lo encuentras, revisa spam.
+              Viene en el correo del pago.
             </p>
           </form>
 

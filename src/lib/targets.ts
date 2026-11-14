@@ -144,6 +144,12 @@ export function revisarDestino(
   if (!value) return { ok: false, error: "Falta el enlace de destino." };
 
   const necesitaPost = necesitaPublicacion(serviceType, orderKind);
+  // Un usuario suelto se revisa antes de convertirlo en enlace: "@@@" o
+  // "mi cuenta" terminaban como una URL con buena pinta y un pedido pagado
+  // que no llegaba a ninguna parte.
+  if (!necesitaPost && !/^https?:\/\//i.test(value) && !/^@?[\w.\-]{2,60}$/.test(value)) {
+    return { ok: false, error: "Ese usuario no es válido: escríbelo sin espacios, o pega el enlace de tu perfil." };
+  }
   const link = normalizarDestino(value, platform, necesitaPost);
 
   if (!necesitaPost) {

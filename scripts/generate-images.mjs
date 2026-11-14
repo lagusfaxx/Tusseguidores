@@ -43,25 +43,30 @@ function cover({ platform, type }) {
   const glyph = GLYPH[type] ?? GLYPH.seguidores;
   const id = `${platform}-${type}`;
 
-  // Sin texto: la tarjeta ya muestra el nombre del producto justo debajo, y
-  // repetirlo sobre la imagen se ve a relleno.
+  // Fondo del color de la red, a sangre, con el icono del servicio encima y
+  // repetido en grande al fondo. Sin texto: el nombre va en la tarjeta.
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  const luz = 0.299 * r + 0.587 * g + 0.114 * b;
+  const oscuro = luz < 60;      // X, Threads: negro sobre negro no se ve
+  const claro = luz > 170;      // Snapchat, Kick: el icono va oscuro
+  const base = oscuro ? "#2a2a33" : color;
+  const tinta = claro ? "#0b0b10" : "#ffffff";
+
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="${esc(subtitle)} para ${esc(title)}">
 <defs>
 <linearGradient id="bg-${id}" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
+<stop offset="0" stop-color="${base}"/><stop offset="1" stop-color="${base}" stop-opacity="0.55"/>
 </linearGradient>
-<radialGradient id="halo-${id}" cx="0.5" cy="0.42" r="0.62">
-<stop offset="0" stop-color="${color}" stop-opacity="0.42"/>
-<stop offset="1" stop-color="${color}" stop-opacity="0"/>
-</radialGradient>
 </defs>
+<rect width="600" height="400" fill="#0f0e17"/>
 <rect width="600" height="400" fill="url(#bg-${id})"/>
-<rect width="600" height="400" fill="url(#halo-${id})"/>
+<g transform="translate(395 150) rotate(-14) scale(15)" opacity="0.13">
+<path d="${glyph}" fill="${tinta}"/>
+</g>
 <g transform="translate(300 200)">
-<circle r="96" fill="${color}" opacity="0.14"/>
-<circle r="96" fill="none" stroke="${color}" stroke-opacity="0.35" stroke-width="1.5"/>
-<g transform="translate(-52 -52) scale(4.33)">
-<path d="${glyph}" fill="${color}"/>
+<circle r="74" fill="${tinta}" opacity="${claro ? 0.1 : 0.16}"/>
+<g transform="translate(-45.6 -45.6) scale(3.8)">
+<path d="${glyph}" fill="${tinta}"/>
 </g>
 </g>
 </svg>`;

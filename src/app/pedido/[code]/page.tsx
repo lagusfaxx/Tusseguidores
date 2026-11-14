@@ -332,9 +332,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="min-w-0">
                         <h2 className="font-bold">¿Lo repetimos?</h2>
-                        <p className="mt-1 text-sm text-ink-400">
-                          Mismo servicio y mismo destino, ya puestos. Solo confirmas y pagas.
-                        </p>
+                        <p className="mt-1 text-sm text-ink-400">Con los mismos datos.</p>
                       </div>
                       <Link href={recompra} className="btn btn-primary shrink-0 text-sm">
                         Repetir este pedido

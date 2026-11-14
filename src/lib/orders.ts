@@ -81,6 +81,18 @@ export function ensureTargets(order: Order): OrderTarget[] {
 
 export type CouponResult = { code: string; discountClp: number } | null;
 
+/** Por qué no sirve un cupón, escrito para el comprador. */
+export function motivoCupon(rawCode: string, amountClp: number): string {
+  const coupon = get<{ min_clp: number; active: number }>(
+    "SELECT min_clp, active FROM coupons WHERE code = ?",
+    [rawCode.trim().toUpperCase()],
+  );
+  if (coupon?.active === 1 && amountClp < coupon.min_clp) {
+    return `Ese cupón es para compras desde $${coupon.min_clp.toLocaleString("es-CL")}.`;
+  }
+  return "Ese cupón no existe o ya venció. Corrígelo o bórralo para seguir.";
+}
+
 export function applyCoupon(rawCode: string, amountClp: number): CouponResult {
   const code = rawCode.trim().toUpperCase();
   if (!code) return null;
@@ -225,6 +237,11 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const base = unitario * links.length;
 
   const coupon = input.couponCode ? applyCoupon(input.couponCode, base) : null;
+  // Un cupón que no sirve se dice: antes se ignoraba y el cliente pagaba el
+  // precio completo creyendo que llevaba descuento.
+  if (input.couponCode?.trim() && !coupon) {
+    return { ok: false, error: motivoCupon(input.couponCode, base) };
+  }
   const amount = base - (coupon?.discountClp ?? 0);
 
   // Antes de crear otro, se mira si el cliente ya tiene este mismo pedido
@@ -1036,6 +1053,33 @@ export function transferenciasPendientes(limit = 100): Order[] {
       LIMIT ?`,
     [limit],
   );
+}
+
+/**
+ * Recompra: de los clientes de la tienda que han pagado, cuántos pagaron más
+ * de una vez, y qué parte de la venta viene de ellos.
+ */
+export function recompraStats() {
+  const fila = get<{ clientes: number; repiten: number; venta: number; venta_repiten: number }>(
+    `SELECT COUNT(*) AS clientes,
+            SUM(CASE WHEN n > 1 THEN 1 ELSE 0 END) AS repiten,
+            SUM(total) AS venta,
+            SUM(CASE WHEN n > 1 THEN total ELSE 0 END) AS venta_repiten
+       FROM (SELECT email, COUNT(*) AS n, SUM(amount_clp) AS total
+               FROM orders
+              WHERE payment_status = 'paid' AND reseller_user_id IS NULL
+                AND status != 'refunded'
+              GROUP BY email)`,
+  );
+  const clientes = fila?.clientes ?? 0;
+  const repiten = fila?.repiten ?? 0;
+  const venta = fila?.venta ?? 0;
+  return {
+    clientes,
+    repiten,
+    porcentaje: clientes ? Math.round((repiten / clientes) * 100) : 0,
+    porcentajeVenta: venta ? Math.round(((fila?.venta_repiten ?? 0) / venta) * 100) : 0,
+  };
 }
 
 export function orderStats() {

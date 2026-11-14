@@ -5,10 +5,10 @@ import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import {
   getFeaturedProducts, getPlatformServiceTypes, getPlatformsWithProducts,
-  getPublishedProducts, cheapestTier,
+  getPublishedProducts, cheapestTier, groupByServiceType,
 } from "@/lib/catalog";
 import { getSettings } from "@/lib/settings";
-import { platformLabel, serviceTypeLabel, sortPlatforms } from "@/lib/labels";
+import { platformAccent, platformLabel, serviceTypeLabel, sortPlatforms } from "@/lib/labels";
 import { formatClp } from "@/lib/pricing";
 import { buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { BoltIcon, CheckIcon, LockIcon, PlatformIcon, ShieldIcon } from "@/components/icons";
@@ -18,6 +18,7 @@ import { getBoolSetting } from "@/lib/settings";
 import { LeerMas } from "@/components/leer-mas";
 import { Stars } from "@/components/stars";
 import { storeRating } from "@/lib/ratings";
+import { SelectorRed, type RedDelSelector } from "@/components/selector-red";
 
 export function generateMetadata(): Metadata {
   const s = getSettings();
@@ -68,6 +69,26 @@ export default function HomePage() {
   const prices = all.map((p) => cheapestTier(p)?.priceClp).filter((v): v is number => typeof v === "number");
   const desde = prices.length ? Math.min(...prices) : 1990;
 
+  const redes: RedDelSelector[] = platforms.map((p) => {
+    const label = platformLabel(p.platform);
+    const items = groupByServiceType(all.filter((x) => x.platform === p.platform)).flatMap((g) => g.items);
+    return {
+      slug: p.platform,
+      label,
+      color: platformAccent(p.platform),
+      total: items.length,
+      items: items.slice(0, 5).map((x) => {
+        const tier = cheapestTier(x);
+        return {
+          slug: x.slug,
+          name: x.name.replace(` para ${label}`, ""),
+          price: tier ? formatClp(tier.priceClp) : "—",
+          entrega: x.delivery_label,
+        };
+      }),
+    };
+  });
+
   const rating = storeRating();
   // Las combinaciones red + servicio que la gente busca por su nombre
   // ("seguidores instagram"). Cada una tiene su página y desde aquí recibe el
@@ -86,106 +107,58 @@ export default function HomePage() {
       <main>
         {/* ---------------------------------------------------------- Hero */}
         <section className="bg-halo border-b border-white/8">
-          <div className="mx-auto max-w-6xl px-4 pb-12 pt-12 sm:pb-16 sm:pt-20">
-            <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-              <div className="max-w-xl">
-                <p className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/5 px-3 py-1.5 text-xs font-semibold text-ink-200">
+          <div className="mx-auto max-w-6xl px-4 pb-10 pt-9 sm:pb-16 sm:pt-16">
+            <div className="grid items-start gap-8 lg:grid-cols-[1fr_1fr] lg:gap-14">
+              <div className="max-w-xl lg:pt-6">
+                <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-ink-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-lime-400" />
-                  Tienda chilena · precios en pesos con IVA
+                  Tienda chilena · precios con IVA
                 </p>
 
-                <h1 className="mt-5 text-pretty text-4xl font-extrabold leading-[1.08] tracking-tight sm:text-5xl">
-                  Seguidores, likes y vistas para tus redes.{" "}
-                  <span className="whitespace-nowrap text-accent-400">Al tiro.</span>
+                <h1 className="mt-4 text-[2.6rem] font-extrabold leading-[1.02] sm:text-6xl">
+                  Seguidores, likes y vistas.{" "}
+                  <span className="whitespace-nowrap text-lime-400">Al tiro.</span>
                 </h1>
 
-                <p className="mt-5 text-lg leading-relaxed text-ink-200">
-                  Eliges cuántos quieres, pagas y empiezan a llegar en minutos. Sin contraseñas:
-                  con tu usuario basta.
+                <p className="mt-4 text-lg leading-relaxed text-ink-200">
+                  Pagas en pesos y empiezan a llegar en minutos.
                 </p>
 
                 {rating ? <Stars rating={rating} tamano="md" className="mt-5" /> : null}
 
-                <div className="mt-7 flex flex-wrap items-center gap-3">
-                  <Link href="#catalogo" className="btn btn-primary text-base">
-                    Ver precios
+                <ul className="mt-6 grid max-w-md grid-cols-2 gap-x-6 gap-y-2.5 text-sm text-ink-200">
+                  {[
+                    [<LockIcon key="i" className="h-4 w-4" />, "Sin contraseñas"],
+                    [<BoltIcon key="i" className="h-4 w-4" />, "Entrega en minutos"],
+                    [<ShieldIcon key="i" className="h-4 w-4" />, "Reposición gratis"],
+                    [<CheckIcon key="i" className="h-4 w-4" />, `Desde ${formatClp(desde)}`],
+                  ].map(([icono, titulo]) => (
+                    <li key={String(titulo)} className="flex items-center gap-2">
+                      <span className="shrink-0 text-lime-400">{icono}</span>
+                      {titulo}
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-7 hidden flex-wrap items-center gap-3 lg:flex">
+                  <Link href="/catalogo" className="btn btn-primary text-base">
+                    Ver los {all.length} servicios
                   </Link>
                   <Link href="/seguimiento" className="btn btn-ghost text-base">
                     Seguir mi pedido
                   </Link>
                 </div>
-
-                {/* Tres datos duros, cada uno en su columna: la línea corrida de
-                    antes se leía como una nota al pie. */}
-                <dl className="mt-9 grid max-w-md grid-cols-3 gap-4 border-t border-white/8 pt-6">
-                  {[
-                    ["Desde", formatClp(desde)],
-                    ["Servicios", String(all.length)],
-                    ["Redes", String(platforms.length)],
-                  ].map(([etiqueta, valor]) => (
-                    <div key={etiqueta}>
-                      <dt className="text-xs uppercase tracking-wider text-ink-400">{etiqueta}</dt>
-                      <dd className="mt-1 text-xl font-extrabold tracking-tight text-white">{valor}</dd>
-                    </div>
-                  ))}
-                </dl>
               </div>
 
-              {/* Selector de red. En móvil basta con el de la cabecera. */}
-              <div className="hidden lg:block">
-                <div className="card p-5">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider text-ink-400">
-                    Ir directo a tu red
-                  </h2>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    {platforms.map((p) => (
-                      <Link
-                        key={p.platform}
-                        href={`/${p.platform}`}
-                        className="group flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/4 px-3 py-2.5 transition-colors hover:border-brand-400/50 hover:bg-white/8"
-                      >
-                        <PlatformIcon
-                          slug={p.platform}
-                          className="h-5 w-5 shrink-0 text-ink-400 transition-colors group-hover:text-brand-300"
-                        />
-                        <span className="truncate text-sm font-medium">{platformLabel(p.platform)}</span>
-                        <span className="ml-auto text-xs text-ink-400">{p.products}</span>
-                      </Link>
-                    ))}
-                  </div>
-                  <Link
-                    href="/catalogo"
-                    className="mt-4 flex items-center justify-center rounded-lg border border-white/10 bg-white/4 py-2.5 text-sm font-semibold text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white"
-                  >
-                    Ver el catálogo completo
-                  </Link>
-                </div>
-              </div>
+              <SelectorRed redes={redes} />
             </div>
           </div>
         </section>
 
-        {/* Cuatro promesas concretas, en columnas del mismo ancho. */}
-        <div className="border-b border-white/8 bg-ink-900/50">
-          <div className="mx-auto grid max-w-6xl grid-cols-2 gap-x-6 gap-y-5 px-4 py-6 lg:grid-cols-4">
-            {[
-              [<LockIcon key="i" className="h-4 w-4" />, "Sin contraseñas"],
-              [<BoltIcon key="i" className="h-4 w-4" />, "Entrega en minutos"],
-              [<ShieldIcon key="i" className="h-4 w-4" />, "Reposición gratis"],
-              [<CheckIcon key="i" className="h-4 w-4" />, "Webpay y transferencia"],
-            ].map(([icono, titulo]) => (
-              <div key={String(titulo)} className="flex items-center gap-2.5">
-                <span className="shrink-0 text-brand-300">{icono}</span>
-                <p className="text-sm font-medium text-ink-200">{titulo}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* -------------------------------------------------------- Catálogo */}
         <section id="catalogo" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-12 sm:py-16">
           <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo que más se vende</h2>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo más vendido</h2>
             <Link
               href="/catalogo"
               className="hidden shrink-0 items-center gap-1.5 rounded-lg border border-white/12 bg-white/5 px-3.5 py-2 text-sm font-semibold text-ink-200 transition-colors hover:border-brand-400/50 hover:text-white sm:inline-flex"
@@ -228,11 +201,10 @@ export default function HomePage() {
                     Para agencias y revendedores
                   </span>
                   <h2 className="mt-4 text-2xl font-bold tracking-tight sm:text-3xl">
-                    Panel mayorista: los mismos servicios, a precio de reventa
+                    Los mismos servicios, a precio de reventa
                   </h2>
                   <p className="mt-3 text-ink-200">
-                    Cargas saldo una vez y pides todo lo que necesites sin pasar por el pago en cada
-                    pedido. Precio por cada 1.000 unidades, historial de pedidos y soporte por ticket.
+                    Cargas saldo una vez y pides sin pagar en cada pedido.
                   </p>
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Link href="/panel/crear-cuenta" className="btn btn-primary">Crear cuenta gratis</Link>
@@ -241,10 +213,10 @@ export default function HomePage() {
                 </div>
                 <ul className="grid gap-2 text-sm">
                   {[
-                    ["Precios mayoristas", "Más bajos que en la tienda, por cada 1.000."],
-                    ["Pago con saldo", "Recargas por Webpay o transferencia."],
-                    ["Todos los servicios", "El catálogo completo, no solo los packs."],
-                    ["Reposición por ticket", "Un ticket por pedido, todo en un lugar."],
+                    ["Precio por cada 1.000", "Más bajo que en la tienda."],
+                    ["Pago con saldo", "Webpay o transferencia."],
+                    ["Catálogo completo", "No solo los packs."],
+                    ["Soporte por ticket", "Uno por pedido."],
                   ].map(([titulo, texto]) => (
                     <li key={titulo} className="rounded-xl border border-white/8 bg-white/3 px-4 py-3">
                       <p className="font-semibold text-white">{titulo}</p>
@@ -263,13 +235,13 @@ export default function HomePage() {
             <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Cómo se compra</h2>
             <ol className="mt-7 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {[
-                ["Eliges el pack", "La red, el servicio y la cantidad."],
-                ["Pegas tu usuario", "O el enlace de la publicación, y tu correo."],
+                ["Eliges el pack", "Red, servicio y cantidad."],
+                ["Pegas tu usuario", "O el enlace de la publicación."],
                 ["Pagas", "Webpay, transferencia o Mercado Pago."],
-                ["Sigues el avance", "Con tu código de pedido, cuando quieras."],
+                ["Sigues el avance", "Con tu código de pedido."],
               ].map(([title, text], i) => (
                 <li key={title} className="card h-full p-4 sm:p-5">
-                  <span className="inline-grid h-7 w-7 place-items-center rounded-lg bg-brand-500/20 font-mono text-xs font-bold text-brand-300">
+                  <span className="inline-grid h-7 w-7 place-items-center rounded-lg bg-lime-400 font-mono text-xs font-bold text-ink-950">
                     {i + 1}
                   </span>
                   <h3 className="mt-3 text-sm font-semibold sm:text-base">{title}</h3>
@@ -299,9 +271,7 @@ export default function HomePage() {
 
               <div className="card flex flex-col justify-center p-6">
                 <h3 className="text-lg font-bold">¿Dudas antes de pagar?</h3>
-                <p className="mt-2 text-sm text-ink-400">
-                  Abre un ticket y te respondemos el mismo día, en la misma página.
-                </p>
+                <p className="mt-2 text-sm text-ink-400">Respondemos el mismo día.</p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/soporte" className="btn btn-ghost text-sm">Abrir un ticket</Link>
                   <Link href="/preguntas-frecuentes" className="btn btn-ghost text-sm">
@@ -315,7 +285,7 @@ export default function HomePage() {
 
         {/* ------------------------------------------------------------- FAQ */}
         <section className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
-          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Preguntas que nos hacen siempre</h2>
+          <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Preguntas frecuentes</h2>
           {/* Dos columnas en pantalla grande: en una sola quedaba media
               pantalla vacía a la derecha. */}
           <div className="mt-7 grid gap-x-10 lg:grid-cols-2">
@@ -341,9 +311,6 @@ export default function HomePage() {
           <section className="border-t border-white/8 bg-ink-900/40">
             <div className="mx-auto max-w-6xl px-4 py-12 sm:py-14">
               <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Lo más buscado</h2>
-              <p className="mt-2 max-w-2xl text-sm text-ink-400">
-                Cada búsqueda tiene su página, con sus precios y sus plazos.
-              </p>
               <ul className="mt-6 flex flex-wrap gap-2">
                 {buscados.map((c) => (
                   <li key={`${c.platform}-${c.service_type}`}>
