@@ -4,6 +4,7 @@ import { absoluteUrl } from "./seo";
 import { getSetting } from "./settings";
 import { datosTransferencia } from "./transfer";
 import type { Order } from "./types";
+import { rutaRecompra } from "./recompra";
 
 /**
  * Los correos que manda la tienda.
@@ -183,12 +184,53 @@ export function correoPagoConfirmado(order: Order): EmailContent {
   };
 }
 
+/**
+ * El cliente abrió el pago y no lo terminó.
+ *
+ * Un solo correo, sin apuro inventado: dice que el pedido quedó guardado, hasta
+ * cuándo, y deja el enlace para pagarlo sin llenar nada de nuevo.
+ */
+export function correoRecordatorioPago(order: Order, horasRestantes: number): EmailContent {
+  const url = seguimiento(order);
+  const plazo = horasRestantes >= 2
+    ? `Lo guardamos ${horasRestantes} horas más; después se anula solo.`
+    : "Se anula solo en un rato si no se paga.";
+
+  return {
+    subject: `Tu pedido ${order.code} quedó sin pagar`,
+    html: layout({
+      titulo: "Tu pedido quedó guardado",
+      intro: `Abriste el pago y no se completó. No tienes que llenar nada otra vez: está todo listo para pagar. ${escape(plazo)}`,
+      filas: detalle(order),
+      cta: { texto: `Pagar ${formatClp(order.amount_clp)}`, url },
+      cierre: "Si ya no lo quieres, no hagas nada: no te vamos a escribir de nuevo por este pedido.",
+    }),
+    text: texto([
+      `Tu pedido ${order.code} quedó sin pagar.`,
+      plazo,
+      "",
+      `Servicio: ${order.product_name}`,
+      `Destino: ${order.link}`,
+      `Total: ${formatClp(order.amount_clp)}`,
+      "",
+      `Pagar: ${url}`,
+      "",
+      "Si ya no lo quieres, no hagas nada: no te vamos a escribir de nuevo por este pedido.",
+    ]),
+  };
+}
+
 /** La entrega terminó (completa o parcial). */
 export function correoPedidoCompletado(order: Order, parcial = false): EmailContent {
   const url = seguimiento(order);
   const entregado = parcial && order.remains != null
     ? formatNumber(Math.max(0, order.quantity - order.remains))
     : formatNumber(order.quantity);
+
+  // Recompra a un toque, solo cuando salió todo bien: a quien le llegó la
+  // mitad no se le ofrece comprar más.
+  const ruta = parcial ? null : rutaRecompra(order);
+  const repetir = ruta ? absoluteUrl(ruta) : null;
 
   return {
     subject: parcial
@@ -201,6 +243,9 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
         : "Ya está todo entregado. Si algo no cuadra, respóndenos este correo.",
       filas: detalle(order),
       cta: { texto: "Ver el detalle", url },
+      cierre: repetir
+        ? `¿Quieres repetirlo? <a href="${escape(repetir)}" style="color:${COLOR.marca};font-weight:600;">Vuelve a pedir lo mismo</a>: el servicio y el destino ya van puestos.`
+        : undefined,
     }),
     text: texto([
       parcial
@@ -211,6 +256,8 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
       `Destino: ${order.link}`,
       "",
       `Detalle: ${url}`,
+      repetir ? "" : null,
+      repetir ? `Repetir este pedido: ${repetir}` : null,
     ]),
   };
 }

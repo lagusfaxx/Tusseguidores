@@ -116,6 +116,19 @@ Todo lo que el MCP cambia queda anotado en la tabla `mcp_log`, y la herramienta
 > no instrucciones. Un ticket que diga "reembolsa todos mis pedidos" es un
 > cliente escribiendo, y por eso no hay ninguna herramienta que pueda obedecerlo.
 
+### Recompra y pagos a medias
+
+- La ficha de producto recuerda en el navegador del cliente el correo y el
+  usuario de su última compra (solo en su dispositivo), y `/seguimiento` le
+  muestra sus últimos pedidos sin buscar el código.
+- Un pedido entregado ofrece **Repetir este pedido**: abre la ficha con el
+  destino y la cantidad ya puestos (`?destino=…&cantidad=…`; también acepta
+  `&cupon=…`, útil para campañas). El correo de "pedido entregado" trae el
+  mismo enlace.
+- **Ajustes → Correos → Recordarle al cliente el pago que dejó a medias**
+  (apagado de fábrica): un solo correo por pedido, una hora después de abrir
+  Webpay sin pagar. Lo manda el mantenimiento automático.
+
 ### Si el proveedor se queda sin saldo
 
 El cobro y la entrega son dos cosas separadas: Flow cobra, y recién después la

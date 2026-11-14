@@ -337,6 +337,39 @@ function pedidoSinPagarIgual(input: {
   );
 }
 
+/**
+ * Pedidos de Webpay que quedaron a medio pagar y todavía no reciben su
+ * recordatorio.
+ *
+ * Se espera una hora (quien se distrajo vuelve solo) y no se escribe pasado un
+ * día: a esa altura el correo molesta más de lo que ayuda. Si la persona ya
+ * pagó otro pedido después de este, tampoco: resolvió por otro lado. Las
+ * transferencias quedan fuera, que ya reciben los datos de la cuenta por correo.
+ */
+export function pedidosParaRecordarPago(limit = 25): { order: Order; horasRestantes: number }[] {
+  const pedidos = all<Order & { edad_horas: number }>(
+    `SELECT o.*, (julianday('now') - julianday(o.created_at)) * 24 AS edad_horas
+       FROM orders o
+      WHERE o.payment_status = 'pending' AND o.status = 'pending'
+        AND o.payment_provider = 'flow' AND o.reseller_user_id IS NULL
+        AND o.created_at < datetime('now', '-1 hours')
+        AND o.created_at > datetime('now', '-24 hours')
+        AND NOT EXISTS (
+          SELECT 1 FROM email_log e WHERE e.order_id = o.id AND e.kind = 'pago_recordatorio'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM orders p
+           WHERE p.email = o.email AND p.payment_status = 'paid' AND p.created_at >= o.created_at
+        )
+      ORDER BY o.id LIMIT ?`,
+    [limit],
+  );
+  return pedidos.map(({ edad_horas, ...order }) => ({
+    order: order as Order,
+    horasRestantes: Math.max(0, Math.floor(HORAS_PEDIDO_SIN_PAGAR - edad_horas)),
+  }));
+}
+
 /** Horas que un pedido de la tienda puede esperar el pago antes de anularse. */
 export const HORAS_PEDIDO_SIN_PAGAR = 48;
 

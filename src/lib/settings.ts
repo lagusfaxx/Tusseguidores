@@ -69,6 +69,9 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   email_admin_alerts: "1",
   // Aviso de cada pedido que entra, aunque todavía no esté pagado.
   email_admin_new_orders: "1",
+  // Un correo, una sola vez, a quien abrió el pago con Webpay y no lo terminó.
+  // Apagado de fábrica: escribirle a los clientes es una decisión del dueño.
+  email_pago_recordatorio: "0",
 
   // Panel SMM de reventa (clientes mayoristas con saldo)
   reseller_enabled: "1",

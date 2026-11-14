@@ -11,7 +11,7 @@ import {
   correoAdminPedidoTrabado,
   correoAdminTransferencia,
   correoPagoConfirmado,
-  correoPedidoCompletado,
+  correoPedidoCompletado, correoRecordatorioPago,
   correoTransferenciaPendiente,
   type EmailContent,
 } from "./email-templates";
@@ -36,6 +36,7 @@ export type EmailKind =
   | "transferencia_pendiente"
   | "pago_confirmado"
   | "pedido_completado"
+  | "pago_recordatorio"
   | "admin_pedido_nuevo"
   | "admin_pedido_pagado"
   | "admin_transferencia"
@@ -73,6 +74,7 @@ const ETIQUETA: Record<EmailKind, string> = {
   transferencia_pendiente: "datos para transferir",
   pago_confirmado: "pago confirmado",
   pedido_completado: "pedido entregado",
+  pago_recordatorio: "recordatorio de pago",
   admin_pedido_nuevo: "aviso interno de pedido nuevo",
   admin_pedido_pagado: "aviso interno de venta pagada",
   admin_transferencia: "aviso interno de transferencia",
@@ -135,6 +137,16 @@ export async function notificarPagoConfirmado(order: Order): Promise<void> {
 export async function notificarPedidoCompletado(order: Order, parcial = false): Promise<void> {
   if (esDelPanel(order)) return;
   await enviar(order, "pedido_completado", order.email, correoPedidoCompletado(order, parcial));
+}
+
+/**
+ * Recordatorio del pago que quedó a medias. Uno solo por pedido: `enviar` no
+ * repite un correo del mismo tipo.
+ */
+export async function notificarRecordatorioPago(order: Order, horasRestantes: number): Promise<void> {
+  if (esDelPanel(order)) return;
+  if (order.payment_status !== "pending") return;
+  await enviar(order, "pago_recordatorio", order.email, correoRecordatorioPago(order, horasRestantes));
 }
 
 /**

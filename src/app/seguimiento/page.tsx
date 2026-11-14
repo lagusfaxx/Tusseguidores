@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { buildMetadata } from "@/lib/seo";
+import { PedidosRecientes } from "@/components/pedidos-recientes";
 
 export function generateMetadata(): Metadata {
   return buildMetadata({
@@ -31,7 +32,7 @@ export default async function TrackingPage({
     <>
       <SiteHeader />
       <main className="bg-halo">
-        <div className="mx-auto max-w-lg px-4 py-20">
+        <div className="mx-auto max-w-lg px-4 py-12 sm:py-20">
           <h1 className="text-3xl font-extrabold tracking-tight">Seguir mi pedido</h1>
           <p className="mt-2 text-ink-200">
             Escribe el código que te mostramos al terminar la compra. Se ve así:{" "}
@@ -52,7 +53,12 @@ export default async function TrackingPage({
               <p className="mt-3 text-sm text-red-300">Escribe un código válido.</p>
             ) : null}
             <button type="submit" className="btn btn-primary mt-5 w-full">Ver mi pedido</button>
+            <p className="mt-3 text-xs leading-relaxed text-ink-400">
+              También viene en el correo que te mandamos al pagar. Si no lo encuentras, revisa spam.
+            </p>
           </form>
+
+          <PedidosRecientes />
         </div>
       </main>
       <SiteFooter />

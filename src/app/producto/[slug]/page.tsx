@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox } from "@/components/buy-box";
+import { BarraComprar } from "@/components/barra-comprar";
 import { LevelCompare } from "@/components/level-compare";
 import { PlatformIcon, CheckIcon, BoltIcon, ShieldIcon } from "@/components/icons";
 import {
@@ -214,7 +215,7 @@ export default async function ProductPage({ params }: Params) {
             </header>
 
             {/* ------------------------------------------------------------ Compra */}
-            <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
+            <div id="comprar" className="scroll-mt-28 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
               <BuyBox
                 productId={product.id}
                 tiers={tiers}
@@ -231,6 +232,7 @@ export default async function ProductPage({ params }: Params) {
                 orderKind={product.order_kind}
                 porPublicacion={necesitaPublicacion(product.service_type, product.order_kind)}
                 transferencia={transferenciaDisponible()}
+                platform={product.platform}
               />
             </div>
 
@@ -409,6 +411,13 @@ export default async function ProductPage({ params }: Params) {
           ) : null}
         </div>
       </main>
+      {cheapest ? (
+        <BarraComprar
+          ancla="comprar"
+          precio={`Desde ${formatClp(cheapest.priceClp)}`}
+          detalle={product.name}
+        />
+      ) : null}
       <SiteFooter />
       <script
         type="application/ld+json"

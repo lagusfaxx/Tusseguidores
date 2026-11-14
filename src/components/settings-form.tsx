@@ -295,6 +295,9 @@ export function SettingsForm({
           <Check label="Avisarme también de cada pedido nuevo" name="email_admin_new_orders"
             checked={settings.email_admin_new_orders === "1"}
             hint="Apenas entra el pedido, aunque todavía no esté pagado. Apágalo si te molestan los carritos abandonados." />
+          <Check label="Recordarle al cliente el pago que dejó a medias" name="email_pago_recordatorio"
+            checked={settings.email_pago_recordatorio === "1"}
+            hint="Un solo correo por pedido, una hora después de que abrió Webpay y no pagó, con el enlace para terminar sin llenar nada otra vez. No se manda si ya pagó otro pedido ni pasado un día. Necesita el mantenimiento automático encendido." />
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
             Cada correo sale una sola vez por pedido, aunque el cron pase muchas veces o Flow repita
             la confirmación. Lo que se envió queda en el historial del pedido.

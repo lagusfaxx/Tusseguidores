@@ -1,7 +1,8 @@
 import "server-only";
 import { get, rescoreServices } from "./db";
 import { getBoolSetting, getNumberSetting, invalidateSettings, setSettings } from "./settings";
-import { anularSinPagar, retryUndispatched, syncOpenOrders } from "./orders";
+import { anularSinPagar, pedidosParaRecordarPago, retryUndispatched, syncOpenOrders } from "./orders";
+import { notificarRecordatorioPago } from "./notify";
 import { publicarNiveles, refrescarEtiquetasDeEntrega } from "./autolevels";
 import { resumirSincronizacion, sincronizarProveedores } from "./catalog-sync";
 import { algunProveedorConfigurado, refreshBalances } from "./provider";
@@ -31,6 +32,8 @@ export type ResultadoMantenimiento = {
   niveles: ReturnType<typeof publicarNiveles> | null;
   /** Pedidos de la tienda anulados por no pagarse a tiempo. */
   sinPagar?: number;
+  /** Recordatorios de pago enviados en esta pasada. */
+  recordatorios?: number;
   error?: string;
 };
 
@@ -75,6 +78,14 @@ async function pasada(forzarCatalogo: boolean): Promise<ResultadoMantenimiento> 
   };
   // Las compras abandonadas se anulan aunque no haya proveedor: no dependen de él.
   resultado.sinPagar = anularSinPagar();
+  // Los recordatorios de pago tampoco: son entre la tienda y el cliente.
+  if (getBoolSetting("email_pago_recordatorio", false)) {
+    const pendientes = pedidosParaRecordarPago();
+    for (const { order, horasRestantes } of pendientes) {
+      await notificarRecordatorioPago(order, horasRestantes);
+    }
+    resultado.recordatorios = pendientes.length;
+  }
   if (!algunProveedorConfigurado()) return resultado;
 
   // Primero lo que toca plata del cliente: pedidos pagados y en curso.
