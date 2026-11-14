@@ -28,6 +28,10 @@ import {
 import { AutoRefresh } from "@/components/auto-refresh";
 import { pagarPedido } from "../actions";
 import { get } from "@/lib/db";
+import { rutaRecompra } from "@/lib/recompra";
+import { getProductsByPlatform } from "@/lib/catalog";
+import { ProductCard } from "@/components/product-card";
+import { RecordarPedido } from "@/components/pedidos-recientes";
 
 export const metadata: Metadata = {
   title: "Estado de tu pedido",
@@ -79,15 +83,28 @@ export default async function OrderPage({ params, searchParams }: Params) {
   const reposicionAbierta = reposicionYaPedida(order.id);
   const destinos = orderTargets(order.id);
   const producto = order.product_id
-    ? get<{ link_label: string; image_url: string | null; slug: string }>(
-        "SELECT link_label, image_url, slug FROM products WHERE id = ?",
+    ? get<{ link_label: string; image_url: string | null; slug: string; platform: string }>(
+        "SELECT link_label, image_url, slug, platform FROM products WHERE id = ?",
         [order.product_id],
       )
     : undefined;
 
+  // Recompra: el momento en que alguien ve su pedido entregado es cuando más
+  // cerca está de pedir otro. Se le deja a un toque, con sus datos ya puestos,
+  // junto a lo demás que hay para la misma red. Solo en pedidos de la tienda:
+  // el mayorista repite desde su panel.
+  const prueba = order.payment_provider === "prueba";
+  const entregado = order.payment_status === "paid" && order.status === "completed";
+  const deLaTienda = order.reseller_user_id == null;
+  const recompra = deLaTienda ? rutaRecompra(order) : null;
+  const paraSumar = entregado && deLaTienda && producto
+    ? getProductsByPlatform(producto.platform).filter((p) => p.id !== order.product_id).slice(0, 3)
+    : [];
+
   return (
     <>
       <AutoRefresh activo={enCurso} />
+      {deLaTienda ? <RecordarPedido code={order.code} name={order.product_name} /> : null}
       <SiteHeader />
       <main className="bg-halo">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:py-12">
@@ -238,7 +255,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
                   <div className="min-w-0 flex-1">
                     <h2 className="font-bold leading-snug">{order.product_name}</h2>
                     <p className="mt-1 text-sm text-ink-400">
-                      {formatNumber(order.quantity)} unidades · {formatClp(order.amount_clp)}
+                      {formatNumber(order.quantity)} unidades · {prueba ? "gratis" : formatClp(order.amount_clp)}
                     </p>
                   </div>
                 </div>
@@ -299,15 +316,56 @@ export default async function OrderPage({ params, searchParams }: Params) {
                   ) : null}
                 </dl>
 
-                {producto?.slug ? (
+                {recompra && !entregado ? (
                   <Link
-                    href={`/producto/${producto.slug}`}
+                    href={recompra}
                     className="mt-5 inline-block text-sm text-brand-300 hover:text-white"
                   >
                     Volver a pedir lo mismo →
                   </Link>
                 ) : null}
               </section>
+
+              {prueba && order.status !== "canceled" ? (
+                <section className="card flex flex-wrap items-center justify-between gap-4 border-lime-400/40 p-5 sm:p-6">
+                  <div className="min-w-0">
+                    <h2 className="font-bold">
+                      {entregado ? "¿Llegaron? Ahora el pack completo" : "Mientras llegan, mira los packs"}
+                    </h2>
+                    <p className="mt-1 text-sm text-ink-400">Mismo sistema, la cantidad que quieras.</p>
+                  </div>
+                  <Link href="/catalogo" className="btn btn-primary shrink-0 text-sm">Ver precios</Link>
+                </section>
+              ) : null}
+
+              {/* ------------------------------------------------- recompra */}
+              {entregado && (recompra || paraSumar.length) ? (
+                <section className="card p-5 sm:p-6">
+                  {recompra ? (
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <h2 className="font-bold">¿Lo repetimos?</h2>
+                        <p className="mt-1 text-sm text-ink-400">Con los mismos datos.</p>
+                      </div>
+                      <Link href={recompra} className="btn btn-primary shrink-0 text-sm">
+                        Repetir este pedido
+                      </Link>
+                    </div>
+                  ) : null}
+                  {paraSumar.length ? (
+                    <div className={recompra ? "mt-6 border-t border-white/8 pt-5" : ""}>
+                      <h3 className="text-sm font-semibold uppercase tracking-wider text-ink-400">
+                        Para la misma cuenta
+                      </h3>
+                      <div className="mt-3 grid gap-3">
+                        {paraSumar.map((p) => (
+                          <ProductCard key={p.id} product={p} fila />
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              ) : null}
 
               {/* ------------------------------------- lo que puede hacer el cliente */}
               {puedeCorregirDestino(order) || (reposicion.disponible && !reposicionAbierta) || devolucion ? (

@@ -50,7 +50,8 @@ function inicioDeGarantia(order: Order): Date | null {
 }
 
 export function reposicionDelPedido(order: Order, ahora = new Date()): Reposicion {
-  const dias = diasDeGarantia(order);
+  // La prueba gratis no lleva reposición.
+  const dias = order.payment_provider === "prueba" ? 0 : diasDeGarantia(order);
   if (dias <= 0) return { disponible: false, motivo: "sin-garantia" };
 
   // Solo se repone lo que se entregó: mientras el pedido va en camino, lo que

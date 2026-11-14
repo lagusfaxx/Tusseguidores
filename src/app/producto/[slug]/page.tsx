@@ -5,12 +5,14 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox } from "@/components/buy-box";
+import { BarraComprar } from "@/components/barra-comprar";
+import { cantidadDePrueba, pruebaDisponible } from "@/lib/prueba";
 import { LevelCompare } from "@/components/level-compare";
 import { PlatformIcon, CheckIcon, BoltIcon, ShieldIcon } from "@/components/icons";
 import {
   getProductBySlug, getPricedTiers, getProductsByPlatform, parseJson,
 } from "@/lib/catalog";
-import { platformLabel, serviceTypeLabel } from "@/lib/labels";
+import { platformAccent, platformLabel, serviceTypeLabel } from "@/lib/labels";
 import {
   formatClp, formatNumber, formatDuration, floorPer1000, minPriceFor, pricingContext,
 } from "@/lib/pricing";
@@ -151,6 +153,8 @@ export default async function ProductPage({ params }: Params) {
         ].join("\n")
       : null;
 
+  const fotoPropia = Boolean(product.image_url) && !product.image_url!.startsWith("/img/productos/");
+
   const productLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -194,7 +198,7 @@ export default async function ProductPage({ params }: Params) {
           <div className="mt-5 grid gap-8 lg:mt-6 lg:grid-cols-[1.15fr_0.85fr] lg:items-start lg:gap-10">
             {/* ------------------------------------------------------- Encabezado */}
             <header className="lg:col-start-1 lg:row-start-1">
-              <div className="flex items-center gap-2 text-sm font-semibold text-brand-300">
+              <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: platformAccent(product.platform) }}>
                 <PlatformIcon slug={product.platform} className="h-4 w-4" />
                 {platformLabel(product.platform)} · {serviceTypeLabel(product.service_type)}
                 {product.level ? (
@@ -214,7 +218,7 @@ export default async function ProductPage({ params }: Params) {
             </header>
 
             {/* ------------------------------------------------------------ Compra */}
-            <div className="lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
+            <div id="comprar" className="scroll-mt-28 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:sticky lg:top-24">
               <BuyBox
                 productId={product.id}
                 tiers={tiers}
@@ -231,22 +235,31 @@ export default async function ProductPage({ params }: Params) {
                 orderKind={product.order_kind}
                 porPublicacion={necesitaPublicacion(product.service_type, product.order_kind)}
                 transferencia={transferenciaDisponible()}
+                platform={product.platform}
               />
+              {product.service_type === "seguidores" && pruebaDisponible(product.platform) ? (
+                <Link
+                  href={`/prueba-gratis?red=${product.platform}`}
+                  className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/4 px-4 py-3 text-sm font-semibold text-ink-200 transition-colors hover:border-lime-400/50 hover:text-white"
+                >
+                  <span className="rounded bg-lime-400 px-1.5 py-0.5 text-[11px] font-bold uppercase text-ink-950">Gratis</span>
+                  ¿No estás seguro? Prueba con {cantidadDePrueba()} seguidores
+                </Link>
+              ) : null}
             </div>
 
             {/* -------------------------------------------------- Contenido largo */}
             <div className="lg:col-start-1 lg:row-start-2">
-              {/* La portada es un degradado con un icono: a media página se comía
-                  el espacio del contenido, así que va como banda con velo, del
-                  mismo alto que en las tarjetas del catálogo. */}
-              <div className="relative overflow-hidden rounded-2xl border border-white/10">
+              {/* Solo con foto subida desde el panel: la portada generada es un
+                  color plano y aquí no aporta. */}
+              <div className={`relative mb-5 overflow-hidden rounded-2xl border border-white/10 ${fotoPropia ? "" : "hidden"}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={product.image_url || "/img/productos/generico.svg"}
                   alt={product.name}
                   width={600}
                   height={400}
-                  fetchPriority="high"
+                  loading={fotoPropia ? "eager" : "lazy"}
                   className="aspect-[16/6] w-full object-cover sm:aspect-[16/5]"
                 />
                 <span className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink-950/85 via-ink-950/15 to-transparent" />
@@ -265,7 +278,7 @@ export default async function ProductPage({ params }: Params) {
 
               {/* Cuatro datos, no tres: el rango de cantidades es la pregunta
                   que más llega por WhatsApp. */}
-              <dl className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {[
                   { icon: BoltIcon, label: "Entrega", value: deliveryLabel },
                   { icon: CheckIcon, label: "Calidad", value: product.quality_label },
@@ -409,6 +422,13 @@ export default async function ProductPage({ params }: Params) {
           ) : null}
         </div>
       </main>
+      {cheapest ? (
+        <BarraComprar
+          ancla="comprar"
+          precio={`Desde ${formatClp(cheapest.priceClp)}`}
+          detalle={product.name}
+        />
+      ) : null}
       <SiteFooter />
       <script
         type="application/ld+json"

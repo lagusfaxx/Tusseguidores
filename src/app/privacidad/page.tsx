@@ -44,6 +44,15 @@ export default function PrivacyPage() {
       </ul>
       <p>No vendemos ni cedemos tus datos a terceros con fines publicitarios.</p>
 
+      <h2>Lo que recuerda tu navegador</h2>
+      <p>
+        Para que no tengas que escribirlos de nuevo, tu navegador recuerda el correo y el usuario
+        de tu última compra y los códigos de tus últimos pedidos. Eso queda guardado solo en tu
+        dispositivo, no en nuestros servidores, y se borra al limpiar los datos del sitio. Si
+        dejas un pago con Webpay a medias, podemos mandarte un único correo con el enlace para
+        terminarlo.
+      </p>
+
       <h2>Cookies</h2>
       <p>
         Usamos una cookie técnica para mantener la sesión del panel de administración. Si tenemos

@@ -295,6 +295,9 @@ export function SettingsForm({
           <Check label="Avisarme también de cada pedido nuevo" name="email_admin_new_orders"
             checked={settings.email_admin_new_orders === "1"}
             hint="Apenas entra el pedido, aunque todavía no esté pagado. Apágalo si te molestan los carritos abandonados." />
+          <Check label="Recordarle al cliente el pago que dejó a medias" name="email_pago_recordatorio"
+            checked={settings.email_pago_recordatorio === "1"}
+            hint="Un solo correo por pedido, una hora después de que abrió Webpay y no pagó, con el enlace para terminar sin llenar nada otra vez. No se manda si ya pagó otro pedido ni pasado un día. Necesita el mantenimiento automático encendido." />
           <p className="rounded-lg bg-white/4 px-3 py-2 text-xs leading-relaxed text-ink-400">
             Cada correo sale una sola vez por pedido, aunque el cron pase muchas veces o Flow repita
             la confirmación. Lo que se envió queda en el historial del pedido.
@@ -409,6 +412,20 @@ export function SettingsForm({
             Cada producto puede llevar su propia nota desde su ficha en el panel. Si la deja en 0,
             usa esta.
           </p>
+        </Section>
+
+        <Section
+          title="Prueba gratis"
+          hint="Unos pocos seguidores sin costo para quien desconfía. Cada cuenta la recibe una sola vez: queda anotada y no se le vuelve a enviar."
+        >
+          <Check label="Ofrecer la prueba gratis" name="trial_enabled" checked={settings.trial_enabled === "1"} />
+          <Field label="Seguidores por prueba" name="trial_quantity" type="number" value={settings.trial_quantity}
+            hint="Se usa el servicio de seguidores más barato entre los rápidos que acepte esta cantidad." />
+          <Field label="Redes" name="trial_platforms" value={settings.trial_platforms}
+            hint="Separadas por coma: instagram,tiktok" />
+          <Field label="Máximo de pruebas en 24 horas" name="trial_daily_limit" type="number" value={settings.trial_daily_limit}
+            hint="Protege el saldo del proveedor. 0 = sin tope." />
+          <Field label="Máximo por persona (IP) en 24 horas" name="trial_per_ip_daily" type="number" value={settings.trial_per_ip_daily} />
         </Section>
 
         <Section title="Operación">

@@ -11,6 +11,16 @@ export function platformColor(slug: string): string {
   return platformBySlug.get(slug)?.color ?? "#7c3aed";
 }
 
+/**
+ * Color de la red para usarlo sobre fondo oscuro. X y Threads son negros:
+ * ahí se usa blanco.
+ */
+export function platformAccent(slug: string): string {
+  const color = platformColor(slug);
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(color.slice(i, i + 2), 16));
+  return 0.299 * r + 0.587 * g + 0.114 * b < 60 ? "#ffffff" : color;
+}
+
 export function serviceTypeLabel(slug: string): string {
   return typeBySlug.get(slug)?.label ?? "Servicios";
 }

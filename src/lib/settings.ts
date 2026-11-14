@@ -69,6 +69,9 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   email_admin_alerts: "1",
   // Aviso de cada pedido que entra, aunque todavía no esté pagado.
   email_admin_new_orders: "1",
+  // Un correo, una sola vez, a quien abrió el pago con Webpay y no lo terminó.
+  // Apagado de fábrica: escribirle a los clientes es una decisión del dueño.
+  email_pago_recordatorio: "0",
 
   // Panel SMM de reventa (clientes mayoristas con saldo)
   reseller_enabled: "1",
@@ -78,6 +81,15 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   reseller_min_topup_clp: "10000",
   reseller_min_order_clp: "200",
   reseller_welcome: "",
+
+  // Prueba gratis: unos pocos seguidores, una vez por cuenta. Ver lib/prueba.ts.
+  trial_enabled: "1",
+  trial_quantity: "20",
+  // Redes donde se ofrece, separadas por coma.
+  trial_platforms: "instagram,tiktok",
+  // Topes de pruebas en 24 horas: en total (0 = sin tope) y por IP.
+  trial_daily_limit: "50",
+  trial_per_ip_daily: "3",
 
   // Asistente de tickets (OpenAI). Contesta solo y avisa al dueño cuando el
   // cliente insiste o el caso necesita una persona. Ver lib/ia-tickets.ts.

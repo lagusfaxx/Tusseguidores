@@ -1,20 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Reacciones para Telegram">
 <defs>
 <linearGradient id="bg-telegram-reacciones" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
+<stop offset="0" stop-color="#229ED9"/><stop offset="1" stop-color="#229ED9" stop-opacity="0.55"/>
 </linearGradient>
-<radialGradient id="halo-telegram-reacciones" cx="0.5" cy="0.42" r="0.62">
-<stop offset="0" stop-color="#229ED9" stop-opacity="0.42"/>
-<stop offset="1" stop-color="#229ED9" stop-opacity="0"/>
-</radialGradient>
 </defs>
+<rect width="600" height="400" fill="#0f0e17"/>
 <rect width="600" height="400" fill="url(#bg-telegram-reacciones)"/>
-<rect width="600" height="400" fill="url(#halo-telegram-reacciones)"/>
+<g transform="translate(395 150) rotate(-14) scale(15)" opacity="0.13">
+<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-3.5 7A1.5 1.5 0 1 1 7 10.5 1.5 1.5 0 0 1 8.5 9Zm7 0A1.5 1.5 0 1 1 14 10.5 1.5 1.5 0 0 1 15.5 9ZM12 18a5.5 5.5 0 0 1-5-3h10a5.5 5.5 0 0 1-5 3Z" fill="#ffffff"/>
+</g>
 <g transform="translate(300 200)">
-<circle r="96" fill="#229ED9" opacity="0.14"/>
-<circle r="96" fill="none" stroke="#229ED9" stroke-opacity="0.35" stroke-width="1.5"/>
-<g transform="translate(-52 -52) scale(4.33)">
-<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-3.5 7A1.5 1.5 0 1 1 7 10.5 1.5 1.5 0 0 1 8.5 9Zm7 0A1.5 1.5 0 1 1 14 10.5 1.5 1.5 0 0 1 15.5 9ZM12 18a5.5 5.5 0 0 1-5-3h10a5.5 5.5 0 0 1-5 3Z" fill="#229ED9"/>
+<circle r="74" fill="#ffffff" opacity="0.16"/>
+<g transform="translate(-45.6 -45.6) scale(3.8)">
+<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm-3.5 7A1.5 1.5 0 1 1 7 10.5 1.5 1.5 0 0 1 8.5 9Zm7 0A1.5 1.5 0 1 1 14 10.5 1.5 1.5 0 0 1 15.5 9ZM12 18a5.5 5.5 0 0 1-5-3h10a5.5 5.5 0 0 1-5 3Z" fill="#ffffff"/>
 </g>
 </g>
 </svg>

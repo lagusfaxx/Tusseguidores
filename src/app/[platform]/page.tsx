@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { PlatformIcon } from "@/components/icons";
 import { getPlatformsWithProducts, getProductsByPlatform, groupByServiceType } from "@/lib/catalog";
-import { platformLabel, serviceTypeLabel } from "@/lib/labels";
+import { platformAccent, platformLabel, serviceTypeLabel } from "@/lib/labels";
 import { breadcrumbLd, buildMetadata, faqLd, jsonLd } from "@/lib/seo";
 import { textoDeRed } from "@/lib/seo-text";
 import { getSetting, getBoolSetting } from "@/lib/settings";
@@ -82,7 +82,7 @@ export default async function PlatformPage({ params }: Params) {
           </nav>
 
           <div className="mt-5 flex items-start gap-3 sm:gap-4">
-            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-brand-500/30 to-accent-500/25 text-brand-300 sm:h-14 sm:w-14 sm:rounded-2xl">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/8 sm:h-14 sm:w-14 sm:rounded-2xl" style={{ color: platformAccent(platform) }}>
               <PlatformIcon slug={platform} className="h-6 w-6 sm:h-7 sm:w-7" />
             </span>
             <div>

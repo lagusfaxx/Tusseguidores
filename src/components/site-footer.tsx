@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlatformsWithProducts } from "@/lib/catalog";
 import { getSettings, getBoolSetting } from "@/lib/settings";
 import { platformLabel, sortPlatforms } from "@/lib/labels";
+import { pruebaDisponible } from "@/lib/prueba";
 
 export function SiteFooter() {
   const s = getSettings();
@@ -13,10 +14,10 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-2 sm:gap-10 sm:py-14 lg:grid-cols-4">
         <div>
           <div className="flex items-center gap-2 font-extrabold">
-            <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-accent-500 text-sm">
+            <span className="grid h-8 w-8 place-items-center rounded-lg bg-lime-400 text-sm text-ink-950">
               TS
             </span>
-            Tus<span className="-ml-2 text-brand-300">Seguidores</span>
+            <span className="font-display text-[18px]">Tus<span className="text-lime-400">Seguidores</span></span>
           </div>
           <p className="mt-4 text-sm leading-relaxed text-ink-400">{s.site_tagline}.</p>
         </div>
@@ -38,6 +39,9 @@ export function SiteFooter() {
         <div>
           <h3 className="text-sm font-semibold text-white">Ayuda</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
+            {pruebaDisponible() ? (
+              <li><Link href="/prueba-gratis" className="hover:text-white">Prueba gratis</Link></li>
+            ) : null}
             <li><Link href="/seguimiento" className="hover:text-white">Seguir mi pedido</Link></li>
             <li><Link href="/soporte" className="hover:text-white">Soporte</Link></li>
             {getBoolSetting("reseller_enabled", true) ? (

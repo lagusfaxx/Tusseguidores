@@ -1,20 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="600" height="400" role="img" aria-label="Me gusta para YouTube">
 <defs>
 <linearGradient id="bg-youtube-likes" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#171331"/><stop offset="1" stop-color="#0c0a18"/>
+<stop offset="0" stop-color="#FF0000"/><stop offset="1" stop-color="#FF0000" stop-opacity="0.55"/>
 </linearGradient>
-<radialGradient id="halo-youtube-likes" cx="0.5" cy="0.42" r="0.62">
-<stop offset="0" stop-color="#FF0000" stop-opacity="0.42"/>
-<stop offset="1" stop-color="#FF0000" stop-opacity="0"/>
-</radialGradient>
 </defs>
+<rect width="600" height="400" fill="#0f0e17"/>
 <rect width="600" height="400" fill="url(#bg-youtube-likes)"/>
-<rect width="600" height="400" fill="url(#halo-youtube-likes)"/>
+<g transform="translate(395 150) rotate(-14) scale(15)" opacity="0.13">
+<path d="M12 21s-8-5.1-8-10.2A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8 3.8C20 15.9 12 21 12 21Z" fill="#ffffff"/>
+</g>
 <g transform="translate(300 200)">
-<circle r="96" fill="#FF0000" opacity="0.14"/>
-<circle r="96" fill="none" stroke="#FF0000" stroke-opacity="0.35" stroke-width="1.5"/>
-<g transform="translate(-52 -52) scale(4.33)">
-<path d="M12 21s-8-5.1-8-10.2A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8 3.8C20 15.9 12 21 12 21Z" fill="#FF0000"/>
+<circle r="74" fill="#ffffff" opacity="0.16"/>
+<g transform="translate(-45.6 -45.6) scale(3.8)">
+<path d="M12 21s-8-5.1-8-10.2A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8 3.8C20 15.9 12 21 12 21Z" fill="#ffffff"/>
 </g>
 </g>
 </svg>

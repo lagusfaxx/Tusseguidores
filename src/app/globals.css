@@ -1,21 +1,23 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink-950: #08060f;
-  --color-ink-900: #0d0a1a;
-  --color-ink-800: #151129;
-  --color-ink-700: #1e1838;
-  --color-ink-600: #2b2350;
-  --color-ink-400: #6f6795;
-  --color-ink-200: #b9b4d4;
+  --color-ink-950: #09090e;
+  --color-ink-900: #0f0e17;
+  --color-ink-800: #171624;
+  --color-ink-700: #211f33;
+  --color-ink-600: #322f4b;
+  --color-ink-400: #8a87a6;
+  --color-ink-200: #c4c1d9;
 
   --color-brand-500: #7c3aed;
   --color-brand-400: #9061ff;
   --color-brand-300: #b18cff;
   --color-accent-500: #ff2e93;
   --color-accent-400: #ff5fae;
-  --color-lime-400: #b6ff3d;
+  --color-lime-400: #c4ff45;
+  --color-lime-300: #d6ff7a;
 
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif;
 
@@ -47,23 +49,33 @@ body {
 /* Fondo con dos halos; se pinta una sola vez y no repinta al hacer scroll. */
 .bg-halo {
   background-image:
-    radial-gradient(60rem 40rem at 12% -10%, rgba(124, 58, 237, 0.28), transparent 60%),
-    radial-gradient(45rem 35rem at 95% 0%, rgba(255, 46, 147, 0.18), transparent 55%);
+    radial-gradient(52rem 30rem at 8% -12%, rgba(124, 58, 237, 0.22), transparent 62%),
+    radial-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+  background-size: auto, 22px 22px;
+  background-repeat: no-repeat, repeat;
+  background-attachment: scroll;
+  -webkit-mask-image: none;
+}
+
+h1, h2, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
 }
 
 .card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: var(--radius-xl2);
+  background: var(--color-ink-900);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.1rem;
 }
 
 .card-hover {
   transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
+/* --red es el color de la red social del producto; sin él, el de la marca. */
 .card-hover:hover {
   transform: translateY(-3px);
-  border-color: rgba(176, 140, 255, 0.45);
-  box-shadow: 0 18px 40px -22px rgba(124, 58, 237, 0.85);
+  border-color: color-mix(in srgb, var(--red, #b18cff) 60%, transparent);
+  box-shadow: 0 18px 40px -24px var(--red, rgba(124, 58, 237, 0.85));
 }
 
 .btn {
@@ -81,11 +93,12 @@ body {
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--color-brand-500), var(--color-accent-500));
-  color: #fff;
-  box-shadow: 0 12px 30px -14px rgba(255, 46, 147, 0.9);
+  background: var(--color-lime-400);
+  color: #0b0d05;
+  font-weight: 700;
+  box-shadow: 0 10px 28px -16px rgba(196, 255, 69, 0.75);
 }
-.btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+.btn-primary:hover:not(:disabled) { background: var(--color-lime-300); }
 
 .btn-ghost {
   background: rgba(255, 255, 255, 0.06);

@@ -81,6 +81,18 @@ export function ensureTargets(order: Order): OrderTarget[] {
 
 export type CouponResult = { code: string; discountClp: number } | null;
 
+/** Por qué no sirve un cupón, escrito para el comprador. */
+export function motivoCupon(rawCode: string, amountClp: number): string {
+  const coupon = get<{ min_clp: number; active: number }>(
+    "SELECT min_clp, active FROM coupons WHERE code = ?",
+    [rawCode.trim().toUpperCase()],
+  );
+  if (coupon?.active === 1 && amountClp < coupon.min_clp) {
+    return `Ese cupón es para compras desde $${coupon.min_clp.toLocaleString("es-CL")}.`;
+  }
+  return "Ese cupón no existe o ya venció. Corrígelo o bórralo para seguir.";
+}
+
 export function applyCoupon(rawCode: string, amountClp: number): CouponResult {
   const code = rawCode.trim().toUpperCase();
   if (!code) return null;
@@ -225,6 +237,11 @@ export function createOrder(input: CreateOrderInput): CreateOrderResult {
   const base = unitario * links.length;
 
   const coupon = input.couponCode ? applyCoupon(input.couponCode, base) : null;
+  // Un cupón que no sirve se dice: antes se ignoraba y el cliente pagaba el
+  // precio completo creyendo que llevaba descuento.
+  if (input.couponCode?.trim() && !coupon) {
+    return { ok: false, error: motivoCupon(input.couponCode, base) };
+  }
   const amount = base - (coupon?.discountClp ?? 0);
 
   // Antes de crear otro, se mira si el cliente ya tiene este mismo pedido
@@ -335,6 +352,40 @@ function pedidoSinPagarIgual(input: {
   return candidatos.find(
     (o) => orderTargets(o.id).map((t) => t.link).join("\n") === buscados,
   );
+}
+
+/**
+ * Pedidos de Webpay que quedaron a medio pagar y todavía no reciben su
+ * recordatorio.
+ *
+ * Se espera una hora (quien se distrajo vuelve solo) y no se escribe pasado un
+ * día: a esa altura el correo molesta más de lo que ayuda. Si la persona ya
+ * pagó otro pedido después de este, tampoco: resolvió por otro lado. Las
+ * transferencias quedan fuera, que ya reciben los datos de la cuenta por correo.
+ */
+export function pedidosParaRecordarPago(limit = 25): { order: Order; horasRestantes: number }[] {
+  const pedidos = all<Order & { edad_horas: number }>(
+    `SELECT o.*, (julianday('now') - julianday(o.created_at)) * 24 AS edad_horas
+       FROM orders o
+      WHERE o.payment_status = 'pending' AND o.status = 'pending'
+        AND o.payment_provider = 'flow' AND o.reseller_user_id IS NULL
+        AND o.created_at < datetime('now', '-1 hours')
+        AND o.created_at > datetime('now', '-24 hours')
+        AND NOT EXISTS (
+          SELECT 1 FROM email_log e WHERE e.order_id = o.id AND e.kind = 'pago_recordatorio'
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM orders p
+           WHERE p.email = o.email AND p.payment_status = 'paid'
+             AND p.payment_provider != 'prueba' AND p.created_at >= o.created_at
+        )
+      ORDER BY o.id LIMIT ?`,
+    [limit],
+  );
+  return pedidos.map(({ edad_horas, ...order }) => ({
+    order: order as Order,
+    horasRestantes: Math.max(0, Math.floor(HORAS_PEDIDO_SIN_PAGAR - edad_horas)),
+  }));
 }
 
 /** Horas que un pedido de la tienda puede esperar el pago antes de anularse. */
@@ -1005,6 +1056,33 @@ export function transferenciasPendientes(limit = 100): Order[] {
   );
 }
 
+/**
+ * Recompra: de los clientes de la tienda que han pagado, cuántos pagaron más
+ * de una vez, y qué parte de la venta viene de ellos.
+ */
+export function recompraStats() {
+  const fila = get<{ clientes: number; repiten: number; venta: number; venta_repiten: number }>(
+    `SELECT COUNT(*) AS clientes,
+            SUM(CASE WHEN n > 1 THEN 1 ELSE 0 END) AS repiten,
+            SUM(total) AS venta,
+            SUM(CASE WHEN n > 1 THEN total ELSE 0 END) AS venta_repiten
+       FROM (SELECT email, COUNT(*) AS n, SUM(amount_clp) AS total
+               FROM orders
+              WHERE payment_status = 'paid' AND reseller_user_id IS NULL
+                AND status != 'refunded' AND payment_provider != 'prueba'
+              GROUP BY email)`,
+  );
+  const clientes = fila?.clientes ?? 0;
+  const repiten = fila?.repiten ?? 0;
+  const venta = fila?.venta ?? 0;
+  return {
+    clientes,
+    repiten,
+    porcentaje: clientes ? Math.round((repiten / clientes) * 100) : 0,
+    porcentajeVenta: venta ? Math.round(((fila?.venta_repiten ?? 0) / venta) * 100) : 0,
+  };
+}
+
 export function orderStats() {
   return {
     transferenciasPorConfirmar: get<{ n: number }>(
@@ -1047,7 +1125,7 @@ export function orderStats() {
                OR provider_error LIKE '%saldo%' OR provider_error LIKE '%insufficient%')`,
     )?.n ?? 0,
     total: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders")?.n ?? 0,
-    paid: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE payment_status = 'paid'")?.n ?? 0,
+    paid: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE payment_status = 'paid' AND payment_provider != 'prueba'")?.n ?? 0,
     pending: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'")?.n ?? 0,
     processing: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status IN ('processing','paid','partial')")?.n ?? 0,
     revenue: get<{ v: number }>("SELECT COALESCE(SUM(amount_clp), 0) AS v FROM orders WHERE payment_status = 'paid'")?.v ?? 0,
