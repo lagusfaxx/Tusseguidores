@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getPlatformsWithProducts } from "@/lib/catalog";
 import { getSettings, getBoolSetting } from "@/lib/settings";
 import { platformLabel, sortPlatforms } from "@/lib/labels";
+import { pruebaDisponible } from "@/lib/prueba";
 
 export function SiteFooter() {
   const s = getSettings();
@@ -38,6 +39,9 @@ export function SiteFooter() {
         <div>
           <h3 className="text-sm font-semibold text-white">Ayuda</h3>
           <ul className="mt-4 space-y-2 text-sm text-ink-400">
+            {pruebaDisponible() ? (
+              <li><Link href="/prueba-gratis" className="hover:text-white">Prueba gratis</Link></li>
+            ) : null}
             <li><Link href="/seguimiento" className="hover:text-white">Seguir mi pedido</Link></li>
             <li><Link href="/soporte" className="hover:text-white">Soporte</Link></li>
             {getBoolSetting("reseller_enabled", true) ? (

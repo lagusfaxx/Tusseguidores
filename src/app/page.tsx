@@ -19,6 +19,7 @@ import { LeerMas } from "@/components/leer-mas";
 import { Stars } from "@/components/stars";
 import { storeRating } from "@/lib/ratings";
 import { SelectorRed, type RedDelSelector } from "@/components/selector-red";
+import { cantidadDePrueba, pruebaDisponible } from "@/lib/prueba";
 
 export function generateMetadata(): Metadata {
   const s = getSettings();
@@ -90,6 +91,7 @@ export default function HomePage() {
   });
 
   const rating = storeRating();
+  const prueba = pruebaDisponible() ? cantidadDePrueba() : 0;
   // Las combinaciones red + servicio que la gente busca por su nombre
   // ("seguidores instagram"). Cada una tiene su página y desde aquí recibe el
   // enlace que necesita para que Google la encuentre y la entienda.
@@ -140,13 +142,20 @@ export default function HomePage() {
                   ))}
                 </ul>
 
-                <div className="mt-7 hidden flex-wrap items-center gap-3 lg:flex">
-                  <Link href="/catalogo" className="btn btn-primary text-base">
+                <div className="mt-7 flex flex-wrap items-center gap-3">
+                  <Link href="/catalogo" className="btn btn-primary hidden text-base lg:inline-flex">
                     Ver los {all.length} servicios
                   </Link>
-                  <Link href="/seguimiento" className="btn btn-ghost text-base">
-                    Seguir mi pedido
-                  </Link>
+                  {prueba ? (
+                    <Link href="/prueba-gratis" className="btn btn-ghost border-lime-400/50 text-base">
+                      <span className="rounded bg-lime-400 px-1.5 py-0.5 text-[11px] font-bold uppercase text-ink-950">Gratis</span>
+                      Probar con {prueba} seguidores
+                    </Link>
+                  ) : (
+                    <Link href="/seguimiento" className="btn btn-ghost hidden text-base lg:inline-flex">
+                      Seguir mi pedido
+                    </Link>
+                  )}
                 </div>
               </div>
 

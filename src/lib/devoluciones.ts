@@ -41,6 +41,8 @@ export const TEXTO_DEVOLUCIONES =
 export function devolucionDisponible(order: Order): boolean {
   return (
     order.payment_status === "paid" &&
+    // La prueba gratis no costó nada: no hay qué devolver.
+    order.payment_provider !== "prueba" &&
     ["canceled", "failed", "partial"].includes(order.status)
   );
 }

@@ -376,7 +376,8 @@ export function pedidosParaRecordarPago(limit = 25): { order: Order; horasRestan
         )
         AND NOT EXISTS (
           SELECT 1 FROM orders p
-           WHERE p.email = o.email AND p.payment_status = 'paid' AND p.created_at >= o.created_at
+           WHERE p.email = o.email AND p.payment_status = 'paid'
+             AND p.payment_provider != 'prueba' AND p.created_at >= o.created_at
         )
       ORDER BY o.id LIMIT ?`,
     [limit],
@@ -1068,7 +1069,7 @@ export function recompraStats() {
        FROM (SELECT email, COUNT(*) AS n, SUM(amount_clp) AS total
                FROM orders
               WHERE payment_status = 'paid' AND reseller_user_id IS NULL
-                AND status != 'refunded'
+                AND status != 'refunded' AND payment_provider != 'prueba'
               GROUP BY email)`,
   );
   const clientes = fila?.clientes ?? 0;
@@ -1124,7 +1125,7 @@ export function orderStats() {
                OR provider_error LIKE '%saldo%' OR provider_error LIKE '%insufficient%')`,
     )?.n ?? 0,
     total: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders")?.n ?? 0,
-    paid: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE payment_status = 'paid'")?.n ?? 0,
+    paid: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE payment_status = 'paid' AND payment_provider != 'prueba'")?.n ?? 0,
     pending: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status = 'pending'")?.n ?? 0,
     processing: get<{ n: number }>("SELECT COUNT(*) AS n FROM orders WHERE status IN ('processing','paid','partial')")?.n ?? 0,
     revenue: get<{ v: number }>("SELECT COALESCE(SUM(amount_clp), 0) AS v FROM orders WHERE payment_status = 'paid'")?.v ?? 0,

@@ -6,6 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { ProductCard } from "@/components/product-card";
 import { BuyBox } from "@/components/buy-box";
 import { BarraComprar } from "@/components/barra-comprar";
+import { cantidadDePrueba, pruebaDisponible } from "@/lib/prueba";
 import { LevelCompare } from "@/components/level-compare";
 import { PlatformIcon, CheckIcon, BoltIcon, ShieldIcon } from "@/components/icons";
 import {
@@ -236,6 +237,15 @@ export default async function ProductPage({ params }: Params) {
                 transferencia={transferenciaDisponible()}
                 platform={product.platform}
               />
+              {product.service_type === "seguidores" && pruebaDisponible(product.platform) ? (
+                <Link
+                  href={`/prueba-gratis?red=${product.platform}`}
+                  className="mt-3 flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/4 px-4 py-3 text-sm font-semibold text-ink-200 transition-colors hover:border-lime-400/50 hover:text-white"
+                >
+                  <span className="rounded bg-lime-400 px-1.5 py-0.5 text-[11px] font-bold uppercase text-ink-950">Gratis</span>
+                  ¿No estás seguro? Prueba con {cantidadDePrueba()} seguidores
+                </Link>
+              ) : null}
             </div>
 
             {/* -------------------------------------------------- Contenido largo */}

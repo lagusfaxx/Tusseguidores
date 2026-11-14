@@ -93,6 +93,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
   // cerca está de pedir otro. Se le deja a un toque, con sus datos ya puestos,
   // junto a lo demás que hay para la misma red. Solo en pedidos de la tienda:
   // el mayorista repite desde su panel.
+  const prueba = order.payment_provider === "prueba";
   const entregado = order.payment_status === "paid" && order.status === "completed";
   const deLaTienda = order.reseller_user_id == null;
   const recompra = deLaTienda ? rutaRecompra(order) : null;
@@ -254,7 +255,7 @@ export default async function OrderPage({ params, searchParams }: Params) {
                   <div className="min-w-0 flex-1">
                     <h2 className="font-bold leading-snug">{order.product_name}</h2>
                     <p className="mt-1 text-sm text-ink-400">
-                      {formatNumber(order.quantity)} unidades · {formatClp(order.amount_clp)}
+                      {formatNumber(order.quantity)} unidades · {prueba ? "gratis" : formatClp(order.amount_clp)}
                     </p>
                   </div>
                 </div>
@@ -324,6 +325,18 @@ export default async function OrderPage({ params, searchParams }: Params) {
                   </Link>
                 ) : null}
               </section>
+
+              {prueba && order.status !== "canceled" ? (
+                <section className="card flex flex-wrap items-center justify-between gap-4 border-lime-400/40 p-5 sm:p-6">
+                  <div className="min-w-0">
+                    <h2 className="font-bold">
+                      {entregado ? "¿Llegaron? Ahora el pack completo" : "Mientras llegan, mira los packs"}
+                    </h2>
+                    <p className="mt-1 text-sm text-ink-400">Mismo sistema, la cantidad que quieras.</p>
+                  </div>
+                  <Link href="/catalogo" className="btn btn-primary shrink-0 text-sm">Ver precios</Link>
+                </section>
+              ) : null}
 
               {/* ------------------------------------------------- recompra */}
               {entregado && (recompra || paraSumar.length) ? (

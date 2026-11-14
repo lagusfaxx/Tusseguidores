@@ -392,3 +392,19 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_exp ON admin_sessions(expires_at);
+
+-- Cuentas que ya recibieron la prueba gratis. Una fila por cuenta, para
+-- siempre: `target_key` es la red más el perfil normalizado, y el índice único
+-- es lo que impide enviarle dos veces a la misma.
+CREATE TABLE IF NOT EXISTS trial_claims (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  target_key TEXT    NOT NULL UNIQUE,
+  platform   TEXT    NOT NULL,
+  link       TEXT    NOT NULL,
+  email      TEXT    NOT NULL,
+  ip         TEXT,
+  order_id   INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  created_at TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_trial_created ON trial_claims(created_at);
+CREATE INDEX IF NOT EXISTS idx_trial_ip      ON trial_claims(ip, created_at);

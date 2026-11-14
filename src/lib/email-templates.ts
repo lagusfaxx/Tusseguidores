@@ -227,6 +227,25 @@ export function correoPedidoCompletado(order: Order, parcial = false): EmailCont
     ? formatNumber(Math.max(0, order.quantity - order.remains))
     : formatNumber(order.quantity);
 
+  // La prueba gratis: el correo de entrega es el momento de ofrecer el pack.
+  if (order.payment_provider === "prueba" && !parcial) {
+    const tienda = absoluteUrl("/catalogo");
+    return {
+      subject: "Tu prueba gratis ya llegó",
+      html: layout({
+        titulo: "Tu prueba gratis ya llegó",
+        intro: `Los ${escape(formatNumber(order.quantity))} seguidores ya están en tu cuenta. Así funciona con cualquier pack.`,
+        filas: [["Código", order.code], ["Destino", order.link]],
+        cta: { texto: "Ver packs y precios", url: tienda },
+      }),
+      text: texto([
+        `Tu prueba gratis ya llegó: ${formatNumber(order.quantity)} seguidores en ${order.link}.`,
+        "",
+        `Packs y precios: ${tienda}`,
+      ]),
+    };
+  }
+
   // Recompra a un toque, solo cuando salió todo bien: a quien le llegó la
   // mitad no se le ofrece comprar más.
   const ruta = parcial ? null : rutaRecompra(order);

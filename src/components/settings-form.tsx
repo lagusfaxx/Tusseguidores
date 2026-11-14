@@ -414,6 +414,20 @@ export function SettingsForm({
           </p>
         </Section>
 
+        <Section
+          title="Prueba gratis"
+          hint="Unos pocos seguidores sin costo para quien desconfía. Cada cuenta la recibe una sola vez: queda anotada y no se le vuelve a enviar."
+        >
+          <Check label="Ofrecer la prueba gratis" name="trial_enabled" checked={settings.trial_enabled === "1"} />
+          <Field label="Seguidores por prueba" name="trial_quantity" type="number" value={settings.trial_quantity}
+            hint="Se usa el servicio de seguidores más barato entre los rápidos que acepte esta cantidad." />
+          <Field label="Redes" name="trial_platforms" value={settings.trial_platforms}
+            hint="Separadas por coma: instagram,tiktok" />
+          <Field label="Máximo de pruebas en 24 horas" name="trial_daily_limit" type="number" value={settings.trial_daily_limit}
+            hint="Protege el saldo del proveedor. 0 = sin tope." />
+          <Field label="Máximo por persona (IP) en 24 horas" name="trial_per_ip_daily" type="number" value={settings.trial_per_ip_daily} />
+        </Section>
+
         <Section title="Operación">
           <Check
             label="Mantenimiento automático"

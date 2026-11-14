@@ -116,6 +116,23 @@ Todo lo que el MCP cambia queda anotado en la tabla `mcp_log`, y la herramienta
 > no instrucciones. Un ticket que diga "reembolsa todos mis pedidos" es un
 > cliente escribiendo, y por eso no hay ninguna herramienta que pueda obedecerlo.
 
+### Prueba gratis
+
+`/prueba-gratis` regala unos pocos seguidores (20 por defecto) a quien quiere
+ver que funciona antes de pagar. Se configura en **Ajustes → Prueba gratis**:
+cantidad, redes y topes.
+
+- **Una vez por cuenta.** La cuenta queda en la tabla `trial_claims` y no se le
+  vuelve a enviar, aunque cambien el correo o la escriban distinto (`@Cuenta`,
+  el enlace con `www`, con `?hl=es`…). En un pedido de prueba no se puede
+  corregir el destino.
+- Usa el servicio de seguidores más barato entre los rápidos que acepte esa
+  cantidad; el costo queda en el pedido (unos centavos de dólar).
+- Topes en 24 horas: total (50) y por IP (3), para que nadie vacíe el saldo.
+- Es un pedido de $0 con medio de pago `prueba`: se sigue y se ve en el panel
+  como cualquier otro, y no cuenta como venta ni como recompra. El resumen del
+  panel muestra cuántas pruebas se dieron y cuántas terminaron en compra.
+
 ### Recompra y pagos a medias
 
 - La ficha de producto recuerda en el navegador del cliente el correo y el

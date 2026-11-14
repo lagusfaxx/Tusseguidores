@@ -50,8 +50,10 @@ export function pasosDelPedido(order: Order): Paso[] {
     },
     {
       id: "pago",
-      titulo: pagado ? "Pago confirmado" : "Esperando el pago",
-      detalle: pagado
+      titulo: order.payment_provider === "prueba" ? "Prueba gratis" : pagado ? "Pago confirmado" : "Esperando el pago",
+      detalle: order.payment_provider === "prueba"
+        ? "Sin costo."
+        : pagado
         ? "Listo, el pedido pasa a entrega."
         : order.payment_provider === "transferencia"
           ? "Transfiere y avísanos para confirmarlo."
@@ -173,6 +175,9 @@ export function avanceDelPedido(order: Order): Avance | null {
  */
 export function puedeCorregirDestino(order: Order): boolean {
   return (
+    // En la prueba gratis el destino no se cambia: es una por cuenta, y
+    // cambiarlo sería enviarla a otra.
+    order.payment_provider !== "prueba" &&
     !order.provider_order_id &&
     !order.manual_dispatch_at &&
     !["completed", "partial", "canceled", "refunded"].includes(order.status)

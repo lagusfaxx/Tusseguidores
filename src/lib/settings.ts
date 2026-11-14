@@ -82,6 +82,15 @@ export const DEFAULT_SETTINGS: SettingsMap = {
   reseller_min_order_clp: "200",
   reseller_welcome: "",
 
+  // Prueba gratis: unos pocos seguidores, una vez por cuenta. Ver lib/prueba.ts.
+  trial_enabled: "1",
+  trial_quantity: "20",
+  // Redes donde se ofrece, separadas por coma.
+  trial_platforms: "instagram,tiktok",
+  // Topes de pruebas en 24 horas: en total (0 = sin tope) y por IP.
+  trial_daily_limit: "50",
+  trial_per_ip_daily: "3",
+
   // Asistente de tickets (OpenAI). Contesta solo y avisa al dueño cuando el
   // cliente insiste o el caso necesita una persona. Ver lib/ia-tickets.ts.
   ia_tickets_enabled: "0",
